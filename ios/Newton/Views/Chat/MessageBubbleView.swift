@@ -3,7 +3,6 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Clean studio-grade typography layout matching Claude iOS & Newton Web.
 //
 
 import SwiftUI
@@ -17,54 +16,45 @@ public struct MessageBubbleView: View {
     @State private var copied: Bool = false
     @State private var previewImageString: String? = nil
     
-    public init(message: Message, onRetry: (() -> Void)? = nil, onEdit: ((Message) -> Void)? = nil) {
-        self.message = message
-        self.onRetry = onRetry
-        self.onEdit = onEdit
-    }
-    
     public var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        HStack {
             if message.role == .user {
-                // User Message Pill (Aligned to trailing with image attachment support)
-                HStack {
-                    Spacer(minLength: 48)
-                    
-                    VStack(alignment: .trailing, spacing: 6) {
-                        // User attached image preview (tap to open full screen)
-                        if let imgStr = message.imageUrl {
-                            Button {
-                                Haptics.light()
-                                previewImageString = imgStr
-                            } label: {
-                                UserAttachedImageView(imageString: imgStr)
-                            }
-                        }
-                        
-                        if !message.content.isEmpty {
-                            Text(message.content)
-                                .font(.system(size: 15.5, weight: .regular))
-                                .foregroundColor(Color.black.opacity(0.9))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(NewtonTheme.userBubble)
-                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                Spacer(minLength: 40)
+                
+                // User Message Bubble (Sand pill with context menu)
+                VStack(alignment: .trailing, spacing: 6) {
+                    if let imgStr = message.imageUrl {
+                        Button {
+                            Haptics.light()
+                            previewImageString = imgStr
+                        } label: {
+                            UserAttachedImageView(imageString: imgStr)
                         }
                     }
-                    .contextMenu {
+                    
+                    if !message.content.isEmpty {
+                        Text(message.content)
+                            .font(.system(size: 15))
+                            .foregroundColor(Color(red: 0.15, green: 0.18, blue: 0.20))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(NewtonTheme.userBubble)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+                .contextMenu {
+                    Button {
+                        UIPasteboard.general.string = message.content
+                        Haptics.light()
+                    } label: {
+                        Label("Copy Message", systemImage: "doc.on.doc")
+                    }
+                    if let onEdit = onEdit {
                         Button {
-                            UIPasteboard.general.string = message.content
                             Haptics.light()
+                            onEdit(message)
                         } label: {
-                            Label("Copy", systemImage: "doc.on.doc")
-                        }
-                        if let onEdit = onEdit {
-                            Button {
-                                Haptics.light()
-                                onEdit(message)
-                            } label: {
-                                Label("Edit Message", systemImage: "pencil")
-                            }
+                            Label("Edit Message", systemImage: "pencil")
                         }
                     }
                 }
@@ -138,109 +128,122 @@ public struct MessageBubbleView: View {
                         .padding(.top, 4)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+                
+                Spacer(minLength: 24)
             }
         }
-        .fullScreenCover(isPresented: Binding(
-            get: { previewImageString != nil },
-            set: { if !$0 { previewImageString = nil } }
-        )) {
-            if let imgStr = previewImageString {
-                FullScreenImageViewer(imageString: imgStr)
+        .fullScreenCover(item: Binding(
+            get: { previewImageString.map { IdentifiableString(value: $0) } },
+            set: { previewImageString = $0?.value }
+        )) { item in
+            FullScreenImageViewer(imageString: item.value) {
+                previewImageString = nil
             }
         }
     }
 }
 
+public struct IdentifiableString: Identifiable {
+    public let id = UUID()
+    public let value: String
+}
+
 public struct FullScreenImageViewer: View {
     public let imageString: String
-    @Environment(\.dismiss) private var dismiss
+    public let onDismiss: () -> Void
     
     @State private var scale: CGFloat = 1.0
-    @State private var savedToast: Bool = false
-    @State private var copiedToast: Bool = false
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
     @State private var loadedUIImage: UIImage? = nil
+    @State private var savedToast: Bool = false
     
     public var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            // Zoomable Image
-            ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                Group {
-                    if let uiImg = loadedUIImage {
-                        Image(uiImage: uiImg)
-                            .resizable()
-                            .scaledToFit()
-                    } else if imageString.hasPrefix("data:image/"),
-                              let commaIndex = imageString.firstIndex(of: ","),
-                              let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
-                              let uiImg = UIImage(data: data) {
-                        Image(uiImage: uiImg)
-                            .resizable()
-                            .scaledToFit()
-                            .onAppear { loadedUIImage = uiImg }
-                    } else if let url = URL(string: imageString) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                                    .tint(.white)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                            case .failure:
-                                Text("Failed to load image")
-                                    .foregroundColor(.white)
-                            @unknown default:
-                                EmptyView()
+            // Image with pinch-to-zoom and pan gestures
+            if let uiImg = loadedUIImage {
+                Image(uiImage: uiImg)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { val in
+                                let delta = val / lastScale
+                                lastScale = val
+                                scale = min(max(scale * delta, 1.0), 5.0)
                             }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .onEnded { _ in
+                                lastScale = 1.0
+                                if scale < 1.0 { withAnimation { scale = 1.0; offset = .zero } }
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture()
+                            .onChanged { val in
+                                if scale > 1.0 {
+                                    offset = CGSize(
+                                        width: lastOffset.width + val.translation.width,
+                                        height: lastOffset.height + val.translation.height
+                                    )
+                                }
+                            }
+                            .onEnded { _ in
+                                lastOffset = offset
+                            }
+                    )
+            } else {
+                ProgressView()
+                    .tint(.white)
             }
             
-            // Top Toolbar (Close, Copy, Save, Share)
+            // Top Controls Bar
             VStack {
-                HStack(spacing: 20) {
-                    Button(action: {
-                        dismiss()
-                    }) {
+                HStack {
+                    Button(action: onDismiss) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 26))
-                            .foregroundColor(.white.opacity(0.85))
+                            .font(.system(size: 28))
+                            .foregroundColor(.white.opacity(0.8))
                     }
                     
                     Spacer()
                     
-                    // Copy button
-                    Button(action: copyImage) {
-                        Image(systemName: copiedToast ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white)
-                    }
-                    
-                    // Save to Camera Roll
-                    Button(action: saveToCameraRoll) {
-                        Image(systemName: savedToast ? "checkmark.circle.fill" : "arrow.down.to.line.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                    }
-                    
-                    // Share
-                    if let url = URL(string: imageString) {
-                        ShareLink(item: url) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white)
+                    if let img = loadedUIImage {
+                        // Copy image
+                        Button(action: {
+                            UIPasteboard.general.image = img
+                            Haptics.success()
+                        }) {
+                            Image(systemName: "doc.on.doc.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(.trailing, 8)
+                        
+                        // Save image to Camera Roll
+                        Button(action: saveToCameraRoll) {
+                            Image(systemName: "square.and.arrow.down.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(.trailing, 8)
+                        
+                        // Share Sheet
+                        ShareLink(item: Image(uiImage: img), preview: SharePreview("Newton Image", image: Image(uiImage: img))) {
+                            Image(systemName: "square.and.arrow.up.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white.opacity(0.8))
                         }
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 16)
+                .padding(.top, 50)
                 
                 Spacer()
                 
@@ -252,51 +255,29 @@ public struct FullScreenImageViewer: View {
                         .padding(.vertical, 8)
                         .background(Color.black.opacity(0.75))
                         .clipShape(Capsule())
-                        .padding(.bottom, 24)
-                }
-                
-                if copiedToast {
-                    Text("Image Copied")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.75))
-                        .clipShape(Capsule())
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 40)
                 }
             }
         }
-        .onAppear {
-            loadImageForActions()
+        .task {
+            loadImageData()
         }
     }
     
-    private func loadImageForActions() {
+    private func loadImageData() {
         if imageString.hasPrefix("data:image/"),
            let commaIndex = imageString.firstIndex(of: ","),
            let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
-           let uiImg = UIImage(data: data) {
-            loadedUIImage = uiImg
+           let img = UIImage(data: data) {
+            self.loadedUIImage = img
         } else if let url = URL(string: imageString) {
             Task {
                 if let (data, _) = try? await URLSession.shared.data(from: url),
-                   let uiImg = UIImage(data: data) {
+                   let img = UIImage(data: data) {
                     await MainActor.run {
-                        loadedUIImage = uiImg
+                        self.loadedUIImage = img
                     }
                 }
-            }
-        }
-    }
-    
-    private func copyImage() {
-        if let uiImg = loadedUIImage {
-            UIPasteboard.general.image = uiImg
-            Haptics.light()
-            withAnimation { copiedToast = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation { copiedToast = false }
             }
         }
     }
@@ -315,43 +296,51 @@ public struct FullScreenImageViewer: View {
 
 public struct UserAttachedImageView: View {
     public let imageString: String
+    @State private var uiImage: UIImage? = nil
     
     public var body: some View {
-        if imageString.hasPrefix("data:image/"),
-           let commaIndex = imageString.firstIndex(of: ","),
-           let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
-           let uiImg = UIImage(data: data) {
-            Image(uiImage: uiImg)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: 220, maxHeight: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(NewtonTheme.border, lineWidth: 0.8)
-                )
-        } else if let url = URL(string: imageString) {
-            AsyncImage(url: url) { img in
-                img.resizable().scaledToFill()
-            } placeholder: {
+        Group {
+            if let image = uiImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: 220, maxHeight: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
+                    )
+            } else {
                 ProgressView()
+                    .frame(width: 120, height: 120)
             }
-            .frame(maxWidth: 220, maxHeight: 180)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .task(id: imageString) {
+            if imageString.hasPrefix("data:image/"),
+               let commaIndex = imageString.firstIndex(of: ","),
+               let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
+               let img = UIImage(data: data) {
+                self.uiImage = img
+            } else if let url = URL(string: imageString) {
+                if let (data, _) = try? await URLSession.shared.data(from: url),
+                   let img = UIImage(data: data) {
+                    await MainActor.run { self.uiImage = img }
+                }
+            }
         }
     }
 }
 
 public struct GeneratedImageCardView: View {
     public let urlStr: String
+    @State private var uiImage: UIImage? = nil
+    @State private var isLoading: Bool = true
+    @State private var loadFailed: Bool = false
     
     public var body: some View {
         Group {
-            if urlStr.hasPrefix("data:image/"),
-               let commaIndex = urlStr.firstIndex(of: ","),
-               let data = Data(base64Encoded: String(urlStr[urlStr.index(after: commaIndex)...])),
-               let uiImg = UIImage(data: data) {
-                Image(uiImage: uiImg)
+            if let image = uiImage {
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -359,110 +348,150 @@ public struct GeneratedImageCardView: View {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(NewtonTheme.border, lineWidth: 0.8)
                     )
-            } else if let url = URL(string: urlStr) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        HStack(spacing: 8) {
-                            ProgressView()
-                            Text("Rendering high-res image...")
-                                .font(.system(size: 13, design: .serif))
-                                .foregroundColor(NewtonTheme.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 220)
-                        .background(NewtonTheme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(NewtonTheme.border, lineWidth: 0.8)
-                            )
-                        
-                    case .failure:
-                        VStack(spacing: 6) {
-                            Image(systemName: "photo.badge.exclamationmark")
-                                .font(.system(size: 24))
-                                .foregroundColor(NewtonTheme.coralRed)
-                            Text("Unable to load generated image")
-                                .font(.system(size: 12))
-                                .foregroundColor(NewtonTheme.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 180)
-                        .background(NewtonTheme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        
-                    @unknown default:
-                        EmptyView()
-                    }
+            } else if isLoading {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Rendering high-res image...")
+                        .font(.system(size: 13, design: .serif))
+                        .foregroundColor(NewtonTheme.textSecondary)
                 }
+                .frame(maxWidth: .infinity, minHeight: 220)
+                .background(NewtonTheme.card)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: 24))
+                        .foregroundColor(NewtonTheme.coralRed)
+                    Text("Unable to load generated image")
+                        .font(.system(size: 12))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                    Button("Retry") {
+                        loadImage()
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(NewtonTheme.sand)
+                }
+                .frame(maxWidth: .infinity, minHeight: 180)
+                .background(NewtonTheme.card)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
         }
         .padding(.vertical, 4)
+        .task(id: urlStr) {
+            loadImage()
+        }
+    }
+    
+    private func loadImage() {
+        isLoading = true
+        loadFailed = false
+        
+        // 1. Base64 handling
+        if urlStr.hasPrefix("data:image/"),
+           let commaIndex = urlStr.firstIndex(of: ",") {
+            let base64 = String(urlStr[urlStr.index(after: commaIndex)...])
+            if let data = Data(base64Encoded: base64), let img = UIImage(data: data) {
+                self.uiImage = img
+                self.isLoading = false
+                return
+            }
+        }
+        
+        // 2. Remote URL handling with URLSession
+        guard let url = URL(string: urlStr) else {
+            isLoading = false
+            loadFailed = true
+            return
+        }
+        
+        Task {
+            do {
+                var request = URLRequest(url: url)
+                request.timeoutInterval = 30
+                let (data, response) = try await URLSession.shared.data(for: request)
+                if let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
+                   let img = UIImage(data: data) {
+                    await MainActor.run {
+                        self.uiImage = img
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.loadFailed = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.loadFailed = true
+                }
+            }
+        }
     }
 }
 
 public struct FormattedAssistantContent: View {
     public let content: String
     
-    public init(content: String) {
-        self.content = content
-    }
-    
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            let blocks = parseContent(content)
-            ForEach(0..<blocks.count, id: \.self) { idx in
-                let block = blocks[idx]
-                if block.isCode {
-                    CodeBlockView(code: block.text, language: block.language)
-                } else {
-                    // Serif typography for AI responses matching Newton & Claude
-                    Text(LocalizedStringKey(block.text))
-                        .font(.system(size: 16.5, weight: .regular, design: .serif))
-                        .lineSpacing(5.0)
+            let blocks = parseContentBlocks(content)
+            ForEach(blocks.indices, id: \.self) { index in
+                switch blocks[index] {
+                case .text(let text):
+                    Text(LocalizedStringKey(text))
+                        .font(.system(size: 15, design: .serif))
                         .foregroundColor(NewtonTheme.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineSpacing(4)
+                        
+                case .code(let lang, let code):
+                    CodeBlockView(language: lang, code: code)
                 }
             }
         }
     }
     
-    private struct ContentBlock {
-        let text: String
-        let isCode: Bool
-        let language: String
-    }
-    
-    private func parseContent(_ raw: String) -> [ContentBlock] {
+    private func parseContentBlocks(_ raw: String) -> [ContentBlock] {
         var blocks: [ContentBlock] = []
-        let parts = raw.components(separatedBy: "```")
+        let pattern = "```([a-zA-Z0-9_-]*)\\n([\\s\\S]*?)```"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return [.text(raw)]
+        }
         
-        for (i, part) in parts.enumerated() {
-            if i % 2 == 1 {
-                // Code block
-                var lang = ""
-                var codeText = part
-                if let firstLineEnd = part.firstIndex(of: "\n") {
-                    lang = String(part[..<firstLineEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    codeText = String(part[part.index(after: firstLineEnd)...])
+        let nsString = raw as NSString
+        let matches = regex.matches(in: raw, range: NSRange(location: 0, length: nsString.length))
+        
+        var currentIndex = 0
+        for match in matches {
+            let matchRange = match.range
+            if matchRange.location > currentIndex {
+                let textPart = nsString.substring(with: NSRange(location: currentIndex, length: matchRange.location - currentIndex))
+                if !textPart.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    blocks.append(.text(textPart))
                 }
-                blocks.append(ContentBlock(text: codeText.trimmingCharacters(in: .whitespacesAndNewlines), isCode: true, language: lang))
-            } else {
-                let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    blocks.append(ContentBlock(text: trimmed, isCode: false, language: ""))
-                }
+            }
+            
+            let lang = match.numberOfRanges > 1 && match.range(at: 1).location != NSNotFound ? nsString.substring(with: match.range(at: 1)) : ""
+            let code = match.numberOfRanges > 2 && match.range(at: 2).location != NSNotFound ? nsString.substring(with: match.range(at: 2)) : ""
+            blocks.append(.code(language: lang, code: code))
+            
+            currentIndex = matchRange.location + matchRange.length
+        }
+        
+        if currentIndex < nsString.length {
+            let remainder = nsString.substring(from: currentIndex)
+            if !remainder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                blocks.append(.text(remainder))
             }
         }
         
-        if blocks.isEmpty {
-            blocks.append(ContentBlock(text: raw, isCode: false, language: ""))
-        }
-        return blocks
+        return blocks.isEmpty ? [.text(raw)] : blocks
     }
+}
+
+public enum ContentBlock {
+    case text(String)
+    case code(language: String, code: String)
 }

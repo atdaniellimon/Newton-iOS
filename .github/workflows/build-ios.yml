@@ -42,12 +42,12 @@ jobs:
           cp -r "build/Release-iphoneos/Newton.app" build/Payload/
           cd build
           zip -r -y "Newton.ipa" Payload
-          cp "Newton.ipa" "Newton_v2.1.ipa"
-          ls -lh Newton.ipa Newton_v2.1.ipa
+          cp "Newton.ipa" "Newton_v2.2.ipa"
+          ls -lh Newton.ipa Newton_v2.2.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Newton-iOS-v2.1-IPA
+          name: Newton-iOS-v2.2-IPA
           path: build/Newton.ipa
           retention-days: 14
