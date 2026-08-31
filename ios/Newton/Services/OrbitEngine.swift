@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 
 public final class OrbitEngine {
     public static let shared = OrbitEngine()
@@ -54,9 +55,51 @@ public final class OrbitEngine {
         return (outputText, results, detectedImageUrl)
     }
     
-    /// Generate an image from a prompt using Flux / Pollinations AI
-    public func generateImage(prompt: String) -> String {
+    /// Generate an image from a prompt calling /v1/images/generations endpoint or falling back to Flux
+    public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Try calling the provider's /v1/images/generations if baseUrl is provided
+        if !baseUrl.isEmpty {
+            let cleanBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
+            
+            if let endpointUrl = URL(string: endpointStr) {
+                var request = URLRequest(url: endpointUrl)
+                request.httpMethod = "POST"
+                request.timeoutInterval = 30
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                if !apiKey.isEmpty {
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                }
+                
+                let payload: [String: Any] = [
+                    "prompt": cleanPrompt,
+                    "n": 1,
+                    "size": "1024x1024"
+                ]
+                
+                if let bodyData = try? JSONSerialization.data(withJSONObject: payload) {
+                    request.httpBody = bodyData
+                    if let (data, response) = try? await URLSession.shared.data(for: request),
+                       let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) {
+                        
+                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let dataArr = json["data"] as? [[String: Any]],
+                           let first = dataArr.first {
+                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
+                                return imgUrl
+                            }
+                            if let b64 = first["b64_json"] as? String, !b64.isEmpty {
+                                return "data:image/png;base64,\(b64)"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 2. High-Quality Flux / Pollinations AI Fallback
         guard let encoded = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return ""
         }
@@ -75,7 +118,7 @@ public final class OrbitEngine {
         switch trimmedName {
         case "image_gen", "imagine", "draw":
             let prompt = params["prompt"] as? String ?? paramsJson
-            let url = generateImage(prompt: prompt)
+            let url = await generateImage(prompt: prompt)
             return OrbitExecutionResult(orbitName: "image_gen", params: paramsJson, result: url, isSuccess: true)
             
         case "web_search", "search":

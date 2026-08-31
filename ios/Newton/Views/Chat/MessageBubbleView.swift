@@ -15,6 +15,7 @@ public struct MessageBubbleView: View {
     public var onEdit: ((Message) -> Void)? = nil
     
     @State private var copied: Bool = false
+    @State private var previewImageString: String? = nil
     
     public init(message: Message, onRetry: (() -> Void)? = nil, onEdit: ((Message) -> Void)? = nil) {
         self.message = message
@@ -30,9 +31,14 @@ public struct MessageBubbleView: View {
                     Spacer(minLength: 48)
                     
                     VStack(alignment: .trailing, spacing: 6) {
-                        // User attached image preview
+                        // User attached image preview (tap to open full screen)
                         if let imgStr = message.imageUrl {
-                            UserAttachedImageView(imageString: imgStr)
+                            Button {
+                                Haptics.light()
+                                previewImageString = imgStr
+                            } label: {
+                                UserAttachedImageView(imageString: imgStr)
+                            }
                         }
                         
                         if !message.content.isEmpty {
@@ -66,7 +72,7 @@ public struct MessageBubbleView: View {
                 .padding(.vertical, 4)
                 
             } else {
-                // Assistant Message (Clean serif typography on canvas, no heavy bounding box)
+                // Assistant Message (Clean serif typography on canvas)
                 VStack(alignment: .leading, spacing: 10) {
                     // Thinking Chain if present
                     if let thinking = message.thinkingContent, !thinking.isEmpty {
@@ -78,9 +84,14 @@ public struct MessageBubbleView: View {
                         OrbitCardView(result: orbit)
                     }
                     
-                    // Generated Image (if present)
-                    if let imgUrlStr = message.imageUrl, let url = URL(string: imgUrlStr) {
-                        GeneratedImageCardView(url: url)
+                    // Generated Image (tap to open full screen)
+                    if let imgUrlStr = message.imageUrl {
+                        Button {
+                            Haptics.light()
+                            previewImageString = imgUrlStr
+                        } label: {
+                            GeneratedImageCardView(urlStr: imgUrlStr)
+                        }
                     }
                     
                     // Main Text Content with elegant Serif typography
@@ -131,6 +142,174 @@ public struct MessageBubbleView: View {
                 .padding(.vertical, 6)
             }
         }
+        .fullScreenCover(isPresented: Binding(
+            get: { previewImageString != nil },
+            set: { if !$0 { previewImageString = nil } }
+        )) {
+            if let imgStr = previewImageString {
+                FullScreenImageViewer(imageString: imgStr)
+            }
+        }
+    }
+}
+
+public struct FullScreenImageViewer: View {
+    public let imageString: String
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var savedToast: Bool = false
+    @State private var copiedToast: Bool = false
+    @State private var loadedUIImage: UIImage? = nil
+    
+    public var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            // Zoomable Image
+            ScrollView([.horizontal, .vertical], showsIndicators: false) {
+                Group {
+                    if let uiImg = loadedUIImage {
+                        Image(uiImage: uiImg)
+                            .resizable()
+                            .scaledToFit()
+                    } else if imageString.hasPrefix("data:image/"),
+                              let commaIndex = imageString.firstIndex(of: ","),
+                              let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
+                              let uiImg = UIImage(data: data) {
+                        Image(uiImage: uiImg)
+                            .resizable()
+                            .scaledToFit()
+                            .onAppear { loadedUIImage = uiImg }
+                    } else if let url = URL(string: imageString) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .tint(.white)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                            case .failure:
+                                Text("Failed to load image")
+                                    .foregroundColor(.white)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            
+            // Top Toolbar (Close, Copy, Save, Share)
+            VStack {
+                HStack(spacing: 20) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 26))
+                            .foregroundColor(.white.opacity(0.85))
+                    }
+                    
+                    Spacer()
+                    
+                    // Copy button
+                    Button(action: copyImage) {
+                        Image(systemName: copiedToast ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Save to Camera Roll
+                    Button(action: saveToCameraRoll) {
+                        Image(systemName: savedToast ? "checkmark.circle.fill" : "arrow.down.to.line.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Share
+                    if let url = URL(string: imageString) {
+                        ShareLink(item: url) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                
+                Spacer()
+                
+                if savedToast {
+                    Text("Saved to Photos")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.75))
+                        .clipShape(Capsule())
+                        .padding(.bottom, 24)
+                }
+                
+                if copiedToast {
+                    Text("Image Copied")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.75))
+                        .clipShape(Capsule())
+                        .padding(.bottom, 24)
+                }
+            }
+        }
+        .onAppear {
+            loadImageForActions()
+        }
+    }
+    
+    private func loadImageForActions() {
+        if imageString.hasPrefix("data:image/"),
+           let commaIndex = imageString.firstIndex(of: ","),
+           let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
+           let uiImg = UIImage(data: data) {
+            loadedUIImage = uiImg
+        } else if let url = URL(string: imageString) {
+            Task {
+                if let (data, _) = try? await URLSession.shared.data(from: url),
+                   let uiImg = UIImage(data: data) {
+                    await MainActor.run {
+                        loadedUIImage = uiImg
+                    }
+                }
+            }
+        }
+    }
+    
+    private func copyImage() {
+        if let uiImg = loadedUIImage {
+            UIPasteboard.general.image = uiImg
+            Haptics.light()
+            withAnimation { copiedToast = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation { copiedToast = false }
+            }
+        }
+    }
+    
+    private func saveToCameraRoll() {
+        if let uiImg = loadedUIImage {
+            UIImageWriteToSavedPhotosAlbum(uiImg, nil, nil, nil)
+            Haptics.success()
+            withAnimation { savedToast = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation { savedToast = false }
+            }
+        }
     }
 }
 
@@ -164,24 +343,15 @@ public struct UserAttachedImageView: View {
 }
 
 public struct GeneratedImageCardView: View {
-    public let url: URL
+    public let urlStr: String
     
     public var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .empty:
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("Generating image...")
-                        .font(.system(size: 13, design: .serif))
-                        .foregroundColor(NewtonTheme.textSecondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 220)
-                .background(NewtonTheme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                
-            case .success(let image):
-                image
+        Group {
+            if urlStr.hasPrefix("data:image/"),
+               let commaIndex = urlStr.firstIndex(of: ","),
+               let data = Data(base64Encoded: String(urlStr[urlStr.index(after: commaIndex)...])),
+               let uiImg = UIImage(data: data) {
+                Image(uiImage: uiImg)
                     .resizable()
                     .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -189,27 +359,47 @@ public struct GeneratedImageCardView: View {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(NewtonTheme.border, lineWidth: 0.8)
                     )
-                    .contextMenu {
-                        ShareLink(item: url) {
-                            Label("Share Image", systemImage: "square.and.arrow.up")
+            } else if let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Rendering high-res image...")
+                                .font(.system(size: 13, design: .serif))
+                                .foregroundColor(NewtonTheme.textSecondary)
                         }
+                        .frame(maxWidth: .infinity, minHeight: 220)
+                        .background(NewtonTheme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(NewtonTheme.border, lineWidth: 0.8)
+                            )
+                        
+                    case .failure:
+                        VStack(spacing: 6) {
+                            Image(systemName: "photo.badge.exclamationmark")
+                                .font(.system(size: 24))
+                                .foregroundColor(NewtonTheme.coralRed)
+                            Text("Unable to load generated image")
+                                .font(.system(size: 12))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 180)
+                        .background(NewtonTheme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        
+                    @unknown default:
+                        EmptyView()
                     }
-                
-            case .failure:
-                VStack(spacing: 6) {
-                    Image(systemName: "photo.badge.exclamationmark")
-                        .font(.system(size: 24))
-                        .foregroundColor(NewtonTheme.coralRed)
-                    Text("Unable to load generated image")
-                        .font(.system(size: 12))
-                        .foregroundColor(NewtonTheme.textSecondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 180)
-                .background(NewtonTheme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                
-            @unknown default:
-                EmptyView()
             }
         }
         .padding(.vertical, 4)

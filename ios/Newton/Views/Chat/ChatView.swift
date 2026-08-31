@@ -135,7 +135,7 @@ public struct ChatView: View {
                     }
                 }
                 
-                // Ultra-Compact Studio Input Bar (Clean without model pill)
+                // Ultra-Compact Studio Input Bar
                 MessageInputBar(
                     text: $inputText,
                     attachedImage: $attachedImage,
@@ -208,8 +208,6 @@ public struct ChatView: View {
     }
     
     private func extractImagePrompt(from text: String) -> String? {
-        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
         let patterns = [
             "^/imagine\\s+(.+)$",
             "^(?:genera|generame|crea|creame|haz)\\s+(?:una\\s+)?(?:imagen|foto|dibujo|grafico)\\s+(?:de|sobre|para)?\\s*(.+)$",
@@ -271,15 +269,26 @@ public struct ChatView: View {
         
         // Check for direct Image Generation prompt match
         if let imagePrompt = extractImagePrompt(from: userPrompt) {
-            let imageUrl = OrbitEngine.shared.generateImage(prompt: imagePrompt)
-            let assistantMessage = Message(
-                role: .assistant,
-                content: "Here is your generated image for: *\(imagePrompt)*",
-                imageUrl: imageUrl
-            )
-            conversation.messages.append(assistantMessage)
+            let baseUrl = settings.effectiveBaseUrl(for: settings.currentProvider)
+            let apiKey = settings.getApiKey(for: settings.currentProvider)
+            
+            let assistantMessageId = UUID().uuidString
+            let placeholder = Message(id: assistantMessageId, role: .assistant, content: "Generating image: *\(imagePrompt)*...", isStreaming: true)
+            conversation.messages.append(placeholder)
             storage.updateConversation(conversation)
-            Haptics.success()
+            
+            Task {
+                let imageUrl = await OrbitEngine.shared.generateImage(prompt: imagePrompt, baseUrl: baseUrl, apiKey: apiKey)
+                await MainActor.run {
+                    if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                        conversation.messages[idx].content = "Here is your generated image for *\(imagePrompt)*:"
+                        conversation.messages[idx].imageUrl = imageUrl
+                        conversation.messages[idx].isStreaming = false
+                    }
+                    storage.updateConversation(conversation)
+                    Haptics.success()
+                }
+            }
             return
         }
         
