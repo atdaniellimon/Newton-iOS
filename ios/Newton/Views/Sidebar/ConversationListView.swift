@@ -3,7 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Matching Claude iOS sidebar layout with Chat Pinning and bottom Settings gear.
+//  Matching Claude iOS sidebar layout with Chat Pinning, Art Gallery and bottom Settings gear.
 //
 
 import SwiftUI
@@ -17,6 +17,7 @@ public struct ConversationListView: View {
     
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
+    @State private var showArtGallery: Bool = false
     
     public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
@@ -57,12 +58,20 @@ public struct ConversationListView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 16)
                 
-                // Studio Section Navigation Items (Chats, Projects, Code, Art gallery)
+                // Studio Section Navigation Items (Chats and Art gallery)
                 VStack(spacing: 4) {
                     SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
-                    SidebarItemRow(icon: "folder", title: "Projects", isSelected: false)
-                    SidebarItemRow(icon: "chevron.left.forwardslash.chevron.right", title: "Code", isSelected: false)
-                    SidebarItemRow(icon: "cube.transparent", title: "Art gallery", isSelected: false)
+                    
+                    // Future sections (temporarily commented out)
+                    // SidebarItemRow(icon: "folder", title: "Projects", isSelected: false)
+                    // SidebarItemRow(icon: "chevron.left.forwardslash.chevron.right", title: "Code", isSelected: false)
+                    
+                    Button {
+                        Haptics.light()
+                        showArtGallery = true
+                    } label: {
+                        SidebarItemRow(icon: "cube.transparent", title: "Art gallery", isSelected: false)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
@@ -185,6 +194,9 @@ public struct ConversationListView: View {
         .navigationBarHidden(true)
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showArtGallery) {
+            ArtGalleryView()
         }
     }
     
