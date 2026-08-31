@@ -18,13 +18,18 @@ public final class SettingsManager: ObservableObject {
     @AppStorage("temperature") public var temperature: Double = 0.7
     @AppStorage("maxTokens") public var maxTokens: Int = 4096
     @AppStorage("customSystemPrompt") public var customSystemPrompt: String = ""
-    @AppStorage("appTheme") public var appThemeRaw: String = "system"
+    @AppStorage("appTheme") public var appThemeRaw: String = AppThemeMode.system.rawValue
     
     private init() {}
     
     public var currentProvider: AIProvider {
         get { AIProvider(rawValue: currentProviderRaw) ?? .openrouter }
         set { currentProviderRaw = newValue.rawValue }
+    }
+    
+    public var appTheme: AppThemeMode {
+        get { AppThemeMode(rawValue: appThemeRaw) ?? .system }
+        set { appThemeRaw = newValue.rawValue }
     }
     
     public var currentApiKey: String {
