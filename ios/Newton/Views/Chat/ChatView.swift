@@ -10,6 +10,22 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private enum ActiveModalSheet: Identifiable {
+    case camera
+    case photoLibrary
+    case settings
+    case modelPicker
+    
+    var id: String {
+        switch self {
+        case .camera: return "camera"
+        case .photoLibrary: return "photoLibrary"
+        case .settings: return "settings"
+        case .modelPicker: return "modelPicker"
+        }
+    }
+}
+
 public struct ChatView: View {
     @Binding public var conversation: Conversation
     @ObservedObject var settings = SettingsManager.shared
@@ -23,20 +39,11 @@ public struct ChatView: View {
     @State private var isStreaming: Bool = false
     @State private var currentStreamTask: Task<Void, Never>? = nil
     @State private var errorMessage: String? = nil
-    @State private var showSettings: Bool = false
-    @State private var showModelPicker: Bool = false
-    @State private var showCameraPicker: Bool = false
+    @State private var activeSheet: ActiveModalSheet? = nil
     @State private var showFileImporter: Bool = false
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
-    }
-    
-    private var shortModelDisplayName: String {
-        if let last = settings.currentModelId.split(separator: "/").last {
-            return String(last)
-        }
-        return settings.currentModelId
     }
     
     public var body: some View {
@@ -128,18 +135,17 @@ public struct ChatView: View {
                     }
                 }
                 
-                // Ultra-Compact Studio Input Bar (Single row)
+                // Ultra-Compact Studio Input Bar
                 MessageInputBar(
                     text: $inputText,
                     attachedImage: $attachedImage,
                     attachedFileName: $attachedFileName,
                     isStreaming: isStreaming,
-                    modelName: shortModelDisplayName,
-                    onModelTap: {
-                        showModelPicker = true
-                    },
                     onTriggerCamera: {
-                        showCameraPicker = true
+                        activeSheet = .camera
+                    },
+                    onTriggerPhotos: {
+                        activeSheet = .photoLibrary
                     },
                     onTriggerFiles: {
                         showFileImporter = true
@@ -154,26 +160,20 @@ public struct ChatView: View {
         }
         .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showSettings = true
-                }) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 15))
-                        .foregroundColor(NewtonTheme.textSecondary)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .camera:
+                ImagePicker(sourceType: .camera) { img in
+                    attachedImage = img
                 }
-            }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
-        .sheet(isPresented: $showModelPicker) {
-            ModelPickerSheet(selectedModelId: $settings.currentModelId)
-        }
-        .sheet(isPresented: $showCameraPicker) {
-            ImagePicker(sourceType: .camera) { img in
-                attachedImage = img
+            case .photoLibrary:
+                ImagePicker(sourceType: .photoLibrary) { img in
+                    attachedImage = img
+                }
+            case .settings:
+                SettingsView()
+            case .modelPicker:
+                ModelPickerSheet(selectedModelId: $settings.currentModelId)
             }
         }
         .fileImporter(
@@ -201,7 +201,6 @@ public struct ChatView: View {
                let uiImg = UIImage(data: data) {
                 attachedImage = uiImg
             }
-            // Remove downstream messages from that point onward
             conversation.messages = Array(conversation.messages.prefix(upTo: idx))
             storage.updateConversation(conversation)
             Haptics.light()
@@ -218,6 +217,7 @@ public struct ChatView: View {
         }
         guard !userPrompt.isEmpty || attachedImage != nil else { return }
         
+        let isFirstMessage = conversation.messages.isEmpty
         inputText = ""
         
         // Prepare image base64 if attached
@@ -240,9 +240,8 @@ public struct ChatView: View {
         userMessage.imageUrl = imgBase64DataUrl
         conversation.messages.append(userMessage)
         
-        if conversation.title == "New Conversation" || conversation.title == "Welcome to Newton" {
-            let words = userPrompt.split(separator: " ").prefix(5).joined(separator: " ")
-            conversation.title = String(words)
+        if isFirstMessage {
+            conversation.title = String(userPrompt.split(separator: " ").prefix(4).joined(separator: " "))
         }
         
         // Check if user is asking for image generation directly
@@ -287,7 +286,6 @@ public struct ChatView: View {
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
             let systemPrompt = settings.defaultSystemPrompt()
-            let convoTitle = conversation.title
             
             do {
                 let stream = LLMService.shared.streamCompletion(
@@ -340,9 +338,16 @@ public struct ChatView: View {
                     Haptics.success()
                 }
                 
+                // Trigger background AI title generation if first message
+                if isFirstMessage && !userPrompt.isEmpty {
+                    Task {
+                        await generateAITitle(forPrompt: userPrompt, response: finalContent)
+                    }
+                }
+                
                 // Notify user if response finished while app was backgrounded
                 if UIApplication.shared.applicationState != .active {
-                    NotificationManager.shared.sendResponseReadyNotification(title: convoTitle, body: finalContent)
+                    NotificationManager.shared.sendResponseReadyNotification(title: conversation.title, body: finalContent)
                 }
                 
             } catch {
@@ -362,6 +367,49 @@ public struct ChatView: View {
             await MainActor.run {
                 isStreaming = false
             }
+        }
+    }
+    
+    private func generateAITitle(forPrompt prompt: String, response: String) async {
+        let titlePrompt = [
+            Message(role: .user, content: "Create a concise, descriptive 2-4 word title in the language of this query: \"\(prompt)\". Output ONLY the title, no quotes or punctuation.")
+        ]
+        
+        let provider = settings.currentProvider
+        let modelId = settings.currentModelId
+        let baseUrl = settings.effectiveBaseUrl(for: provider)
+        let apiKey = settings.getApiKey(for: provider)
+        
+        do {
+            let stream = LLMService.shared.streamCompletion(
+                messages: titlePrompt,
+                provider: provider,
+                modelId: modelId,
+                baseUrl: baseUrl,
+                apiKey: apiKey,
+                temperature: 0.3,
+                maxTokens: 15,
+                systemPrompt: "You are a concise title generator. Reply ONLY with a 2-4 word title."
+            )
+            
+            var generatedTitle = ""
+            for try await token in stream {
+                generatedTitle += token
+            }
+            
+            let cleanTitle = generatedTitle
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\"", with: "")
+                .replacingOccurrences(of: "\n", with: " ")
+            
+            if !cleanTitle.isEmpty {
+                await MainActor.run {
+                    conversation.title = cleanTitle
+                    storage.updateConversation(conversation)
+                }
+            }
+        } catch {
+            // Keep default initial words on fallback
         }
     }
     

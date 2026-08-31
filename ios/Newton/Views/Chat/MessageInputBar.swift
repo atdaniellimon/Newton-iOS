@@ -3,12 +3,11 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Ultra-compact single-row studio input bar with auto-expanding vertical growth.
+//  Ultra-clean, sleek studio input bar.
 //
 
 import SwiftUI
 import UIKit
-import PhotosUI
 
 public struct MessageInputBar: View {
     @Binding public var text: String
@@ -16,15 +15,13 @@ public struct MessageInputBar: View {
     @Binding public var attachedFileName: String?
     
     public let isStreaming: Bool
-    public let modelName: String
-    public let onModelTap: () -> Void
     public let onTriggerCamera: () -> Void
+    public let onTriggerPhotos: () -> Void
     public let onTriggerFiles: () -> Void
     public let onTriggerWebSearch: () -> Void
     public let onSend: () -> Void
     public let onStop: () -> Void
     
-    @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @FocusState private var isFocused: Bool
     
     public init(
@@ -32,9 +29,8 @@ public struct MessageInputBar: View {
         attachedImage: Binding<UIImage?>,
         attachedFileName: Binding<String?>,
         isStreaming: Bool,
-        modelName: String,
-        onModelTap: @escaping () -> Void,
         onTriggerCamera: @escaping () -> Void,
+        onTriggerPhotos: @escaping () -> Void,
         onTriggerFiles: @escaping () -> Void,
         onTriggerWebSearch: @escaping () -> Void,
         onSend: @escaping () -> Void,
@@ -44,9 +40,8 @@ public struct MessageInputBar: View {
         self._attachedImage = attachedImage
         self._attachedFileName = attachedFileName
         self.isStreaming = isStreaming
-        self.modelName = modelName
-        self.onModelTap = onModelTap
         self.onTriggerCamera = onTriggerCamera
+        self.onTriggerPhotos = onTriggerPhotos
         self.onTriggerFiles = onTriggerFiles
         self.onTriggerWebSearch = onTriggerWebSearch
         self.onSend = onSend
@@ -66,7 +61,7 @@ public struct MessageInputBar: View {
                                 .frame(width: 32, height: 32)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                             
-                            Text("Image ready")
+                            Text("Image attached")
                                 .font(.system(size: 11.5, weight: .medium))
                                 .foregroundColor(NewtonTheme.textPrimary)
                             
@@ -117,8 +112,8 @@ public struct MessageInputBar: View {
             }
             
             // Ultra-Compact Single Row Input Bar (Height ~42px)
-            HStack(alignment: .center, spacing: 6) {
-                // Plus Menu with native PhotosPicker & Camera
+            HStack(alignment: .center, spacing: 8) {
+                // Plus Menu with Camera, Photos, Files, Web Search
                 Menu {
                     Button(action: onTriggerWebSearch) {
                         Label("Web Search", systemImage: "globe")
@@ -128,12 +123,7 @@ public struct MessageInputBar: View {
                         Label("Camera", systemImage: "camera")
                     }
                     
-                    // Native PhotosPicker entry
-                    PhotosPicker(
-                        selection: $selectedPhotoItem,
-                        matching: .images,
-                        photoLibrary: .shared()
-                    ) {
+                    Button(action: onTriggerPhotos) {
                         Label("Add Photos", systemImage: "photo.on.rectangle")
                     }
                     
@@ -151,31 +141,11 @@ public struct MessageInputBar: View {
                     }
                 }
                 
-                // Model Selector Pill Badge
-                Button(action: {
-                    Haptics.selection()
-                    onModelTap()
-                }) {
-                    HStack(spacing: 3) {
-                        Text(modelName)
-                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                            .foregroundColor(NewtonTheme.textPrimary)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 7.5))
-                            .foregroundColor(NewtonTheme.textSecondary)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(NewtonTheme.surface)
-                    .clipShape(Capsule())
-                }
-                
                 // Native Auto-Expanding Vertical TextField
                 TextField("Reply to Newton...", text: $text, axis: .vertical)
                     .focused($isFocused)
                     .lineLimit(1...5)
-                    .font(.system(size: 14.5))
+                    .font(.system(size: 15))
                     .foregroundColor(NewtonTheme.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
@@ -213,17 +183,6 @@ public struct MessageInputBar: View {
             .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 2)
             .padding(.horizontal, 14)
             .padding(.bottom, 6)
-        }
-        .onChange(of: selectedPhotoItem) { newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let uiImg = UIImage(data: data) {
-                    await MainActor.run {
-                        attachedImage = uiImg
-                        Haptics.success()
-                    }
-                }
-            }
         }
     }
 }
