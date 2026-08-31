@@ -33,6 +33,7 @@
 		A10024 /* Hero3DCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10025 /* Hero3DCanvasView.swift */; };
 		A10025 /* ThinkingOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10026 /* ThinkingOrbView.swift */; };
 		A10026 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10027 /* Assets.xcassets */; };
+		A10027 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10028 /* ImagePicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +65,7 @@
 		B10025 /* Hero3DCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hero3DCanvasView.swift; sourceTree = "<group>"; };
 		B10026 /* ThinkingOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingOrbView.swift; sourceTree = "<group>"; };
 		B10027 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10028 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,6 +159,7 @@
 				B10014 /* CodeBlockView.swift */,
 				B10025 /* Hero3DCanvasView.swift */,
 				B10026 /* ThinkingOrbView.swift */,
+				B10028 /* ImagePicker.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -284,6 +287,7 @@
 				A10023 /* MainView.swift in Sources */,
 				A10024 /* Hero3DCanvasView.swift in Sources */,
 				A10025 /* ThinkingOrbView.swift in Sources */,
+				A10027 /* ImagePicker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,6 +387,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Newton;
 				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Newton requires camera access to take and attach photos to prompts.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Newton requires photo library access to attach images to prompts.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -410,6 +416,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Newton;
 				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Newton requires camera access to take and attach photos to prompts.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Newton requires photo library access to attach images to prompts.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

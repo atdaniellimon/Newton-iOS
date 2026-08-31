@@ -7,6 +7,8 @@
 //
 
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 public struct ChatView: View {
     @Binding public var conversation: Conversation
@@ -14,11 +16,18 @@ public struct ChatView: View {
     @ObservedObject var storage = StorageManager.shared
     
     @State private var inputText: String = ""
+    @State private var attachedImage: UIImage? = nil
+    @State private var attachedFileName: String? = nil
+    @State private var attachedFileData: Data? = nil
+    
     @State private var isStreaming: Bool = false
     @State private var currentStreamTask: Task<Void, Never>? = nil
     @State private var errorMessage: String? = nil
     @State private var showSettings: Bool = false
     @State private var showModelPicker: Bool = false
+    @State private var showCameraPicker: Bool = false
+    @State private var showPhotosPicker: Bool = false
+    @State private var showFileImporter: Bool = false
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
@@ -123,10 +132,24 @@ public struct ChatView: View {
                 // Floating Studio Input Bar
                 MessageInputBar(
                     text: $inputText,
+                    attachedImage: $attachedImage,
+                    attachedFileName: $attachedFileName,
                     isStreaming: isStreaming,
                     modelName: shortModelDisplayName,
                     onModelTap: {
                         showModelPicker = true
+                    },
+                    onTriggerCamera: {
+                        showCameraPicker = true
+                    },
+                    onTriggerPhotos: {
+                        showPhotosPicker = true
+                    },
+                    onTriggerFiles: {
+                        showFileImporter = true
+                    },
+                    onTriggerWebSearch: {
+                        inputText += "[ORBIT:web_search]{\"query\": \"\"}[/ORBIT]"
                     },
                     onSend: sendMessage,
                     onStop: stopStreaming
@@ -152,13 +175,48 @@ public struct ChatView: View {
         .sheet(isPresented: $showModelPicker) {
             ModelPickerSheet(selectedModelId: $settings.currentModelId)
         }
+        .sheet(isPresented: $showCameraPicker) {
+            ImagePicker(sourceType: .camera) { img in
+                attachedImage = img
+            }
+        }
+        .sheet(isPresented: $showPhotosPicker) {
+            ImagePicker(sourceType: .photoLibrary) { img in
+                attachedImage = img
+            }
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.item, .text, .pdf, .sourceCode, .image],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let selectedUrl = urls.first else { return }
+                attachedFileName = selectedUrl.lastPathComponent
+                attachedFileData = try? Data(contentsOf: selectedUrl)
+            case .failure(let error):
+                print("File import error: \(error)")
+            }
+        }
     }
     
     private func sendMessage() {
-        let userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if userPrompt.isEmpty && attachedImage != nil {
+            userPrompt = "Please analyze this attached image."
+        }
+        if userPrompt.isEmpty && attachedFileName != nil {
+            userPrompt = "Please examine the contents of this file."
+        }
         guard !userPrompt.isEmpty else { return }
         
         inputText = ""
+        let hadImage = attachedImage
+        let hadFile = attachedFileName
+        attachedImage = nil
+        attachedFileName = nil
+        attachedFileData = nil
         errorMessage = nil
         
         let userMessage = Message(role: .user, content: userPrompt)
