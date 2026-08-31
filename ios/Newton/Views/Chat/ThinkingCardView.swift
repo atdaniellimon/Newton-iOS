@@ -49,7 +49,7 @@ public struct ThinkingCardView: View {
             }
         }
         .padding(10)
-        .background(NewtonTheme.surfaceDark.opacity(0.6))
+        .background(NewtonTheme.surface.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)

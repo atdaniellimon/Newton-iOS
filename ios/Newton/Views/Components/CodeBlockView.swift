@@ -52,10 +52,10 @@ public struct CodeBlockView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(NewtonTheme.surfaceDark)
+            .background(NewtonTheme.surface)
             
             Divider()
-                .background(NewtonTheme.borderDark)
+                .background(NewtonTheme.border)
             
             // Code Content
             ScrollView(.horizontal, showsIndicators: true) {
@@ -65,11 +65,11 @@ public struct CodeBlockView: View {
                     .padding(12)
             }
         }
-        .background(NewtonTheme.bgDark.opacity(0.95))
+        .background(NewtonTheme.card.opacity(0.95))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(NewtonTheme.borderDark, lineWidth: 0.8)
+                .stroke(NewtonTheme.border, lineWidth: 0.8)
         )
     }
 }

@@ -38,7 +38,7 @@ public struct OrbitCardView: View {
                 .lineLimit(6)
         }
         .padding(10)
-        .background(NewtonTheme.surfaceDark.opacity(0.7))
+        .background(NewtonTheme.surface.opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)

@@ -34,7 +34,7 @@ public struct ModelPickerSheet: View {
     public var body: some View {
         NavigationView {
             ZStack {
-                NewtonTheme.bgDark
+                NewtonTheme.bg
                     .ignoresSafeArea()
                 
                 VStack(spacing: 16) {
@@ -46,11 +46,11 @@ public struct ModelPickerSheet: View {
                             .foregroundColor(NewtonTheme.textPrimary)
                     }
                     .padding(10)
-                    .background(NewtonTheme.surfaceDark)
+                    .background(NewtonTheme.surface)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(NewtonTheme.borderDark, lineWidth: 0.8)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
                     )
                     .padding(.horizontal, 16)
                     
@@ -82,11 +82,11 @@ public struct ModelPickerSheet: View {
                             }
                         }
                         .padding(10)
-                        .background(NewtonTheme.surfaceDark)
+                        .background(NewtonTheme.surface)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(NewtonTheme.borderDark, lineWidth: 0.8)
+                                .stroke(NewtonTheme.border, lineWidth: 0.8)
                         )
                     }
                     .padding(.horizontal, 16)
@@ -130,7 +130,7 @@ public struct ModelPickerSheet: View {
                                         }
                                     }
                                 }
-                                .listRowBackground(NewtonTheme.cardDark)
+                                .listRowBackground(NewtonTheme.card)
                             }
                         }
                     }

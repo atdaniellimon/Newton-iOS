@@ -25,11 +25,11 @@ public struct StatusPillView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(NewtonTheme.surfaceDark.opacity(0.8))
+        .background(NewtonTheme.surface.opacity(0.8))
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(NewtonTheme.borderDark, lineWidth: 0.7)
+                .stroke(NewtonTheme.border, lineWidth: 0.7)
         )
     }
     

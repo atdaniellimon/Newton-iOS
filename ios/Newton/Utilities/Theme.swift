@@ -50,17 +50,23 @@ public struct NewtonTheme {
             : UIColor(red: 0.94, green: 0.92, blue: 0.89, alpha: 1.0)  // #F0EBE3
     })
     
+    public static let cardDark = Color(red: 0.16, green: 0.19, blue: 0.21)
+    
     public static let surface = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0.20, green: 0.24, blue: 0.26, alpha: 1.0)  // #333D42
             : UIColor(red: 0.90, green: 0.88, blue: 0.84, alpha: 1.0)  // #E6E0D6
     })
     
+    public static let surfaceDark = Color(red: 0.20, green: 0.24, blue: 0.26)
+    
     public static let border = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0.26, green: 0.31, blue: 0.33, alpha: 0.8)  // #424E54
             : UIColor(red: 0.82, green: 0.79, blue: 0.74, alpha: 0.9)  // #D1C9BC
     })
+    
+    public static let borderDark = Color(red: 0.26, green: 0.31, blue: 0.33)
     
     // Accent Colors
     public static let sand = Color(red: 0.88, green: 0.74, blue: 0.50)          // #E0BD80
@@ -94,4 +100,16 @@ public struct NewtonTheme {
             ? UIColor(red: 0.88, green: 0.74, blue: 0.50, alpha: 1.0)
             : UIColor(red: 0.90, green: 0.80, blue: 0.62, alpha: 1.0)
     })
+}
+
+extension View {
+    public func newtonCardStyle() -> some View {
+        self
+            .background(NewtonTheme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(NewtonTheme.border, lineWidth: 0.8)
+            )
+    }
 }
