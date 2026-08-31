@@ -21,23 +21,29 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
-      - name: Build and Archive
+      - name: List Xcode Schemes
         run: |
-          mkdir -p build
-          xcodebuild archive \
+          xcodebuild -list -project "ios/Newton/Newton.xcodeproj"
+
+      - name: Build Newton App
+        run: |
+          mkdir -p build/Release-iphoneos
+          xcodebuild clean build \
             -project "ios/Newton/Newton.xcodeproj" \
             -scheme "Newton" \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath "build/Newton.xcarchive" \
-            CODE_SIGNING_REQUIRED=NO \
+            -destination "generic/platform=iOS" \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CONFIGURATION_BUILD_DIR="$(pwd)/build/Release-iphoneos"
 
       - name: Package into IPA
         run: |
           mkdir -p build/Payload
-          cp -r "build/Newton.xcarchive/Products/Applications/Newton.app" build/Payload/
+          cp -r "build/Release-iphoneos/Newton.app" build/Payload/
           cd build
           zip -r -y "Newton.ipa" Payload
           ls -lh Newton.ipa
