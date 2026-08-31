@@ -3,17 +3,17 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  High-performance Server-Sent Events (SSE) streaming engine with Multimodal Vision support.
+//  Multi-provider streaming client with Multimodal Vision and Singularity prompt injection.
 //
 
 import Foundation
+import UIKit
 
 public final class LLMService {
     public static let shared = LLMService()
     
     private init() {}
     
-    /// Stream completions token-by-token using AsyncThrowingStream with Vision Multimodal support
     public func streamCompletion(
         messages: [Message],
         provider: AIProvider,
@@ -21,27 +21,25 @@ public final class LLMService {
         baseUrl: String,
         apiKey: String,
         temperature: Double = 0.7,
-        maxTokens: Int = 2048,
-        systemPrompt: String = ""
+        maxTokens: Int = 4096,
+        systemPrompt: String = SettingsManager.singularitySystemPrompt
     ) -> AsyncThrowingStream<String, Error> {
         
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
                     guard let url = constructEndpointURL(provider: provider, baseUrl: baseUrl) else {
-                        throw LLMError.invalidEndpoint
+                        throw NSError(domain: "LLMService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid API Base URL: \(baseUrl)"])
                     }
                     
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
-                    request.timeoutInterval = 90
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.setValue("application/json", forHTTPHeaderField: "Accept")
+                    request.timeoutInterval = 120
                     
-                    // Setup Authentication Headers
                     setupAuthHeaders(request: &request, provider: provider, apiKey: apiKey)
                     
-                    // Construct Payload
                     let payloadData = try constructPayload(
                         provider: provider,
                         modelId: modelId,
@@ -52,28 +50,27 @@ public final class LLMService {
                     )
                     request.httpBody = payloadData
                     
-                    let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
                     
                     guard let httpResponse = response as? HTTPURLResponse else {
-                        throw LLMError.invalidResponse
+                        throw NSError(domain: "LLMService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid response from server"])
                     }
                     
                     guard (200...299).contains(httpResponse.statusCode) else {
                         var errorBody = ""
-                        for try await line in asyncBytes.lines {
-                            errorBody += line + "\n"
+                        for try await line in bytes.lines {
+                            errorBody += line
                         }
-                        throw LLMError.apiError(code: httpResponse.statusCode, message: errorBody)
+                        throw NSError(domain: "LLMService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "API Error (\(httpResponse.statusCode)): \(errorBody)"])
                     }
                     
-                    // Stream token-by-token parsing SSE lines
-                    for try await line in asyncBytes.lines {
+                    for try await line in bytes.lines {
                         guard !Task.isCancelled else { break }
                         
                         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { continue }
                         
-                        if trimmed == "data: [DONE]" || trimmed == "data:[DONE]" {
+                        if trimmed == "data: [DONE]" || trimmed == "[DONE]" {
                             break
                         }
                         
@@ -110,7 +107,6 @@ public final class LLMService {
         case .ollama:
             return URL(string: "\(cleanBase)/api/chat")
         default:
-            // OpenAI, Groq, Mistral, OpenRouter, DeepSeek, Custom OpenAI Compatible
             if cleanBase.hasSuffix("/chat/completions") {
                 return URL(string: cleanBase)
             } else if cleanBase.hasSuffix("/v1") {
@@ -147,8 +143,9 @@ public final class LLMService {
         systemPrompt: String
     ) throws -> Data {
         
+        let effectiveSystemPrompt = systemPrompt.isEmpty ? SettingsManager.singularitySystemPrompt : systemPrompt
+        
         if provider == .anthropic {
-            // Anthropic Messages API format
             var formattedMessages: [[String: Any]] = []
             for msg in messages where msg.role != .system {
                 let role = msg.role == .user ? "user" : "assistant"
@@ -174,7 +171,7 @@ public final class LLMService {
                         ],
                         [
                             "type": "text",
-                            "text": msg.content.isEmpty ? "Analyze this image." : msg.content
+                            "text": msg.content.isEmpty ? "Analyze this content." : msg.content
                         ]
                     ]
                     formattedMessages.append(["role": role, "content": contentArray])
@@ -188,32 +185,37 @@ public final class LLMService {
                 "messages": formattedMessages,
                 "max_tokens": maxTokens,
                 "temperature": temperature,
-                "stream": true
+                "stream": true,
+                "system": effectiveSystemPrompt
             ]
-            if !systemPrompt.isEmpty {
-                payload["system"] = systemPrompt
-            }
             return try JSONSerialization.data(withJSONObject: payload)
             
         } else {
-            // OpenAI & OpenAI Compatible format (OpenRouter, Groq, Gemini, Ollama, DeepSeek)
+            // OpenAI & OpenAI Compatible format (OpenRouter, Custom AIEndpoints, Groq, Ollama, DeepSeek)
             var formattedMessages: [[String: Any]] = []
             
-            if !systemPrompt.isEmpty {
-                formattedMessages.append(["role": "system", "content": systemPrompt])
-            }
+            formattedMessages.append([
+                "role": "system",
+                "content": effectiveSystemPrompt
+            ])
             
-            for msg in messages {
+            for (index, msg) in messages.enumerated() {
                 let role = msg.role.rawValue
+                var textContent = msg.content
+                
+                // Reinforce Singularity identity on initial user prompt for local proxy compatibility
+                if index == 0 && msg.role == .user {
+                    textContent = "[IDENTITY: You are Newton (Singularity). Always respond as Newton.]\n\n\(textContent)"
+                }
                 
                 if let imgDataUrl = msg.imageUrl, !imgDataUrl.isEmpty {
                     let contentArray: [[String: Any]] = [
-                        ["type": "text", "text": msg.content.isEmpty ? "Describe this image." : msg.content],
+                        ["type": "text", "text": textContent.isEmpty ? "Describe and analyze this content." : textContent],
                         ["type": "image_url", "image_url": ["url": imgDataUrl]]
                     ]
                     formattedMessages.append(["role": role, "content": contentArray])
                 } else {
-                    formattedMessages.append(["role": role, "content": msg.content])
+                    formattedMessages.append(["role": role, "content": textContent])
                 }
             }
             
@@ -245,40 +247,32 @@ public final class LLMService {
             return nil
         }
         
-        // OpenAI format: choices[0].delta.content or delta.reasoning_content
-        if let choices = json["choices"] as? [[String: Any]], let firstChoice = choices.first {
+        if let choices = json["choices"] as? [[String: Any]],
+           let firstChoice = choices.first {
+            
             if let delta = firstChoice["delta"] as? [String: Any] {
+                if let reasoning = delta["reasoning_content"] as? String, !reasoning.isEmpty {
+                    return "<think>\(reasoning)</think>"
+                }
                 if let content = delta["content"] as? String {
                     return content
                 }
-                if let reasoning = delta["reasoning_content"] as? String {
-                    return "<think>\(reasoning)</think>"
-                }
+            }
+            
+            if let text = firstChoice["text"] as? String {
+                return text
             }
         }
         
-        // Ollama format: message.content
-        if let message = json["message"] as? [String: Any], let content = message["content"] as? String {
+        if let message = json["message"] as? [String: Any],
+           let content = message["content"] as? String {
             return content
         }
         
-        return nil
-    }
-}
-
-public enum LLMError: LocalizedError {
-    case invalidEndpoint
-    case invalidResponse
-    case apiError(code: Int, message: String)
-    
-    public var errorDescription: String? {
-        switch self {
-        case .invalidEndpoint:
-            return "Invalid API Endpoint URL."
-        case .invalidResponse:
-            return "Invalid HTTP Response from AI server."
-        case .apiError(let code, let msg):
-            return "API Error (\(code)): \(msg)"
+        if let response = json["response"] as? String {
+            return response
         }
+        
+        return nil
     }
 }
