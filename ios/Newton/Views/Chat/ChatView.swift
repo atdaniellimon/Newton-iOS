@@ -26,7 +26,6 @@ public struct ChatView: View {
     @State private var showSettings: Bool = false
     @State private var showModelPicker: Bool = false
     @State private var showCameraPicker: Bool = false
-    @State private var showPhotosPicker: Bool = false
     @State private var showFileImporter: Bool = false
     
     public init(conversation: Binding<Conversation>) {
@@ -45,7 +44,7 @@ public struct ChatView: View {
             NewtonTheme.bg
                 .ignoresSafeArea()
             
-            // 3D Undulating wave grid background (visible across whole chat canvas)
+            // 3D Undulating wave grid background
             Hero3DCanvasView()
                 .ignoresSafeArea()
                 .opacity(0.88)
@@ -61,7 +60,7 @@ public struct ChatView: View {
                                     inputText = prompt
                                     sendMessage()
                                 })
-                                .padding(.top, 28)
+                                .padding(.top, 24)
                             } else {
                                 ForEach(conversation.messages) { message in
                                     MessageBubbleView(
@@ -69,21 +68,21 @@ public struct ChatView: View {
                                         onRetry: {
                                             retryLastMessage()
                                         },
-                                        onEdit: { editedText in
-                                            inputText = editedText
+                                        onEdit: { msgToEdit in
+                                            editMessage(msgToEdit)
                                         }
                                     )
                                     .id(message.id)
                                 }
                             }
                             
-                            // Single Unified 3D Thinking Indicator (No redundant boxes)
+                            // Single Unified 3D Thinking Indicator
                             if isStreaming && (conversation.messages.last?.content.isEmpty ?? true) {
                                 HStack(spacing: 12) {
                                     ThinkingOrbView(size: 32, style: .globe)
                                     
                                     Text("Newton is reasoning...")
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium, design: .serif))
                                         .foregroundColor(NewtonTheme.sand)
                                     
                                     Spacer()
@@ -112,7 +111,7 @@ public struct ChatView: View {
                                 .frame(height: 1)
                                 .id("bottom_anchor")
                         }
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 10)
                     }
                     .onChange(of: conversation.messages.count) { _ in
                         withAnimation {
@@ -129,7 +128,7 @@ public struct ChatView: View {
                     }
                 }
                 
-                // Floating Studio Input Bar
+                // Ultra-Compact Studio Input Bar (Single row)
                 MessageInputBar(
                     text: $inputText,
                     attachedImage: $attachedImage,
@@ -141,9 +140,6 @@ public struct ChatView: View {
                     },
                     onTriggerCamera: {
                         showCameraPicker = true
-                    },
-                    onTriggerPhotos: {
-                        showPhotosPicker = true
                     },
                     onTriggerFiles: {
                         showFileImporter = true
@@ -180,11 +176,6 @@ public struct ChatView: View {
                 attachedImage = img
             }
         }
-        .sheet(isPresented: $showPhotosPicker) {
-            ImagePicker(sourceType: .photoLibrary) { img in
-                attachedImage = img
-            }
-        }
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: [.item, .text, .pdf, .sourceCode, .image],
@@ -198,6 +189,22 @@ public struct ChatView: View {
             case .failure(let error):
                 print("File import error: \(error)")
             }
+        }
+    }
+    
+    private func editMessage(_ msg: Message) {
+        if let idx = conversation.messages.firstIndex(where: { $0.id == msg.id }) {
+            inputText = msg.content
+            if let imgStr = msg.imageUrl, imgStr.hasPrefix("data:image/"),
+               let commaIdx = imgStr.firstIndex(of: ","),
+               let data = Data(base64Encoded: String(imgStr[imgStr.index(after: commaIdx)...])),
+               let uiImg = UIImage(data: data) {
+                attachedImage = uiImg
+            }
+            // Remove downstream messages from that point onward
+            conversation.messages = Array(conversation.messages.prefix(upTo: idx))
+            storage.updateConversation(conversation)
+            Haptics.light()
         }
     }
     
@@ -267,7 +274,8 @@ public struct ChatView: View {
         
         isStreaming = true
         
-        currentStreamTask = Task {
+        // Run with Background Task Protection
+        NotificationManager.shared.beginBackgroundTask(name: "NewtonStreamTask") {
             var fullResponse = ""
             var currentThinking = ""
             var isInsideThinkingTag = false
@@ -279,6 +287,7 @@ public struct ChatView: View {
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
             let systemPrompt = settings.defaultSystemPrompt()
+            let convoTitle = conversation.title
             
             do {
                 let stream = LLMService.shared.streamCompletion(
@@ -309,37 +318,50 @@ public struct ChatView: View {
                         fullResponse += token
                     }
                     
-                    if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                        conversation.messages[index].content = fullResponse
-                        conversation.messages[index].thinkingContent = currentThinking.isEmpty ? nil : currentThinking
+                    await MainActor.run {
+                        if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                            conversation.messages[index].content = fullResponse
+                            conversation.messages[index].thinkingContent = currentThinking.isEmpty ? nil : currentThinking
+                        }
                     }
                 }
                 
                 let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(fullResponse)
                 
-                if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                    conversation.messages[index].content = finalContent
-                    conversation.messages[index].imageUrl = detectedImgUrl
-                    conversation.messages[index].orbitResults = orbitResults
-                    conversation.messages[index].isStreaming = false
-                }
-                
-                storage.updateConversation(conversation)
-                Haptics.success()
-                
-            } catch {
-                if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                    if fullResponse.isEmpty {
-                        conversation.messages.remove(at: index)
-                    } else {
+                await MainActor.run {
+                    if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                        conversation.messages[index].content = finalContent
+                        conversation.messages[index].imageUrl = detectedImgUrl
+                        conversation.messages[index].orbitResults = orbitResults
                         conversation.messages[index].isStreaming = false
                     }
+                    
+                    storage.updateConversation(conversation)
+                    Haptics.success()
                 }
-                errorMessage = error.localizedDescription
-                Haptics.error()
+                
+                // Notify user if response finished while app was backgrounded
+                if UIApplication.shared.applicationState != .active {
+                    NotificationManager.shared.sendResponseReadyNotification(title: convoTitle, body: finalContent)
+                }
+                
+            } catch {
+                await MainActor.run {
+                    if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                        if fullResponse.isEmpty {
+                            conversation.messages.remove(at: index)
+                        } else {
+                            conversation.messages[index].isStreaming = false
+                        }
+                    }
+                    errorMessage = error.localizedDescription
+                    Haptics.error()
+                }
             }
             
-            isStreaming = false
+            await MainActor.run {
+                isStreaming = false
+            }
         }
     }
     

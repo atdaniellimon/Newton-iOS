@@ -34,6 +34,7 @@
 		A10025 /* ThinkingOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10026 /* ThinkingOrbView.swift */; };
 		A10026 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10027 /* Assets.xcassets */; };
 		A10027 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10028 /* ImagePicker.swift */; };
+		A10028 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10029 /* NotificationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +67,7 @@
 		B10026 /* ThinkingOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingOrbView.swift; sourceTree = "<group>"; };
 		B10027 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10028 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
+		B10029 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +129,7 @@
 				B10008 /* OrbitEngine.swift */,
 				B10009 /* StorageManager.swift */,
 				B10010 /* LLMService.swift */,
+				B10029 /* NotificationManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -288,6 +291,7 @@
 				A10024 /* Hero3DCanvasView.swift in Sources */,
 				A10025 /* ThinkingOrbView.swift in Sources */,
 				A10027 /* ImagePicker.swift in Sources */,
+				A10028 /* NotificationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

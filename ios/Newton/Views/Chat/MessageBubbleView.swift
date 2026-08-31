@@ -12,11 +12,11 @@ import UIKit
 public struct MessageBubbleView: View {
     public let message: Message
     public var onRetry: (() -> Void)? = nil
-    public var onEdit: ((String) -> Void)? = nil
+    public var onEdit: ((Message) -> Void)? = nil
     
     @State private var copied: Bool = false
     
-    public init(message: Message, onRetry: (() -> Void)? = nil, onEdit: ((String) -> Void)? = nil) {
+    public init(message: Message, onRetry: (() -> Void)? = nil, onEdit: ((Message) -> Void)? = nil) {
         self.message = message
         self.onRetry = onRetry
         self.onEdit = onEdit
@@ -55,7 +55,7 @@ public struct MessageBubbleView: View {
                         if let onEdit = onEdit {
                             Button {
                                 Haptics.light()
-                                onEdit(message.content)
+                                onEdit(message)
                             } label: {
                                 Label("Edit Message", systemImage: "pencil")
                             }
@@ -66,7 +66,7 @@ public struct MessageBubbleView: View {
                 .padding(.vertical, 4)
                 
             } else {
-                // Assistant Message (Clean typography on canvas, no heavy bounding box)
+                // Assistant Message (Clean serif typography on canvas, no heavy bounding box)
                 VStack(alignment: .leading, spacing: 10) {
                     // Thinking Chain if present
                     if let thinking = message.thinkingContent, !thinking.isEmpty {
@@ -83,7 +83,7 @@ public struct MessageBubbleView: View {
                         GeneratedImageCardView(url: url)
                     }
                     
-                    // Main Text Content
+                    // Main Text Content with elegant Serif typography
                     if !message.content.isEmpty {
                         FormattedAssistantContent(content: message.content)
                             .textSelection(.enabled)
@@ -173,7 +173,7 @@ public struct GeneratedImageCardView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                     Text("Generating image...")
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, design: .serif))
                         .foregroundColor(NewtonTheme.textSecondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
@@ -231,9 +231,10 @@ public struct FormattedAssistantContent: View {
                 if block.isCode {
                     CodeBlockView(code: block.text, language: block.language)
                 } else {
+                    // Serif typography for AI responses matching Newton & Claude
                     Text(LocalizedStringKey(block.text))
-                        .font(.system(size: 16, weight: .regular))
-                        .lineSpacing(4.5)
+                        .font(.system(size: 16.5, weight: .regular, design: .serif))
+                        .lineSpacing(5.0)
                         .foregroundColor(NewtonTheme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

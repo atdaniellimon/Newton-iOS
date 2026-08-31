@@ -10,25 +10,24 @@ import SwiftUI
 @main
 struct NewtonApp: App {
     @StateObject private var settings = SettingsManager.shared
-    @StateObject private var storage = StorageManager.shared
+    @AppStorage("newton_app_theme") private var appThemeRaw: String = AppThemeMode.dark.rawValue
+    
+    private var colorScheme: ColorScheme? {
+        switch appThemeRaw {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil
+        }
+    }
+    
+    init() {
+        NotificationManager.shared.requestAuthorization()
+    }
     
     var body: some Scene {
         WindowGroup {
             MainView()
                 .preferredColorScheme(colorScheme)
-                .environmentObject(settings)
-                .environmentObject(storage)
-        }
-    }
-    
-    private var colorScheme: ColorScheme? {
-        switch settings.appTheme {
-        case .dark:
-            return .dark
-        case .light:
-            return .light
-        case .system:
-            return nil
         }
     }
 }
