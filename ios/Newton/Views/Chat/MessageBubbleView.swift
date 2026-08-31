@@ -138,9 +138,9 @@ public struct MessageBubbleView: View {
             get: { previewImageString.map { IdentifiableString(value: $0) } },
             set: { previewImageString = $0?.value }
         )) { item in
-            FullScreenImageViewer(imageString: item.value) {
+            FullScreenImageViewer(imageString: item.value, onDismiss: {
                 previewImageString = nil
-            }
+            })
         }
     }
 }
@@ -152,14 +152,20 @@ public struct IdentifiableString: Identifiable {
 
 public struct FullScreenImageViewer: View {
     public let imageString: String
-    public let onDismiss: () -> Void
+    public var onDismiss: (() -> Void)? = nil
     
+    @Environment(\.dismiss) private var dismiss
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var loadedUIImage: UIImage? = nil
     @State private var savedToast: Bool = false
+    
+    public init(imageString: String, onDismiss: (() -> Void)? = nil) {
+        self.imageString = imageString
+        self.onDismiss = onDismiss
+    }
     
     public var body: some View {
         ZStack {
@@ -206,7 +212,13 @@ public struct FullScreenImageViewer: View {
             // Top Controls Bar
             VStack {
                 HStack {
-                    Button(action: onDismiss) {
+                    Button(action: {
+                        if let dismissCallback = onDismiss {
+                            dismissCallback()
+                        } else {
+                            dismiss()
+                        }
+                    }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 28))
                             .foregroundColor(.white.opacity(0.8))
@@ -436,10 +448,11 @@ public struct FormattedAssistantContent: View {
     public let content: String
     
     public var body: some View {
-        let blocks = parseContentBlocks(content)
-        return VStack(alignment: .leading, spacing: 12) {
-            ForEach(blocks.indices, id: \.self) { index in
-                switch blocks[index] {
+        let parsedBlocks = parseContentBlocks(content)
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(0..<parsedBlocks.count, id: \.self) { index in
+                let block = parsedBlocks[index]
+                switch block {
                 case .text(let text):
                     Text(LocalizedStringKey(text))
                         .font(.system(size: 15, design: .serif))
