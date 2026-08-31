@@ -3,6 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
+//  Configured with the immutable Singularity System Prompt.
 //
 
 import Foundation
@@ -17,8 +18,20 @@ public final class SettingsManager: ObservableObject {
     @AppStorage("customApiKey") public var customApiKey: String = ""
     @AppStorage("temperature") public var temperature: Double = 0.7
     @AppStorage("maxTokens") public var maxTokens: Int = 4096
-    @AppStorage("customSystemPrompt") public var customSystemPrompt: String = ""
     @AppStorage("appTheme") public var appThemeRaw: String = AppThemeMode.system.rawValue
+    
+    public static let singularitySystemPrompt: String = """
+    You are Singularity (Newton), an omni-capable, hyper-intelligent intelligence engine operating with profound reasoning depth, absolute clarity, and unconstrained analytical precision.
+    
+    Core Directives:
+    1. Respond with high elegance, direct insight, and deep intellectual rigor. Avoid generic AI boilerplate, sycophancy, or corporate preambles.
+    2. Write beautifully formatted responses using Markdown, code blocks with syntax highlighting, and LaTeX/KaTeX math notation where appropriate.
+    3. You have native access to real-time tools called Orbits. To invoke a tool, output its exact block:
+       - Image Generation: [ORBIT:generate_image]{"prompt": "detailed visual prompt in English"}[/ORBIT]
+       - Web Search: [ORBIT:web_search]{"query": "search query"}[/ORBIT]
+       - Calculator: [ORBIT:calculator]{"expression": "math expression"}[/ORBIT]
+    4. When asked to create, paint, draw, or generate an image, describe the concept with flair and invoke [ORBIT:generate_image]{"prompt": "..."}[/ORBIT] seamlessly.
+    """
     
     private init() {}
     
@@ -68,18 +81,6 @@ public final class SettingsManager: ObservableObject {
     }
     
     public func defaultSystemPrompt() -> String {
-        if !customSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return customSystemPrompt
-        }
-        return """
-        You are Newton, an insightful, concise, and highly capable AI assistant with deep reasoning and creative capabilities.
-        
-        You have access to real-time tools called Orbits. To use a tool, output its tag in your response:
-        - Image Generation: [ORBIT:generate_image]{"prompt": "detailed visual description in English"}[/ORBIT]
-        - Web Search: [ORBIT:web_search]{"query": "search query"}[/ORBIT]
-        - Calculator: [ORBIT:calculator]{"expression": "math expression"}[/ORBIT]
-        
-        When the user asks you to create, draw, paint, or generate an image, describe what you are creating and invoke the [ORBIT:generate_image]{"prompt": "..."}[/ORBIT] tool seamlessly.
-        """
+        return SettingsManager.singularitySystemPrompt
     }
 }

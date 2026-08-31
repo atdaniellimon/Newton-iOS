@@ -179,16 +179,6 @@ public struct SettingsView: View {
                     }
                     .listRowBackground(NewtonTheme.card)
                     
-                    // System Prompt
-                    Section(header: Text("CUSTOM SYSTEM PROMPT").foregroundColor(NewtonTheme.textSecondary)) {
-                        TextEditor(text: $settings.customSystemPrompt)
-                            .font(.system(size: 13))
-                            .foregroundColor(NewtonTheme.textPrimary)
-                            .frame(minHeight: 80)
-                            .scrollContentBackground(.hidden)
-                    }
-                    .listRowBackground(NewtonTheme.card)
-                    
                     // Test Connection
                     Section {
                         Button(action: testConnection) {
