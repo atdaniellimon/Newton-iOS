@@ -13,8 +13,8 @@ public final class OrbitEngine {
     
     private init() {}
     
-    /// Process any [ORBIT:name]{...}[/ORBIT] in text or trigger image generation
-    public func processOrbitsInText(_ text: String, baseUrl: String = "", apiKey: String = "") async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?) {
+    /// Process any [ORBIT:name]{...}[/ORBIT] or JSON tool call in text
+    public func processOrbitsInText(_ text: String, userPrompt: String = "", baseUrl: String = "", apiKey: String = "") async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?) {
         var outputText = text
         var results: [OrbitExecutionResult] = []
         var detectedImageUrl: String? = nil
@@ -43,7 +43,54 @@ public final class OrbitEngine {
             }
         }
         
-        // 2. Detect direct markdown images
+        // 2. Process JSON tool calls ```json { "name": "generate_image", "parameters": { "prompt": "..." } } ```
+        let jsonToolPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"parameters\"\\s*:\\s*(\\{[\\s\\S]*?\\})\\s*\\}\\s*```"
+        if let regex = try? NSRegularExpression(pattern: jsonToolPattern, options: [.caseInsensitive]) {
+            let nsString = outputText as NSString
+            let matches = regex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsString.length))
+            for match in matches {
+                guard match.numberOfRanges >= 3 else { continue }
+                let fullMatch = nsString.substring(with: match.range(at: 0))
+                let toolName = nsString.substring(with: match.range(at: 1))
+                let paramsJson = nsString.substring(with: match.range(at: 2))
+                
+                let result = await executeOrbit(name: toolName, paramsJson: paramsJson, baseUrl: baseUrl, apiKey: apiKey)
+                results.append(result)
+                if toolName.lowercased() == "generate_image" || toolName.lowercased() == "image_gen" {
+                    detectedImageUrl = result.result
+                }
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
+            }
+        }
+        
+        // 3. Fallback: if user asked for an image and no image was produced yet, generate it directly!
+        if detectedImageUrl == nil && !userPrompt.isEmpty {
+            let lower = userPrompt.lowercased()
+            if lower.contains("genera una imagen") || lower.contains("generame una imagen") ||
+               lower.contains("crea una imagen") || lower.contains("creame una imagen") ||
+               lower.contains("dibuja") || lower.contains("generate image") ||
+               lower.contains("create an image") || lower.contains("/imagine") {
+                
+                let cleanPrompt = userPrompt
+                    .replacingOccurrences(of: "/imagine", with: "")
+                    .replacingOccurrences(of: "genera una imagen de", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "generame una imagen de", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "crea una imagen de", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "creame una imagen de", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "dibuja", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "generate an image of", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "generate image of", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                let promptToUse = cleanPrompt.isEmpty ? userPrompt : cleanPrompt
+                detectedImageUrl = await generateImage(prompt: promptToUse, baseUrl: baseUrl, apiKey: apiKey)
+                if outputText.isEmpty || outputText.contains("Parece que no puedo") || outputText.contains("no tengo la capacidad") {
+                    outputText = "Aquí tienes la imagen generada de *\(promptToUse)*:"
+                }
+            }
+        }
+        
+        // 4. Detect direct markdown images
         if detectedImageUrl == nil {
             if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?|data:image/.*?)\\)", options: []) {
                 let nsStr = outputText as NSString

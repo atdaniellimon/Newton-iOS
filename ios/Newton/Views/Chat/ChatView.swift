@@ -304,7 +304,12 @@ public struct ChatView: View {
                 }
                 
                 // Process tool calling (image generation, web search, calculator)
-                let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(fullResponse, baseUrl: baseUrl, apiKey: apiKey)
+                let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(
+                    fullResponse,
+                    userPrompt: userPrompt,
+                    baseUrl: baseUrl,
+                    apiKey: apiKey
+                )
                 
                 await MainActor.run {
                     if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
