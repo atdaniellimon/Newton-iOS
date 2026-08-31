@@ -1,0 +1,7 @@
+{
+  "max_results": 5,
+  "timeout": 15,
+  "user_agent": "Newton-Orbit/1.0",
+  "enable_scraping": false,
+  "search_provider": "duckduckgo"
+}

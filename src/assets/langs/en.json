@@ -1,0 +1,43 @@
+{
+	"feed": {
+		"title": "feed"
+	},
+	"instants": {
+		"title": "instants"
+	},
+	"create": {
+		"title": "create"
+	},
+	"explore": {
+		"title": "explore"
+	},
+	"profile": {
+		"title": "profile"
+	},
+	"setup": {
+		"emailSignUp": "Sign up with Email",
+		"haveAccount": "Already have an account? Sign in",
+		"bycontinuing": "By continuing, you accept our ",
+		"termsbtn": "Terms of Service",
+		"privacybtn": "Privacy Policy",
+		"signex": "daniel@moke.com",
+		"emailAddr": "Email",
+		"passwrd": "Password",
+		"crtpasswrd": "Create a password",
+		"confirmpswd": "Confirm your password",
+		"continue": "Continue",
+		"back": "Back",
+		"welcomeback": "Welcome back.",
+		"forgot": "Forgot your password?",
+		"noacc": "No account? Create one",
+		"reset": {
+			"title": "We'll send you a reset link"
+		},
+		"welcome": {
+			"title": "Welcome to Glaze."
+		}
+	},
+	"error": {
+		"nointernet": "Looks like there's no internet connection, try again later."
+	}
+}

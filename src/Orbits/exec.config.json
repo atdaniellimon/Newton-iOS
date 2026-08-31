@@ -1,0 +1,6 @@
+{
+  "max_execution_time": 5,
+  "max_memory_mb": 100,
+  "max_output_size": 10000,
+  "allowed_imports": ["math", "random", "statistics", "itertools", "functools", "collections", "string"]
+}

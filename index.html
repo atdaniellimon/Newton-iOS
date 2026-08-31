@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Newton AI</title>
+    
+    <link rel="stylesheet" href="/src/css/style.css">
+    <link rel="stylesheet" href="/src/components/Code/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/framework7-icons@5.0.5/css/framework7-icons.min.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="icon" href="/src/assets/newton_logo.png" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/src/assets/newton_logo.png">
+
+    <!-- External Libraries for Diagram, Client Execution & 3D Visuals -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <!-- FULLSCREEN THREE.JS CANVAS BACKGROUND -->
+    <div id="hero-canvas" aria-hidden="true"></div>
+    
+	<!-- App Page -->
+	<div moke-page="/app">
+		<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+		<div class="side-bar">
+			<header>
+				<button act="configs" title="Configuration">
+					<i class="f7-icons">gear_alt</i>
+				</button>
+				<button act="app" class="active" title="Chat">
+					<i class="f7-icons">chat_bubble</i>
+				</button>
+				<button act="code" title="Code Workbench">
+					<i class="f7-icons">text_append</i>
+				</button>
+			</header>
+
+			<!-- Conversation Search -->
+			<div class="chat-search-wrapper">
+				<i class="f7-icons">search</i>
+				<input type="text" id="chat-search-input" placeholder="Search chats...">
+			</div>
+
+			<div class="conversation-list" id="conversation-list">
+				<!-- Conversations rendered by JS -->
+			</div>
+		</div>
+		<div class="chat">
+			<!-- Chat Header Bar -->
+			<div class="chat-header-bar">
+				<div class="chat-header-left">
+					<button id="mobile-sidebar-toggle" class="mobile-sidebar-toggle" title="Toggle Sidebar">
+						<i class="f7-icons">sidebar_left</i>
+					</button>
+					<div class="status-pill" id="chat-status-pill" onclick="Moke.navigate('/configs')" title="Settings / Configuration">
+						<div class="status-orb-container" id="status-orb-container"></div>
+						<span id="header-model-name">Newton I</span>
+						<i class="f7-icons chevron">chevron_down</i>
+					</div>
+				</div>
+			</div>
+
+			<div id="messages-container">
+				<div class="no-chat" id="no-chat-container">
+					<div class="hero-logo-wrapper">
+						<img src="/src/assets/newton_logo.png" alt="Newton Logo">
+					</div>
+					<h1 class="hero-title">What will you discover today?</h1>
+
+					<div class="suggestion-grid">
+						<div class="suggestion-card" data-prompt="Explain quantum computing basics with a simple real-world analogy.">
+							<i class="f7-icons">lightbulb</i>
+							<div class="sug-text">
+								<strong>Explain a Concept</strong>
+								<span>Quantum computing basics</span>
+							</div>
+						</div>
+						<div class="suggestion-card" data-prompt="Write an efficient Python script for web scraping with async request handling.">
+							<i class="f7-icons">terminal</i>
+							<div class="sug-text">
+								<strong>Code & Debug</strong>
+								<span>Python web scraper script</span>
+							</div>
+						</div>
+						<div class="suggestion-card" data-prompt="Draft a clean technical specification document for a cloud microservices architecture.">
+							<i class="f7-icons">doc_text</i>
+							<div class="sug-text">
+								<strong>Write & Draft</strong>
+								<span>Technical architecture spec</span>
+							</div>
+						</div>
+						<div class="suggestion-card" data-prompt="What are the key architectural differences between Claude 3.5 Sonnet and DeepSeek R1?">
+							<i class="f7-icons">sparkles</i>
+							<div class="sug-text">
+								<strong>Analyze & Compare</strong>
+								<span>Claude 3.5 vs DeepSeek R1</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<footer>
+				<div class="input-pod">
+					<input type="file" id="file-input" multiple style="display:none;" accept=".txt,.py,.js,.html,.css,.json,.csv,.md,.c,.cpp,.h,.sql,.pdf,image/*">
+					<div class="input-attachments-preview" id="input-attachments-preview" style="display:none;"></div>
+					<textarea placeholder="Ask Newton anything..." id="chat-input" rows="1" aria-label="Your question to Newton"></textarea>
+					<div class="input-action-bar">
+						<div class="left-actions">
+							<button id="attach-file-btn" class="pod-action-btn" title="Attach file">
+								<i class="f7-icons">paperclip</i>
+							</button>
+							<button id="search-orbit-toggle" class="pod-action-btn" title="Web Orbits Active">
+								<i class="f7-icons">globe</i>
+							</button>
+						</div>
+						<div class="right-actions">
+							<button id="stop-generating" class="stop-btn" style="display:none;" title="Stop generation">
+								<i class="f7-icons">stop_fill</i>
+							</button>
+							<button id="send" class="send-btn" disabled title="Send message">
+								<i class="f7-icons">arrow_up</i>
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="input-disclaimer">Newton AI may produce creative or technical output. Verify important data.</div>
+			</footer>
+		</div>
+	</div>
+	
+	<!-- Config Page -->
+	<div moke-page="/configs">
+	    <div class="configs-container">
+	        <button onclick="Moke.navigate('/app')" class="close"><i class="f7-icons">xmark</i></button>
+	        <h1><i class="f7-icons">gear_alt</i> Configuration</h1>
+	        <div class="api-badge" id="api-status-badge"><i class="f7-icons">checkmark_alt</i> Connected</div>
+	        
+	        <!-- Provider Selector -->
+	        <div class="config-group">
+	            <label for="config-provider-select">AI Provider</label>
+	            <select id="config-provider-select" style="width:100%; padding:10px 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--input-bg); color: var(--text-primary); font-size: 14px; outline: none;">
+	                <option value="openrouter">OpenRouter (Default)</option>
+	                <option value="openai">OpenAI</option>
+	                <option value="anthropic">Anthropic</option>
+	                <option value="openai_compatible">OpenAI Compatible (Custom / Local)</option>
+	                <option value="anthropic_compatible">Anthropic Compatible (Custom / Proxy)</option>
+	                <option value="gemini">Google Gemini</option>
+	                <option value="groq">Groq</option>
+	                <option value="deepseek">DeepSeek</option>
+	                <option value="ollama">Ollama (Local API)</option>
+	                <option value="llamacpp">llama.cpp / llama-server</option>
+	            </select>
+	            <div class="config-hint">Select the service provider for your AI requests</div>
+	        </div>
+
+	        <!-- API Key Input -->
+	        <div class="config-group" id="api-key-group">
+	            <label for="config-api-key">API Key</label>
+	            <div style="display: flex; gap: 8px;">
+	                <input type="password" id="config-api-key" placeholder="Paste your API key here" style="flex:1; padding:10px 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--input-bg); color: var(--text-primary); font-size: 13px; outline: none;">
+	                <button id="toggle-key-visibility" style="padding: 0 12px; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 10px; cursor: pointer;">
+	                    <i class="f7-icons">eye</i>
+	                </button>
+	            </div>
+	            <div class="config-hint">Keys are stored client-side in your browser localStorage only</div>
+	        </div>
+
+	        <!-- Base URL Input (for Ollama / custom) -->
+	        <div class="config-group" id="base-url-group" style="display:none;">
+	            <label for="config-base-url">Base URL</label>
+	            <input type="text" id="config-base-url" placeholder="http://localhost:11434/v1" style="width:100%; padding:10px 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--input-bg); color: var(--text-primary); font-size: 13px; outline: none;">
+	            <div class="config-hint" id="base-url-hint">Endpoint URL for Ollama, OpenAI-compatible or Anthropic proxy</div>
+	        </div>
+	        
+	        <!-- Model selector -->
+	        <div class="config-group">
+	            <label>Model</label>
+	            <div style="background: var(--card-bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+	                <span>
+	                    <i class="f7-icons" id="current-model-icon">sparkles</i>
+	                    <strong id="current-model" style="margin-left: 6px;">Singularity</strong>
+	                    <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;" id="current-model-desc">Balanced model</span>
+	                </span>
+	                <button id="change-model-btn" style="padding: 6px 14px; font-size: 12px; border: none; border-radius: 8px; background: var(--sand); color: var(--text-primary); cursor: pointer; font-weight: 500;">Change</button>
+	            </div>
+	        </div>
+
+	        <!-- Theme Selector -->
+	        <div class="config-group">
+	            <label>Theme</label>
+	            <div style="display: flex; gap: 12px;">
+	                <button id="theme-select-dark" style="flex:1; padding: 10px; border: 1px solid var(--border-color); border-radius: 10px; background: #272E33; color: #D3C6AA; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+	                    <i class="f7-icons">moon_fill</i> Dark Theme
+	                </button>
+	                <button id="theme-select-light" style="flex:1; padding: 10px; border: 1px solid var(--border-color); border-radius: 10px; background: #F0F2D4; color: #708089; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+	                    <i class="f7-icons">sun_max_fill</i> Light Theme
+	                </button>
+	            </div>
+	        </div>
+	        
+	        <!-- System Prompt -->
+	        <div class="config-group">
+	            <label for="config-system-prompt">System Prompt</label>
+	            <textarea id="config-system-prompt" rows="4" style="width:100%; padding:12px 16px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--input-bg); outline: none; font-family: var(--mod-font); font-size: 13px; color: var(--text-primary); box-sizing: border-box; resize: vertical; min-height: 90px;"></textarea>
+	            <div style="display: flex; gap: 8px; margin-top: 6px;">
+	                <button id="reset-prompt-btn" style="padding: 4px 12px; font-size: 11px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-secondary); cursor: pointer;"><i class="f7-icons">arrow_counterclockwise</i> Reset Prompt</button>
+	            </div>
+	        </div>
+	        
+	        <div class="config-group">
+	            <label for="config-temperature">Temperature: <span id="temp-value">0.7</span></label>
+	            <input type="range" id="config-temperature" min="0" max="2" step="0.1" value="0.7">
+	        </div>
+	        
+	        <div class="config-group">
+	            <label for="config-max-tokens">Max Tokens: <span id="maxtokens-value">2048</span></label>
+	            <input type="range" id="config-max-tokens" min="256" max="8192" step="256" value="2048">
+	        </div>
+	        
+	        <!-- Model selector popup/modal -->
+	        <div id="model-selector" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background: var(--card-bg); padding:24px; border-radius:16px; box-shadow: var(--shadow-xl); border: 1px solid var(--border-color); z-index:1000; min-width:320px; max-width:90%; color: var(--text-primary);">
+	            <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><i class="f7-icons">sparkles</i> Select Model</h3>
+	            <label style="font-size:12px; color:var(--text-secondary); display:block; margin-bottom:4px;">Choose from detected / preset list:</label>
+	            <select id="model-select" style="width:100%; padding:10px; margin:0 0 12px 0; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-primary); font-size: 14px;">
+	                <!-- Populated by JS -->
+	            </select>
+	            <label style="font-size:12px; color:var(--text-secondary); display:block; margin-bottom:4px;">Or enter custom model ID:</label>
+	            <input type="text" id="model-custom-input" placeholder="e.g. claude-3-7-sonnet-20250219 or qwen2.5:32b" style="width:100%; padding:10px 12px; margin:0 0 16px 0; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box;">
+	            <div style="display:flex; gap:10px; margin-top:4px;">
+	                <button id="model-select-confirm" style="flex:1; padding:10px; border: none; border-radius: 8px; background: var(--sand); color: var(--text-primary); cursor: pointer; font-weight: 500;">Confirm</button>
+	                <button id="model-select-cancel" style="flex:1; padding:10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); color: var(--text-secondary); cursor: pointer;">Cancel</button>
+	            </div>
+	        </div>
+	        
+	        <div class="config-status" id="config-status"></div>
+	        
+	        <button type="button" id="save-config" style="width:100%; padding:14px; margin-top:10px; background: var(--sand); color: var(--text-primary); border: none; border-radius: 16px; font-family: var(--mod-font); font-size: 15px; font-weight: 500; cursor: pointer; box-shadow: var(--static-shadow);"><i class="f7-icons">floppy_disk</i> Save Settings</button>
+	        <button type="button" id="test-config" style="width:100%; padding:12px; margin-top:8px; background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 14px; font-family: var(--mod-font); font-size: 13px; font-weight: 500; cursor: pointer;"><i class="f7-icons">bolt_fill</i> Test Connection</button>
+	        
+	        <div style="margin-top: 20px; padding: 15px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); font-size: 13px; color: var(--text-muted);">
+	            <strong style="color: var(--text-primary); display:flex; align-items:center; gap:6px;"><i class="f7-icons">lock_fill</i> Privacy & Security</strong>
+	            Your API key is kept locally inside your browser localStorage. Newton Web App operates in Zero-Knowledge mode.
+	        </div>
+	    </div>
+	</div>
+
+	<!-- Code Page (VS Code Layout) -->
+	<div moke-page="/code">
+	    <div class="code-container">
+	        <!-- Newton IDE Activity Bar (Functional icons only) -->
+	        <div class="vscode-activity-bar">
+	            <div class="activity-top">
+	                <div class="newton-ide-brand" onclick="Moke.navigate('/app')" title="Return to Chat (/app)">
+	                    <img src="/src/assets/newton_logo.png" alt="Newton">
+	                </div>
+	                <button class="activity-item active toggle-sidebar" title="Explorer (Toggle Sidebar)"><i class="f7-icons">folder</i></button>
+	            </div>
+	            <div class="activity-bottom">
+	                <button class="activity-item" onclick="Moke.navigate('/configs')" title="Settings (/configs)"><i class="f7-icons">gear_alt</i></button>
+	            </div>
+	        </div>
+
+	        <!-- VS Code Explorer Sidebar -->
+	        <div class="code-sidebar">
+	            <div class="code-sidebar-header">
+	                <span>EXPLORER</span>
+	                <div style="display:flex; gap:4px;">
+	                    <button id="code-new-file" class="code-new-file-btn" title="New File"><i class="f7-icons">plus</i></button>
+	                    <button class="toggle-sidebar" title="Toggle Sidebar"><i class="f7-icons">chevron_left</i></button>
+	                </div>
+	            </div>
+	            
+	            <!-- Workspace Folder Section -->
+	            <div class="explorer-section">
+	                <div class="explorer-folder-header">
+	                    <i class="f7-icons">chevron_down</i>
+	                    <span>NEWTON-WORKSPACE</span>
+	                </div>
+	                <div class="code-file-list" id="code-file-list">
+	                    <div class="file-empty"><i class="f7-icons">folder</i> No files uploaded</div>
+	                </div>
+	            </div>
+	        </div>
+
+	        <!-- Main Editor Area -->
+	        <div class="code-main">
+	            <!-- Sleek VS Code + Newton Tab Header -->
+	            <div class="vscode-tabs-header">
+	                <div class="code-tabs"></div>
+	                <div class="vscode-tab-actions">
+	                    <button id="code-run" class="vscode-action-btn run-btn" title="Run Code (Ctrl+Enter)"><i class="f7-icons">play_fill</i> Run</button>
+	                    <button id="code-stop" class="vscode-action-btn stop-btn" disabled title="Stop Execution"><i class="f7-icons">stop_fill</i></button>
+	                    <button id="code-save" class="vscode-action-btn" title="Save File (Ctrl+S)"><i class="f7-icons">floppy_disk</i></button>
+	                    <button id="code-preview-btn" class="vscode-action-btn" title="Preview HTML" style="display:none;"><i class="f7-icons">eye</i></button>
+	                    <button id="code-copy-btn" class="vscode-action-btn" title="Copy Code"><i class="f7-icons">doc_on_doc</i></button>
+	                    <button id="code-wrap-btn" class="vscode-action-btn" title="Toggle Word Wrap"><i class="f7-icons">text_alignleft</i></button>
+	                    <div class="editor-font-controls">
+	                        <button id="code-font-dec" class="vscode-action-btn" title="Decrease Font Size">A-</button>
+	                        <button id="code-font-inc" class="vscode-action-btn" title="Increase Font Size">A+</button>
+	                    </div>
+	                </div>
+	            </div>
+
+	            <!-- Integrated Breadcrumbs & AI Copilot Bar -->
+	            <div class="vscode-breadcrumbs">
+	                <div class="breadcrumb-left">
+	                    <span id="breadcrumb-path"><i class="f7-icons" style="font-size:12px; margin-right:4px;">folder</i> workspace &gt; <strong id="breadcrumb-file">script.py</strong></span>
+	                </div>
+	                
+	                <!-- Newton Copilot Compact Pill -->
+	                <div class="code-ai-pill">
+	                    <i class="f7-icons ai-icon">sparkles</i>
+	                    <input type="text" id="code-ai-input" placeholder="Ask Newton Copilot to write, refactor, or debug code...">
+	                    <button id="code-ai-submit" title="Newton Refactor"><i class="f7-icons">arrow_up</i></button>
+	                </div>
+
+	                <div class="breadcrumb-right">
+	                    <select id="code-language">
+	                        <option value="python">Python (Pyodide Wasm)</option>
+	                        <option value="javascript">JavaScript</option>
+	                        <option value="html">HTML / Web</option>
+	                        <option value="css">CSS</option>
+	                        <option value="json">JSON</option>
+	                    </select>
+	                </div>
+	            </div>
+
+	            <!-- Editor Wrapper -->
+	            <div class="code-editor-wrapper">
+	                <div class="code-progress" id="code-progress"></div>
+	                <div class="newton-editor-watermark">
+	                    <span>"Hypothesis: Every line of code obeys a law of logic."</span>
+	                </div>
+	                <textarea id="code-editor" spellcheck="false"></textarea>
+	                
+	                <!-- Live Preview Overlay/Pane -->
+	                <div class="code-preview-container" id="code-preview-container">
+	                    <div class="code-preview-header">
+	                        <span><i class="f7-icons">globe</i> Live Preview</span>
+	                        <div class="preview-actions">
+	                            <button id="preview-refresh" title="Refresh"><i class="f7-icons">arrow_counterclockwise</i></button>
+	                            <button id="preview-open" title="Open in new tab"><i class="f7-icons">arrow_up_right</i></button>
+	                            <button id="preview-close" title="Close preview"><i class="f7-icons">xmark</i></button>
+	                        </div>
+	                    </div>
+	                    <iframe class="code-preview-frame" id="code-preview-frame" sandbox="allow-scripts allow-modals"></iframe>
+	                </div>
+	            </div>
+
+	            <!-- VS Code Terminal Drawer -->
+	            <div class="code-console" id="code-console">
+	                <div class="console-resize-handle"></div>
+	                <div class="console-header">
+	                    <div class="terminal-tabs">
+	                        <span class="terminal-tab active"><i class="f7-icons" style="font-size:12px; margin-right:4px;">terminal</i> OUTPUT</span>
+	                    </div>
+	                    <div class="console-actions">
+	                        <button class="console-clear" title="Clear Console"><i class="f7-icons">trash</i></button>
+	                        <button class="console-close" title="Close Console"><i class="f7-icons">xmark</i></button>
+	                    </div>
+	                </div>
+	                <div class="console-content" id="console-content">Newton Orbit Execution Engine Ready.</div>
+	            </div>
+
+	            <!-- VS Code Bottom Status Bar -->
+	            <div class="vscode-status-bar">
+	                <div class="status-left">
+	                    <span class="status-item newton-brand" onclick="Moke.navigate('/app')" title="Newton AI"><img src="/src/assets/newton_logo.png" alt="Newton Logo" style="width:14px; height:14px;"> Newton IDE</span>
+	                </div>
+	                <div class="status-right">
+	                    <span class="status-item" id="status-line-col">Ln 1, Col 1</span>
+	                    <span class="status-item">Spaces: 4</span>
+	                    <span class="status-item">UTF-8</span>
+	                    <span class="status-item lang-item" id="code-lang-badge">Python</span>
+	                    <span class="status-item" id="code-status-text">Ready</span>
+	                </div>
+	            </div>
+	        </div>
+	    </div>
+	</div>
+
+	<!-- Onboarding Modal Wizard -->
+	<div class="modal-overlay" id="onboarding-modal">
+		<div class="onboarding-card">
+			<h2><i class="f7-icons">sparkles</i> Welcome to Newton</h2>
+			<p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Bring your own API Key to get started. Select your preferred provider below:</p>
+			
+			<div class="provider-grid">
+				<div class="provider-option selected" data-provider="openrouter">
+					<i class="f7-icons">globe</i> OpenRouter
+				</div>
+				<div class="provider-option" data-provider="openai">
+					<i class="f7-icons">cpu</i> OpenAI
+				</div>
+				<div class="provider-option" data-provider="anthropic">
+					<i class="f7-icons">chat_bubble</i> Anthropic
+				</div>
+				<div class="provider-option" data-provider="groq">
+					<i class="f7-icons">bolt</i> Groq
+				</div>
+			</div>
+
+			<div style="margin-top: 16px;">
+				<label style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-secondary);">Enter API Key:</label>
+				<input type="password" id="onboarding-api-key" placeholder="sk-..." style="width:100%; padding:12px; border:1px solid var(--border-color); border-radius:10px; background:var(--input-bg); color:var(--text-primary); outline:none;">
+			</div>
+
+			<div style="display:flex; gap:12px; margin-top:24px;">
+				<button id="onboarding-start-btn" style="width:100%; padding: 14px; border: none; border-radius: 14px; background: var(--sand); color: var(--text-primary); font-family: var(--mod-font); font-size: 15px; font-weight: 500; cursor: pointer;">Save & Continue</button>
+			    <button id="onboarding-skip-btn" style="width:100%; padding: 10px; margin-top: 8px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 13px;">Skip for now</button>
+		    </div>
+	    </div>
+	</div>
+
+	<!-- Python Interactive Input Modal -->
+	<div class="modal-overlay" id="python-input-modal" style="display:none; z-index: 20000;">
+		<div class="onboarding-card" style="max-width: 440px; text-align: left; padding: 24px 28px;">
+			<h3 style="margin-top:0; margin-bottom: 12px; display:flex; align-items:center; gap:8px; font-family: var(--ser-font); font-size: 22px; color: var(--text-primary);">
+				<i class="f7-icons" style="color: #3870FF;">terminal</i> Python Input
+			</h3>
+			<p id="python-input-label" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">Python script is requesting input:</p>
+			<input type="text" id="python-input-field" style="width:100%; padding:12px 14px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--input-bg); color: var(--text-primary); font-family: var(--mod-font); font-size: 14px; outline: none; box-sizing: border-box; margin-bottom: 18px;" placeholder="Escribe tu respuesta...">
+			<div style="display:flex; justify-content: flex-end; gap: 10px;">
+				<button id="python-input-cancel" style="padding: 10px 18px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-size: 13px;">Cancel</button>
+				<button id="python-input-submit" style="padding: 10px 22px; border: none; border-radius: 10px; background: var(--sand); color: var(--text-primary); cursor: pointer; font-weight: 500; font-size: 13px;">Submit</button>
+			</div>
+		</div>
+	</div>
+	
+    <script src="/src/components/MokeSDK/index.js"></script>
+    <script>
+	    Moke.import({
+	        piece: 'Sidebar',
+	        def_route: true,
+	        as_module: true
+	    });
+	    Moke.import({
+	        piece: 'App',
+	        def_route: true
+	    });
+	    Moke.import({
+	        piece: 'NewtonCore',
+	        def_route: true,
+	        as_module: true
+	    });
+	    Moke.import({
+	        piece: 'ThinkingOrbs',
+	        def_route: true
+	    });
+	    Moke.import({
+	        piece: 'Config',
+	        def_route: true
+	    });
+	    Moke.on('load', () => {
+	        Moke.navigate('/app');
+	    });
+	</script>
+    <script src="/src/components/Hero3D/index.js"></script>
+</body>
+</html>
