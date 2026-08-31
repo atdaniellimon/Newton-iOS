@@ -12,33 +12,55 @@ public final class OrbitEngine {
     
     private init() {}
     
-    /// Process any [ORBIT:name]{...}[/ORBIT] in text
-    public func processOrbitsInText(_ text: String) async -> (processedText: String, results: [OrbitExecutionResult]) {
+    /// Process any [ORBIT:name]{...}[/ORBIT] in text or trigger image generation
+    public func processOrbitsInText(_ text: String) async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?) {
         var outputText = text
         var results: [OrbitExecutionResult] = []
+        var detectedImageUrl: String? = nil
         
+        // 1. Process explicit [ORBIT:name]{...}
         let pattern = "\\[ORBIT:(\\w+)\\]\\s*(\\{[\\s\\S]*?\\})(?:\\s*\\[/ORBIT\\])?"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-            return (text, [])
+        if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+            let nsString = text as NSString
+            let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
+            
+            for match in matches {
+                guard match.numberOfRanges >= 3 else { continue }
+                let fullMatch = nsString.substring(with: match.range(at: 0))
+                let orbitName = nsString.substring(with: match.range(at: 1))
+                let paramsJson = nsString.substring(with: match.range(at: 2))
+                
+                let result = await executeOrbit(name: orbitName, paramsJson: paramsJson)
+                results.append(result)
+                
+                if orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" {
+                    detectedImageUrl = result.result
+                }
+                
+                let replacement = (orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine") ? "" : "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: replacement)
+            }
         }
         
-        let nsString = text as NSString
-        let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
-        
-        for match in matches {
-            guard match.numberOfRanges >= 3 else { continue }
-            let fullMatch = nsString.substring(with: match.range(at: 0))
-            let orbitName = nsString.substring(with: match.range(at: 1))
-            let paramsJson = nsString.substring(with: match.range(at: 2))
-            
-            let result = await executeOrbit(name: orbitName, paramsJson: paramsJson)
-            results.append(result)
-            
-            let replacement = "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
-            outputText = outputText.replacingOccurrences(of: fullMatch, with: replacement)
+        // 2. Detect markdown images or /imagine in output
+        if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?)\\)", options: []) {
+            let nsStr = outputText as NSString
+            if let firstMatch = imgRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsStr.length)) {
+                let urlStr = nsStr.substring(with: firstMatch.range(at: 1))
+                detectedImageUrl = urlStr
+            }
         }
         
-        return (outputText, results)
+        return (outputText, results, detectedImageUrl)
+    }
+    
+    /// Generate an image from a prompt using Flux / Pollinations AI
+    public func generateImage(prompt: String) -> String {
+        let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let encoded = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            return ""
+        }
+        return "https://image.pollinations.ai/prompt/\(encoded)?width=1024&height=1024&nologo=true&model=flux"
     }
     
     public func executeOrbit(name: String, paramsJson: String) async -> OrbitExecutionResult {
@@ -51,6 +73,11 @@ public final class OrbitEngine {
         }
         
         switch trimmedName {
+        case "image_gen", "imagine", "draw":
+            let prompt = params["prompt"] as? String ?? paramsJson
+            let url = generateImage(prompt: prompt)
+            return OrbitExecutionResult(orbitName: "image_gen", params: paramsJson, result: url, isSuccess: true)
+            
         case "web_search", "search":
             let query = params["query"] as? String ?? paramsJson
             let searchResult = await performWebSearch(query: query)

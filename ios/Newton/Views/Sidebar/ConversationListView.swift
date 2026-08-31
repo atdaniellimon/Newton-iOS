@@ -3,6 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
+//  Matching Claude iOS sidebar layout.
 //
 
 import SwiftUI
@@ -16,6 +17,8 @@ public struct ConversationListView: View {
     
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
+    @State private var conversationToDelete: Conversation? = nil
+    @State private var showDeleteConfirmation: Bool = false
     
     public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
@@ -39,18 +42,14 @@ public struct ConversationListView: View {
             
             // 3D background wave grid
             Hero3DCanvasView()
-                .opacity(0.4)
+                .opacity(0.35)
                 .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // Header with Newton Brand
-                HStack(spacing: 10) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(NewtonTheme.sand)
-                    
+            VStack(alignment: .leading, spacing: 0) {
+                // Top Brand Title (No bulb icon, clean serif "Newton")
+                HStack {
                     Text("Newton")
-                        .font(.system(size: 24, weight: .bold, design: .serif))
+                        .font(.system(size: 28, weight: .bold, design: .serif))
                         .foregroundColor(NewtonTheme.textPrimary)
                     
                     Spacer()
@@ -66,49 +65,31 @@ public struct ConversationListView: View {
                             .clipShape(Circle())
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 18)
                 
-                // New Chat Button
-                Button(action: createNewChat) {
-                    HStack {
-                        Image(systemName: "plus.bubble.fill")
-                            .font(.system(size: 15))
-                        Text("New Chat")
-                            .font(.system(size: 15, weight: .semibold))
-                        Spacer()
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 13))
-                    }
-                    .foregroundColor(Color.black.opacity(0.9))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(NewtonTheme.sand)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                // Studio Section Navigation Items (Chats, Projects, Code, Artifacts)
+                VStack(spacing: 4) {
+                    SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
+                    SidebarItemRow(icon: "folder", title: "Projects", isSelected: false)
+                    SidebarItemRow(icon: "chevron.left.forwardslash.chevron.right", title: "Code", isSelected: false)
+                    SidebarItemRow(icon: "cube.transparent", title: "Artifacts", isSelected: false)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.bottom, 16)
                 
-                // Search Bar
+                // "Recents" Section Header
                 HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(NewtonTheme.textSecondary)
-                    TextField("Search conversations...", text: $searchText)
-                        .foregroundColor(NewtonTheme.textPrimary)
-                        .font(.system(size: 14))
+                    Text("Recents")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(NewtonTheme.textMuted)
+                    Spacer()
                 }
-                .padding(10)
-                .background(NewtonTheme.surface.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(NewtonTheme.border, lineWidth: 0.8)
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 6)
                 
-                // Conversations List
+                // Conversations List with Swipe to Delete and Clean Typography
                 List {
                     ForEach(filteredConversations) { convo in
                         Button(action: {
@@ -116,44 +97,79 @@ public struct ConversationListView: View {
                             selectedConversationId = convo.id
                             onSelectConversation?(convo.id)
                         }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: convo.provider.iconName)
-                                    .font(.system(size: 15))
-                                    .foregroundColor(NewtonTheme.sand)
-                                    .frame(width: 24)
-                                
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(convo.title)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(NewtonTheme.textPrimary)
-                                        .lineLimit(1)
-                                    
-                                    HStack(spacing: 4) {
-                                        Text(convo.provider.displayName)
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .foregroundColor(NewtonTheme.textSecondary)
-                                        Text("•")
-                                            .font(.system(size: 10))
-                                            .foregroundColor(NewtonTheme.textMuted)
-                                        Text(formatDate(convo.updatedAt))
-                                            .font(.system(size: 10))
-                                            .foregroundColor(NewtonTheme.textMuted)
-                                    }
-                                }
+                            HStack {
+                                Text(convo.title)
+                                    .font(.system(size: 15, weight: .regular))
+                                    .foregroundColor(NewtonTheme.textPrimary)
+                                    .lineLimit(1)
                                 
                                 Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(NewtonTheme.textSecondary.opacity(0.5))
                             }
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
                         }
-                        .listRowBackground(NewtonTheme.card.opacity(0.85))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Haptics.medium()
+                                storage.deleteConversation(id: convo.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash.fill")
+                            }
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                Haptics.medium()
+                                storage.deleteConversation(id: convo.id)
+                            } label: {
+                                Label("Delete Chat", systemImage: "trash")
+                            }
+                        }
                     }
-                    .onDelete(perform: storage.deleteConversation)
                 }
+                .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                
+                Divider()
+                    .background(NewtonTheme.border)
+                
+                // Bottom Bar matching screenshot (User Avatar D on left + Floating "+ New chat" pill on right)
+                HStack {
+                    // User Avatar with Initial "D"
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(NewtonTheme.surface)
+                                .frame(width: 38, height: 38)
+                            Text("D")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // "+ New chat" pill button
+                    Button(action: createNewChat) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("New chat")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(Color.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.85))
+                        .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(NewtonTheme.bg)
             }
         }
         .navigationBarHidden(true)
@@ -171,17 +187,29 @@ public struct ConversationListView: View {
         selectedConversationId = newConvo.id
         onSelectConversation?(newConvo.id)
     }
+}
+
+public struct SidebarItemRow: View {
+    public let icon: String
+    public let title: String
+    public let isSelected: Bool
     
-    private func formatDate(_ date: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: date)
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
+    public var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundColor(isSelected ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                .frame(width: 24)
+            
+            Text(title)
+                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? NewtonTheme.textPrimary : NewtonTheme.textSecondary)
+            
+            Spacer()
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(isSelected ? NewtonTheme.card.opacity(0.7) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

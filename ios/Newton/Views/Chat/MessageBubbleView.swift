@@ -12,18 +12,21 @@ import UIKit
 public struct MessageBubbleView: View {
     public let message: Message
     public var onRetry: (() -> Void)? = nil
+    public var onEdit: ((String) -> Void)? = nil
     
     @State private var copied: Bool = false
+    @State private var showFullScreenImage: Bool = false
     
-    public init(message: Message, onRetry: (() -> Void)? = nil) {
+    public init(message: Message, onRetry: (() -> Void)? = nil, onEdit: ((String) -> Void)? = nil) {
         self.message = message
         self.onRetry = onRetry
+        self.onEdit = onEdit
     }
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if message.role == .user {
-                // User Message Pill (Aligned to trailing)
+                // User Message Pill (Aligned to trailing with long press to edit)
                 HStack {
                     Spacer(minLength: 48)
                     
@@ -34,6 +37,22 @@ public struct MessageBubbleView: View {
                         .padding(.vertical, 10)
                         .background(NewtonTheme.userBubble)
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .contextMenu {
+                            Button {
+                                UIPasteboard.general.string = message.content
+                                Haptics.light()
+                            } label: {
+                                Label("Copy", systemImage: "doc.on.doc")
+                            }
+                            if let onEdit = onEdit {
+                                Button {
+                                    Haptics.light()
+                                    onEdit(message.content)
+                                } label: {
+                                    Label("Edit Message", systemImage: "pencil")
+                                }
+                            }
+                        }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
@@ -51,6 +70,11 @@ public struct MessageBubbleView: View {
                         OrbitCardView(result: orbit)
                     }
                     
+                    // Generated Image (if present)
+                    if let imgUrlStr = message.imageUrl, let url = URL(string: imgUrlStr) {
+                        GeneratedImageCardView(url: url)
+                    }
+                    
                     // Main Text Content
                     if !message.content.isEmpty {
                         FormattedAssistantContent(content: message.content)
@@ -58,7 +82,7 @@ public struct MessageBubbleView: View {
                     }
                     
                     // Action Buttons Bar (Copy, Share, Regenerate)
-                    if !message.isStreaming && !message.content.isEmpty {
+                    if !message.isStreaming && (!message.content.isEmpty || message.imageUrl != nil) {
                         HStack(spacing: 16) {
                             Button(action: {
                                 UIPasteboard.general.string = message.content
@@ -99,6 +123,59 @@ public struct MessageBubbleView: View {
                 .padding(.vertical, 6)
             }
         }
+    }
+}
+
+public struct GeneratedImageCardView: View {
+    public let url: URL
+    
+    public var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .empty:
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Generating image...")
+                        .font(.system(size: 13))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 220)
+                .background(NewtonTheme.card)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
+                    )
+                    .contextMenu {
+                        ShareLink(item: url) {
+                            Label("Share Image", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                
+            case .failure:
+                VStack(spacing: 6) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: 24))
+                        .foregroundColor(NewtonTheme.coralRed)
+                    Text("Unable to load generated image")
+                        .font(.system(size: 12))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 180)
+                .background(NewtonTheme.card)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                
+            @unknown default:
+                EmptyView()
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

@@ -34,6 +34,7 @@ public struct Message: Identifiable, Codable, Equatable {
     public var role: MessageRole
     public var content: String
     public var thinkingContent: String?
+    public var imageUrl: String?
     public var orbitResults: [OrbitExecutionResult]
     public let createdAt: Date
     public var isStreaming: Bool
@@ -43,6 +44,7 @@ public struct Message: Identifiable, Codable, Equatable {
         role: MessageRole,
         content: String,
         thinkingContent: String? = nil,
+        imageUrl: String? = nil,
         orbitResults: [OrbitExecutionResult] = [],
         createdAt: Date = Date(),
         isStreaming: Bool = false
@@ -51,6 +53,7 @@ public struct Message: Identifiable, Codable, Equatable {
         self.role = role
         self.content = content
         self.thinkingContent = thinkingContent
+        self.imageUrl = imageUrl
         self.orbitResults = orbitResults
         self.createdAt = createdAt
         self.isStreaming = isStreaming
@@ -61,6 +64,7 @@ public struct Message: Identifiable, Codable, Equatable {
                lhs.role == rhs.role &&
                lhs.content == rhs.content &&
                lhs.thinkingContent == rhs.thinkingContent &&
+               lhs.imageUrl == rhs.imageUrl &&
                lhs.isStreaming == rhs.isStreaming &&
                lhs.orbitResults == rhs.orbitResults
     }

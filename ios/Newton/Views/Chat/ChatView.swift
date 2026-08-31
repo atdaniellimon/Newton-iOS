@@ -39,35 +39,9 @@ public struct ChatView: View {
             // 3D Undulating wave grid background (visible across whole chat canvas)
             Hero3DCanvasView()
                 .ignoresSafeArea()
-                .opacity(0.85)
+                .opacity(0.88)
             
             VStack(spacing: 0) {
-                // Header Bar (Title + Config Gear)
-                HStack {
-                    Text(conversation.title)
-                        .font(.system(size: 16, weight: .semibold, design: .serif))
-                        .foregroundColor(NewtonTheme.textPrimary)
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 15))
-                            .foregroundColor(NewtonTheme.textSecondary)
-                            .padding(8)
-                            .background(NewtonTheme.surface)
-                            .clipShape(Circle())
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                
-                Divider()
-                    .background(NewtonTheme.border)
-                
                 // Messages Scroll View
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -78,13 +52,16 @@ public struct ChatView: View {
                                     inputText = prompt
                                     sendMessage()
                                 })
-                                .padding(.top, 20)
+                                .padding(.top, 28)
                             } else {
                                 ForEach(conversation.messages) { message in
                                     MessageBubbleView(
                                         message: message,
                                         onRetry: {
                                             retryLastMessage()
+                                        },
+                                        onEdit: { editedText in
+                                            inputText = editedText
                                         }
                                     )
                                     .id(message.id)
@@ -126,7 +103,7 @@ public struct ChatView: View {
                                 .frame(height: 1)
                                 .id("bottom_anchor")
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 12)
                     }
                     .onChange(of: conversation.messages.count) { _ in
                         withAnimation {
@@ -156,7 +133,19 @@ public struct ChatView: View {
                 )
             }
         }
+        .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showSettings = true
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -178,6 +167,28 @@ public struct ChatView: View {
         if conversation.title == "New Conversation" || conversation.title == "Welcome to Newton" {
             let words = userPrompt.split(separator: " ").prefix(5).joined(separator: " ")
             conversation.title = String(words)
+        }
+        
+        // Check if user is asking for image generation directly
+        let lower = userPrompt.lowercased()
+        if lower.hasPrefix("/imagine ") || lower.hasPrefix("draw ") || lower.hasPrefix("generate image") || lower.hasPrefix("genera una imagen") || lower.hasPrefix("dibuja ") {
+            let prompt = lower
+                .replacingOccurrences(of: "/imagine ", with: "")
+                .replacingOccurrences(of: "generate image of ", with: "")
+                .replacingOccurrences(of: "genera una imagen de ", with: "")
+                .replacingOccurrences(of: "dibuja ", with: "")
+                .replacingOccurrences(of: "draw ", with: "")
+            
+            let imageUrl = OrbitEngine.shared.generateImage(prompt: prompt)
+            let assistantMessage = Message(
+                role: .assistant,
+                content: "Here is your generated image for: *\(prompt)*",
+                imageUrl: imageUrl
+            )
+            conversation.messages.append(assistantMessage)
+            storage.updateConversation(conversation)
+            Haptics.success()
+            return
         }
         
         let assistantMessageId = UUID().uuidString
@@ -235,10 +246,11 @@ public struct ChatView: View {
                     }
                 }
                 
-                let (finalContent, orbitResults) = await OrbitEngine.shared.processOrbitsInText(fullResponse)
+                let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(fullResponse)
                 
                 if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
                     conversation.messages[index].content = finalContent
+                    conversation.messages[index].imageUrl = detectedImgUrl
                     conversation.messages[index].orbitResults = orbitResults
                     conversation.messages[index].isStreaming = false
                 }
@@ -329,27 +341,18 @@ public struct NewtonHeroWelcomeView: View {
     
     public var body: some View {
         VStack(spacing: 24) {
-            // Authentic Newton Brand Logo
+            // Clean Newton Brand (No bulb icon, clean serif "Newton")
             VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(NewtonTheme.sand.opacity(0.14))
-                        .frame(width: 64, height: 64)
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(NewtonTheme.sand)
-                }
-                
                 Text("Newton")
-                    .font(.system(size: 26, weight: .bold, design: .serif))
+                    .font(.system(size: 32, weight: .bold, design: .serif))
                     .foregroundColor(NewtonTheme.textPrimary)
                 
                 Text("What will you discover today?")
-                    .font(.system(size: 18, weight: .regular, design: .serif))
+                    .font(.system(size: 19, weight: .regular, design: .serif))
                     .italic()
                     .foregroundColor(NewtonTheme.textSecondary)
             }
-            .padding(.top, 10)
+            .padding(.top, 16)
             
             // 2x2 Grid of Pill Cards matching Newton Web
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {

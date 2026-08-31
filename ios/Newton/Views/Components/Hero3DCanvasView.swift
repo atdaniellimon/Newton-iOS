@@ -22,26 +22,26 @@ public struct Hero3DCanvasView: View {
                 let w = size.width
                 let h = size.height
                 let cx = w / 2.0
-                let cy = h * 0.62
+                let cy = h * 0.58
                 
-                let rows = 28
-                let cols = 28
-                let gridSpacing: CGFloat = 36.0
-                let cameraHeight: CGFloat = 240.0
-                let fov: CGFloat = 360.0
+                let rows = 32
+                let cols = 30
+                let gridSpacing: CGFloat = 34.0
+                let cameraHeight: CGFloat = 220.0
+                let fov: CGFloat = 380.0
                 
                 var gridPoints: [[CGPoint]] = Array(repeating: Array(repeating: .zero, count: cols), count: rows)
                 
                 for r in 0..<rows {
                     for c in 0..<cols {
                         let xWorld = (CGFloat(c) - CGFloat(cols) / 2.0) * gridSpacing
-                        let zWorld = CGFloat(r) * gridSpacing + 35.0
+                        let zWorld = CGFloat(r) * gridSpacing + 30.0
                         
-                        // Wave equation: undulating dynamic harmonic motion
-                        let u = Double(xWorld) * 0.032
-                        let v = Double(zWorld) * 0.032
-                        let wave = sin(u + time * 0.75) * cos(v + time * 0.75) * 32.0
-                        let yWorld = wave - 15.0
+                        // Wave equation: dynamic harmonic kinetic wave motion
+                        let u = Double(xWorld) * 0.034
+                        let v = Double(zWorld) * 0.034
+                        let wave = sin(u + time * 0.8) * cos(v + time * 0.8) * 38.0
+                        let yWorld = wave - 12.0
                         
                         let depth = zWorld
                         guard depth > 10 else { continue }
@@ -71,9 +71,9 @@ public struct Hero3DCanvasView: View {
                     }
                     
                     let depthRatio = 1.0 - Double(r) / Double(rows)
-                    let alpha = max(0.04, depthRatio * (isDark ? 0.22 : 0.16))
-                    let lineColor = isDark ? NewtonTheme.sand : Color(red: 0.45, green: 0.50, blue: 0.48)
-                    context.stroke(path, with: .color(lineColor.opacity(alpha)), lineWidth: 0.85)
+                    let alpha = max(0.06, depthRatio * (isDark ? 0.35 : 0.28))
+                    let lineColor = isDark ? NewtonTheme.sand : Color(red: 0.35, green: 0.40, blue: 0.38)
+                    context.stroke(path, with: .color(lineColor.opacity(alpha)), lineWidth: 0.95)
                 }
                 
                 // Draw Vertical Perspective Lines
@@ -91,9 +91,9 @@ public struct Hero3DCanvasView: View {
                             }
                         }
                     }
-                    let alpha = isDark ? 0.08 : 0.06
-                    let lineColor = isDark ? NewtonTheme.forestGreen : Color(red: 0.55, green: 0.58, blue: 0.55)
-                    context.stroke(path, with: .color(lineColor.opacity(alpha)), lineWidth: 0.6)
+                    let alpha = isDark ? 0.16 : 0.14
+                    let lineColor = isDark ? NewtonTheme.forestGreen : Color(red: 0.45, green: 0.48, blue: 0.45)
+                    context.stroke(path, with: .color(lineColor.opacity(alpha)), lineWidth: 0.7)
                 }
             }
         }
