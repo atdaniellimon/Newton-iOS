@@ -43,19 +43,16 @@ public final class NotificationManager {
     
     /// Execute background task keeping network connection alive
     public func beginBackgroundTask(name: String, task: @escaping () async -> Void) {
-        var bgTaskId: UIBackgroundTaskIdentifier = .invalid
-        bgTaskId = UIApplication.shared.beginBackgroundTask(withName: name) {
-            if bgTaskId != .invalid {
-                UIApplication.shared.endBackgroundTask(bgTaskId)
-                bgTaskId = .invalid
-            }
+        let bgTaskId = UIApplication.shared.beginBackgroundTask(withName: name) {
+            // Expiration handler
         }
         
         Task {
             await task()
-            if bgTaskId != .invalid {
-                UIApplication.shared.endBackgroundTask(bgTaskId)
-                bgTaskId = .invalid
+            await MainActor.run {
+                if bgTaskId != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskId)
+                }
             }
         }
     }
