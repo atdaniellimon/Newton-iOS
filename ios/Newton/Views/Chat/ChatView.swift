@@ -135,7 +135,7 @@ public struct ChatView: View {
                     }
                 }
                 
-                // Ultra-Compact Studio Input Bar
+                // Ultra-Compact Studio Input Bar (Clean without model pill)
                 MessageInputBar(
                     text: $inputText,
                     attachedImage: $attachedImage,
@@ -207,13 +207,38 @@ public struct ChatView: View {
         }
     }
     
+    private func extractImagePrompt(from text: String) -> String? {
+        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        let patterns = [
+            "^/imagine\\s+(.+)$",
+            "^(?:genera|generame|crea|creame|haz)\\s+(?:una\\s+)?(?:imagen|foto|dibujo|grafico)\\s+(?:de|sobre|para)?\\s*(.+)$",
+            "^(?:generate|create|make)\\s+(?:an?\\s+)?(?:image|photo|drawing|picture)\\s+(?:of|about|for)?\\s*(.+)$",
+            "^(?:dibuja|dibujame|pinta|pintame|draw|paint)\\s+(?:a|un|una)?\\s*(.+)$"
+        ]
+        
+        for p in patterns {
+            if let regex = try? NSRegularExpression(pattern: p, options: [.caseInsensitive]) {
+                let ns = text as NSString
+                if let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)),
+                   match.numberOfRanges >= 2 {
+                    let extracted = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !extracted.isEmpty {
+                        return extracted
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
     private func sendMessage() {
         var userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         if userPrompt.isEmpty && attachedImage != nil {
-            userPrompt = "Please analyze this image."
+            userPrompt = "Describe and explain the details, text, and information shown in the attached content."
         }
         if userPrompt.isEmpty && attachedFileName != nil {
-            userPrompt = "Please examine this attached file: \(attachedFileName ?? "")."
+            userPrompt = "Please examine the contents of this file: \(attachedFileName ?? "")."
         }
         guard !userPrompt.isEmpty || attachedImage != nil else { return }
         
@@ -244,20 +269,12 @@ public struct ChatView: View {
             conversation.title = String(userPrompt.split(separator: " ").prefix(4).joined(separator: " "))
         }
         
-        // Check if user is asking for image generation directly
-        let lower = userPrompt.lowercased()
-        if lower.hasPrefix("/imagine ") || lower.hasPrefix("draw ") || lower.hasPrefix("generate image") || lower.hasPrefix("genera una imagen") || lower.hasPrefix("dibuja ") {
-            let prompt = lower
-                .replacingOccurrences(of: "/imagine ", with: "")
-                .replacingOccurrences(of: "generate image of ", with: "")
-                .replacingOccurrences(of: "genera una imagen de ", with: "")
-                .replacingOccurrences(of: "dibuja ", with: "")
-                .replacingOccurrences(of: "draw ", with: "")
-            
-            let imageUrl = OrbitEngine.shared.generateImage(prompt: prompt)
+        // Check for direct Image Generation prompt match
+        if let imagePrompt = extractImagePrompt(from: userPrompt) {
+            let imageUrl = OrbitEngine.shared.generateImage(prompt: imagePrompt)
             let assistantMessage = Message(
                 role: .assistant,
-                content: "Here is your generated image for: *\(prompt)*",
+                content: "Here is your generated image for: *\(imagePrompt)*",
                 imageUrl: imageUrl
             )
             conversation.messages.append(assistantMessage)
@@ -409,7 +426,7 @@ public struct ChatView: View {
                 }
             }
         } catch {
-            // Keep default initial words on fallback
+            // Fallback
         }
     }
     
@@ -480,7 +497,7 @@ public struct NewtonHeroWelcomeView: View {
     
     public var body: some View {
         VStack(spacing: 24) {
-            // Clean Newton Brand (No bulb icon, clean serif "Newton")
+            // Clean Newton Brand
             VStack(spacing: 6) {
                 Text("Newton")
                     .font(.system(size: 32, weight: .bold, design: .serif))

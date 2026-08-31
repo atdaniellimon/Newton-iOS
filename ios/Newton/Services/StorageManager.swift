@@ -6,68 +6,50 @@
 //
 
 import Foundation
-import Combine
 
 public final class StorageManager: ObservableObject {
     public static let shared = StorageManager()
     
     @Published public var conversations: [Conversation] = []
     
-    private let fileName = "newton_conversations.json"
+    private let conversationsFileName = "newton_conversations_v1.json"
+    
+    private var fileURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent(conversationsFileName)
+    }
     
     private init() {
         loadConversations()
     }
     
-    private var fileURL: URL {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        return paths[0].appendingPathComponent(fileName)
-    }
-    
-    public func loadConversations() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            // Create initial welcome conversation
-            let welcomeMessage = Message(
-                role: .assistant,
-                content: "Hello! I am **Newton AI**, your high-precision scientific and coding assistant. How can I assist your research or projects today?"
-            )
-            let initial = Conversation(
-                title: "Welcome to Newton",
-                messages: [welcomeMessage]
-            )
-            self.conversations = [initial]
-            saveConversations()
-            return
-        }
-        
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let decoded = try JSONDecoder().decode([Conversation].self, from: data)
-            self.conversations = decoded
-        } catch {
-            print("Error loading conversations: \(error)")
-        }
-    }
-    
-    public func saveConversations() {
-        do {
-            let data = try JSONEncoder().encode(conversations)
-            try data.write(to: fileURL, options: [.atomicWrite])
-        } catch {
-            print("Error saving conversations: \(error)")
-        }
-    }
-    
-    public func createConversation(title: String = "New Conversation", provider: AIProvider, modelId: String) -> Conversation {
-        let conversation = Conversation(title: title, messages: [], provider: provider, modelId: modelId)
-        conversations.insert(conversation, at: 0)
+    public func createConversation(provider: AIProvider, modelId: String, title: String = "New Conversation") -> Conversation {
+        let newConvo = Conversation(
+            title: title,
+            provider: provider,
+            modelId: modelId,
+            messages: []
+        )
+        conversations.insert(newConvo, at: 0)
+        sortConversations()
         saveConversations()
-        return conversation
+        return newConvo
     }
     
-    public func updateConversation(_ conversation: Conversation) {
-        if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
-            conversations[index] = conversation
+    public func updateConversation(_ convo: Conversation) {
+        if let index = conversations.firstIndex(where: { $0.id == convo.id }) {
+            var updated = convo
+            updated.updatedAt = Date()
+            conversations[index] = updated
+            sortConversations()
+            saveConversations()
+        }
+    }
+    
+    public func togglePin(id: String) {
+        if let index = conversations.firstIndex(where: { $0.id == id }) {
+            conversations[index].isPinned.toggle()
+            sortConversations()
             saveConversations()
         }
     }
@@ -80,5 +62,51 @@ public final class StorageManager: ObservableObject {
     public func deleteConversation(id: String) {
         conversations.removeAll(where: { $0.id == id })
         saveConversations()
+    }
+    
+    public func sortConversations() {
+        conversations.sort { (a, b) -> Bool in
+            if a.isPinned != b.isPinned {
+                return a.isPinned && !b.isPinned
+            }
+            return a.updatedAt > b.updatedAt
+        }
+    }
+    
+    private func saveConversations() {
+        do {
+            let data = try JSONEncoder().encode(conversations)
+            try data.write(to: fileURL, options: [.atomicWrite])
+        } catch {
+            print("Error saving conversations: \(error)")
+        }
+    }
+    
+    private func loadConversations() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            let welcome = Conversation(
+                title: "Welcome to Newton",
+                provider: .openrouter,
+                modelId: "anthropic/claude-3.5-sonnet",
+                messages: [
+                    Message(
+                        role: .assistant,
+                        content: "Welcome to Newton. An elegant, private AI interface designed for deep reasoning, creative writing, and high-performance coding."
+                    )
+                ]
+            )
+            self.conversations = [welcome]
+            saveConversations()
+            return
+        }
+        
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let loaded = try JSONDecoder().decode([Conversation].self, from: data)
+            self.conversations = loaded
+            sortConversations()
+        } catch {
+            print("Error loading conversations: \(error)")
+        }
     }
 }

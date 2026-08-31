@@ -3,7 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Matching Claude iOS sidebar layout.
+//  Matching Claude iOS sidebar layout with Chat Pinning and bottom Settings gear.
 //
 
 import SwiftUI
@@ -17,8 +17,6 @@ public struct ConversationListView: View {
     
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
-    @State private var conversationToDelete: Conversation? = nil
-    @State private var showDeleteConfirmation: Bool = false
     
     public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
@@ -26,10 +24,11 @@ public struct ConversationListView: View {
     }
     
     private var filteredConversations: [Conversation] {
+        let list = storage.conversations
         if searchText.isEmpty {
-            return storage.conversations
+            return list
         }
-        return storage.conversations.filter {
+        return list.filter {
             $0.title.localizedCaseInsensitiveContains(searchText) ||
             $0.messages.contains(where: { $0.content.localizedCaseInsensitiveContains(searchText) })
         }
@@ -46,28 +45,17 @@ public struct ConversationListView: View {
                 .ignoresSafeArea()
             
             VStack(alignment: .leading, spacing: 0) {
-                // Top Brand Title (No bulb icon, clean serif "Newton")
+                // Top Brand Title
                 HStack {
                     Text("Newton")
                         .font(.system(size: 28, weight: .bold, design: .serif))
                         .foregroundColor(NewtonTheme.textPrimary)
                     
                     Spacer()
-                    
-                    Button(action: {
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(NewtonTheme.textSecondary)
-                            .padding(8)
-                            .background(NewtonTheme.surface)
-                            .clipShape(Circle())
-                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
-                .padding(.bottom, 18)
+                .padding(.bottom, 16)
                 
                 // Studio Section Navigation Items (Chats, Projects, Code, Artifacts)
                 VStack(spacing: 4) {
@@ -77,7 +65,7 @@ public struct ConversationListView: View {
                     SidebarItemRow(icon: "cube.transparent", title: "Artifacts", isSelected: false)
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, 14)
                 
                 // "Recents" Section Header
                 HStack {
@@ -89,7 +77,7 @@ public struct ConversationListView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 6)
                 
-                // Conversations List with Swipe to Delete and Clean Typography
+                // Conversations List with Pinning and Deletion
                 List {
                     ForEach(filteredConversations) { convo in
                         Button(action: {
@@ -97,9 +85,15 @@ public struct ConversationListView: View {
                             selectedConversationId = convo.id
                             onSelectConversation?(convo.id)
                         }) {
-                            HStack {
+                            HStack(spacing: 8) {
+                                if convo.isPinned {
+                                    Image(systemName: "pin.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(NewtonTheme.sand)
+                                }
+                                
                                 Text(convo.title)
-                                    .font(.system(size: 15, weight: .regular))
+                                    .font(.system(size: 15, weight: convo.isPinned ? .semibold : .regular))
                                     .foregroundColor(NewtonTheme.textPrimary)
                                     .lineLimit(1)
                                 
@@ -110,6 +104,15 @@ public struct ConversationListView: View {
                         }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                Haptics.light()
+                                storage.togglePin(id: convo.id)
+                            } label: {
+                                Label(convo.isPinned ? "Unpin" : "Pin", systemImage: convo.isPinned ? "pin.slash.fill" : "pin.fill")
+                            }
+                            .tint(NewtonTheme.sand)
+                        }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 Haptics.medium()
@@ -119,6 +122,13 @@ public struct ConversationListView: View {
                             }
                         }
                         .contextMenu {
+                            Button {
+                                Haptics.light()
+                                storage.togglePin(id: convo.id)
+                            } label: {
+                                Label(convo.isPinned ? "Unpin Chat" : "Pin Chat", systemImage: convo.isPinned ? "pin.slash" : "pin")
+                            }
+                            
                             Button(role: .destructive) {
                                 Haptics.medium()
                                 storage.deleteConversation(id: convo.id)
@@ -134,19 +144,19 @@ public struct ConversationListView: View {
                 Divider()
                     .background(NewtonTheme.border)
                 
-                // Bottom Bar matching screenshot (User Avatar D on left + Floating "+ New chat" pill on right)
+                // Bottom Bar: Settings Gear on left + "+ New chat" pill on right
                 HStack {
-                    // User Avatar with Initial "D"
+                    // Settings Gear Button
                     Button(action: {
                         showSettings = true
                     }) {
                         ZStack {
                             Circle()
                                 .fill(NewtonTheme.surface)
-                                .frame(width: 38, height: 38)
-                            Text("D")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(NewtonTheme.textPrimary)
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 17))
+                                .foregroundColor(NewtonTheme.textSecondary)
                         }
                     }
                     
