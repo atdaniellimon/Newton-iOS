@@ -14,7 +14,6 @@ public final class SettingsManager: ObservableObject {
     @AppStorage("currentProvider") public var currentProviderRaw: String = AIProvider.openrouter.rawValue
     @AppStorage("currentModelId") public var currentModelId: String = "anthropic/claude-3.5-sonnet"
     @AppStorage("customBaseUrl") public var customBaseUrl: String = "http://127.0.0.1:8000/v1"
-    @AppStorage("ollamaBaseUrl") public var ollamaBaseUrl: String = "http://127.0.0.1:11434"
     @AppStorage("customApiKey") public var customApiKey: String = ""
     @AppStorage("temperature") public var temperature: Double = 0.7
     @AppStorage("maxTokens") public var maxTokens: Int = 4096
@@ -28,15 +27,27 @@ public final class SettingsManager: ObservableObject {
         set { currentProviderRaw = newValue.rawValue }
     }
     
+    public var currentApiKey: String {
+        get { getApiKey(for: currentProvider) }
+        set { setApiKey(newValue, for: currentProvider) }
+    }
+    
+    public func isConfigured() -> Bool {
+        if currentProvider.isCustomOrLocal {
+            return !effectiveBaseUrl(for: currentProvider).isEmpty
+        }
+        return !getApiKey(for: currentProvider).isEmpty
+    }
+    
     public func getApiKey(for provider: AIProvider) -> String {
-        if provider == .custom {
+        if provider == .openaiCompatible || provider == .anthropicCompatible {
             return customApiKey
         }
         return KeychainManager.shared.getApiKey(for: provider)
     }
     
     public func setApiKey(_ key: String, for provider: AIProvider) {
-        if provider == .custom {
+        if provider == .openaiCompatible || provider == .anthropicCompatible {
             customApiKey = key
         } else {
             KeychainManager.shared.saveApiKey(key, for: provider)
@@ -45,14 +56,10 @@ public final class SettingsManager: ObservableObject {
     }
     
     public func effectiveBaseUrl(for provider: AIProvider) -> String {
-        switch provider {
-        case .custom:
-            return customBaseUrl.isEmpty ? "http://127.0.0.1:8000/v1" : customBaseUrl
-        case .ollama:
-            return ollamaBaseUrl.isEmpty ? "http://127.0.0.1:11434" : ollamaBaseUrl
-        default:
-            return provider.defaultBaseUrl
+        if provider == .openaiCompatible || provider == .anthropicCompatible {
+            return customBaseUrl.isEmpty ? provider.defaultBaseUrl : customBaseUrl
         }
+        return provider.defaultBaseUrl
     }
     
     public func defaultSystemPrompt() -> String {
