@@ -455,7 +455,7 @@ public struct FormattedAssistantContent: View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(blocks) { block in
                 if block.isCode, let code = block.code {
-                    CodeBlockView(language: block.language ?? "", code: code)
+                    CodeBlockView(code: code, language: block.language ?? "")
                 } else if let txt = block.text {
                     Text(LocalizedStringKey(txt))
                         .font(.system(size: 15, design: .serif))
