@@ -20,9 +20,9 @@ public final class LLMService {
         modelId: String,
         baseUrl: String,
         apiKey: String,
-        temperature: Double,
-        maxTokens: Int,
-        systemPrompt: String
+        temperature: Double = 0.7,
+        maxTokens: Int = 2048,
+        systemPrompt: String = ""
     ) -> AsyncThrowingStream<String, Error> {
         
         return AsyncThrowingStream { continuation in
@@ -129,7 +129,7 @@ public final class LLMService {
         case .anthropic:
             request.setValue(key, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        case .openRouter:
+        case .openrouter:
             request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
             request.setValue("https://newton.ai", forHTTPHeaderField: "HTTP-Referer")
             request.setValue("Newton iOS", forHTTPHeaderField: "X-Title")
@@ -154,7 +154,6 @@ public final class LLMService {
                 let role = msg.role == .user ? "user" : "assistant"
                 
                 if let imgDataUrl = msg.imageUrl, imgDataUrl.hasPrefix("data:image/") {
-                    // Extract base64 and media type
                     var mediaType = "image/jpeg"
                     var base64Data = imgDataUrl
                     if let commaIdx = imgDataUrl.firstIndex(of: ",") {
@@ -175,7 +174,7 @@ public final class LLMService {
                         ],
                         [
                             "type": "text",
-                            "text": msg.content
+                            "text": msg.content.isEmpty ? "Analyze this image." : msg.content
                         ]
                     ]
                     formattedMessages.append(["role": role, "content": contentArray])
@@ -208,7 +207,6 @@ public final class LLMService {
                 let role = msg.role.rawValue
                 
                 if let imgDataUrl = msg.imageUrl, !imgDataUrl.isEmpty {
-                    // Multimodal content array
                     let contentArray: [[String: Any]] = [
                         ["type": "text", "text": msg.content.isEmpty ? "Describe this image." : msg.content],
                         ["type": "image_url", "image_url": ["url": imgDataUrl]]
