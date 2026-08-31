@@ -436,8 +436,8 @@ public struct FormattedAssistantContent: View {
     public let content: String
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            let blocks = parseContentBlocks(content)
+        let blocks = parseContentBlocks(content)
+        return VStack(alignment: .leading, spacing: 12) {
             ForEach(blocks.indices, id: \.self) { index in
                 switch blocks[index] {
                 case .text(let text):
