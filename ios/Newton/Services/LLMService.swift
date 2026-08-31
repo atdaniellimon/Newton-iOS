@@ -203,9 +203,9 @@ public final class LLMService {
                 let role = msg.role.rawValue
                 var textContent = msg.content
                 
-                // Reinforce Singularity identity on initial user prompt for local proxy compatibility
+                // Reinforce Singularity identity & Orbits capability on initial user prompt for local proxy compatibility
                 if index == 0 && msg.role == .user {
-                    textContent = "[IDENTITY: You are Newton (Singularity). Always respond as Newton.]\n\n\(textContent)"
+                    textContent = "[IDENTITY & ORBITS: You are Newton (Singularity). You have the tool [ORBIT:generate_image]{\"prompt\": \"...\"}[/ORBIT] to create images. If the user asks for an image, invoke it directly.]\n\n\(textContent)"
                 }
                 
                 if let imgDataUrl = msg.imageUrl, !imgDataUrl.isEmpty {
