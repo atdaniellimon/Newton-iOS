@@ -133,6 +133,7 @@ public struct ChatView: View {
                             proxy.scrollTo("bottom_anchor", anchor: .bottom)
                         }
                     }
+                    .scrollDismissesKeyboard(.interactively)
                 }
                 
                 // Ultra-Compact Studio Input Bar

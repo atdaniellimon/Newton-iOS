@@ -57,12 +57,12 @@ public struct ConversationListView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 16)
                 
-                // Studio Section Navigation Items (Chats, Projects, Code, Artifacts)
+                // Studio Section Navigation Items (Chats, Projects, Code, Art gallery)
                 VStack(spacing: 4) {
                     SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
                     SidebarItemRow(icon: "folder", title: "Projects", isSelected: false)
                     SidebarItemRow(icon: "chevron.left.forwardslash.chevron.right", title: "Code", isSelected: false)
-                    SidebarItemRow(icon: "cube.transparent", title: "Artifacts", isSelected: false)
+                    SidebarItemRow(icon: "cube.transparent", title: "Art gallery", isSelected: false)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
