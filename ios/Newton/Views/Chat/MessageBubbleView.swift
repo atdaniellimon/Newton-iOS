@@ -3,93 +3,102 @@
 //  Newton
 //
 //  Created for Newton iOS.
+//  Clean studio-grade typography layout matching Claude iOS & Newton Web.
 //
 
 import SwiftUI
+import UIKit
 
 public struct MessageBubbleView: View {
     public let message: Message
+    public var onRetry: (() -> Void)? = nil
     
-    public init(message: Message) {
+    @State private var copied: Bool = false
+    
+    public init(message: Message, onRetry: (() -> Void)? = nil) {
         self.message = message
+        self.onRetry = onRetry
     }
     
     public var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            if message.role == .assistant {
-                // Newton Avatar
-                ZStack {
-                    Circle()
-                        .fill(NewtonTheme.sand.opacity(0.15))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14))
-                        .foregroundColor(NewtonTheme.sand)
-                }
-            } else {
-                Spacer(minLength: 40)
-            }
-            
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
-                // Thinking card if present
-                if let thinking = message.thinkingContent, !thinking.isEmpty {
-                    ThinkingCardView(content: thinking)
-                }
-                
-                // Orbit result cards
-                ForEach(message.orbitResults) { orbit in
-                    OrbitCardView(result: orbit)
-                }
-                
-                // Message body
-                if message.role == .user {
-                    Text(message.content)
-                        .font(.system(size: 15))
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(NewtonTheme.messageUserGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                } else {
-                    FormattedAssistantContent(content: message.content)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(NewtonTheme.cardDark)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(NewtonTheme.borderDark, lineWidth: 0.6)
-                        )
-                }
-                
-                if message.isStreaming {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                        Text("Newton is thinking...")
-                            .font(.system(size: 11))
-                            .foregroundColor(NewtonTheme.textSecondary)
-                    }
-                    .padding(.leading, 4)
-                }
-            }
-            
+        VStack(alignment: .leading, spacing: 6) {
             if message.role == .user {
-                // User Avatar
-                ZStack {
-                    Circle()
-                        .fill(NewtonTheme.surfaceDark)
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(NewtonTheme.textPrimary)
+                // User Message Pill (Aligned to trailing)
+                HStack {
+                    Spacer(minLength: 48)
+                    
+                    Text(message.content)
+                        .font(.system(size: 15.5, weight: .regular))
+                        .foregroundColor(Color.black.opacity(0.9))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(NewtonTheme.userBubble)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+                
             } else {
-                Spacer(minLength: 40)
+                // Assistant Message (Clean typography on canvas, no heavy bounding box)
+                VStack(alignment: .leading, spacing: 10) {
+                    // Thinking Chain if present
+                    if let thinking = message.thinkingContent, !thinking.isEmpty {
+                        ThinkingCardView(content: thinking)
+                    }
+                    
+                    // Orbit results
+                    ForEach(message.orbitResults) { orbit in
+                        OrbitCardView(result: orbit)
+                    }
+                    
+                    // Main Text Content
+                    if !message.content.isEmpty {
+                        FormattedAssistantContent(content: message.content)
+                            .textSelection(.enabled)
+                    }
+                    
+                    // Action Buttons Bar (Copy, Share, Regenerate)
+                    if !message.isStreaming && !message.content.isEmpty {
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                UIPasteboard.general.string = message.content
+                                Haptics.light()
+                                withAnimation { copied = true }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    withAnimation { copied = false }
+                                }
+                            }) {
+                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(copied ? NewtonTheme.forestGreen : NewtonTheme.textSecondary)
+                            }
+                            
+                            ShareLink(item: message.content) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(NewtonTheme.textSecondary)
+                            }
+                            
+                            if let retry = onRetry {
+                                Button(action: {
+                                    Haptics.light()
+                                    retry()
+                                }) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(NewtonTheme.textSecondary)
+                                }
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 6)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 4)
     }
 }
 
@@ -101,7 +110,7 @@ public struct FormattedAssistantContent: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             let blocks = parseContent(content)
             ForEach(0..<blocks.count, id: \.self) { idx in
                 let block = blocks[idx]
@@ -109,9 +118,10 @@ public struct FormattedAssistantContent: View {
                     CodeBlockView(code: block.text, language: block.language)
                 } else {
                     Text(LocalizedStringKey(block.text))
-                        .font(.system(size: 14.5))
+                        .font(.system(size: 16, weight: .regular))
+                        .lineSpacing(4.5)
                         .foregroundColor(NewtonTheme.textPrimary)
-                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -138,7 +148,6 @@ public struct FormattedAssistantContent: View {
                 }
                 blocks.append(ContentBlock(text: codeText.trimmingCharacters(in: .whitespacesAndNewlines), isCode: true, language: lang))
             } else {
-                // Normal markdown text
                 let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     blocks.append(ContentBlock(text: trimmed, isCode: false, language: ""))

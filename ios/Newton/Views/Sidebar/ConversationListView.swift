@@ -34,18 +34,18 @@ public struct ConversationListView: View {
     
     public var body: some View {
         ZStack {
-            NewtonTheme.bgDark
+            NewtonTheme.bg
                 .ignoresSafeArea()
             
-            // Subtle 3D background grid
+            // 3D background wave grid
             Hero3DCanvasView()
                 .opacity(0.4)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header with Logo
+                // Header with Newton Brand
                 HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "lightbulb.fill")
                         .font(.system(size: 20))
                         .foregroundColor(NewtonTheme.sand)
                     
@@ -62,13 +62,13 @@ public struct ConversationListView: View {
                             .font(.system(size: 16))
                             .foregroundColor(NewtonTheme.textSecondary)
                             .padding(8)
-                            .background(NewtonTheme.surfaceDark)
+                            .background(NewtonTheme.surface)
                             .clipShape(Circle())
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
                 
                 // New Chat Button
                 Button(action: createNewChat) {
@@ -81,14 +81,14 @@ public struct ConversationListView: View {
                         Image(systemName: "sparkle")
                             .font(.system(size: 13))
                     }
-                    .foregroundColor(.black)
+                    .foregroundColor(Color.black.opacity(0.9))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(NewtonTheme.sand)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 
                 // Search Bar
                 HStack {
@@ -99,11 +99,11 @@ public struct ConversationListView: View {
                         .font(.system(size: 14))
                 }
                 .padding(10)
-                .background(NewtonTheme.surfaceDark.opacity(0.85))
+                .background(NewtonTheme.surface.opacity(0.8))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(NewtonTheme.borderDark, lineWidth: 0.8)
+                        .stroke(NewtonTheme.border, lineWidth: 0.8)
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -149,7 +149,7 @@ public struct ConversationListView: View {
                             }
                             .padding(.vertical, 6)
                         }
-                        .listRowBackground(NewtonTheme.cardDark.opacity(0.85))
+                        .listRowBackground(NewtonTheme.card.opacity(0.85))
                     }
                     .onDelete(perform: storage.deleteConversation)
                 }

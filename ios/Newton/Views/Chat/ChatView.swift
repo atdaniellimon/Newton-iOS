@@ -3,6 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
+//  Matching Newton Web and Studio UI.
 //
 
 import SwiftUI
@@ -23,26 +24,30 @@ public struct ChatView: View {
         self._conversation = conversation
     }
     
+    private var shortModelDisplayName: String {
+        if let last = settings.currentModelId.split(separator: "/").last {
+            return String(last)
+        }
+        return settings.currentModelId
+    }
+    
     public var body: some View {
         ZStack {
             NewtonTheme.bg
                 .ignoresSafeArea()
             
-            // 3D Undulating wave grid background
-            if conversation.messages.isEmpty {
-                Hero3DCanvasView()
-                    .ignoresSafeArea()
-                    .opacity(0.85)
-            }
+            // 3D Undulating wave grid background (visible across whole chat canvas)
+            Hero3DCanvasView()
+                .ignoresSafeArea()
+                .opacity(0.85)
             
             VStack(spacing: 0) {
-                // Header Status Pill & Model info
+                // Header Bar (Title + Config Gear)
                 HStack {
-                    Button(action: {
-                        showModelPicker = true
-                    }) {
-                        StatusPillView()
-                    }
+                    Text(conversation.title)
+                        .font(.system(size: 16, weight: .semibold, design: .serif))
+                        .foregroundColor(NewtonTheme.textPrimary)
+                        .lineLimit(1)
                     
                     Spacer()
                     
@@ -57,7 +62,7 @@ public struct ChatView: View {
                             .clipShape(Circle())
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.vertical, 8)
                 
                 Divider()
@@ -66,45 +71,40 @@ public struct ChatView: View {
                 // Messages Scroll View
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 12) {
+                        LazyVStack(spacing: 8) {
                             if conversation.messages.isEmpty {
-                                EmptyStateView(onPromptSelected: { prompt in
+                                // Newton Hero Welcome Screen matching web screenshot
+                                NewtonHeroWelcomeView(onPromptSelected: { prompt in
                                     inputText = prompt
                                     sendMessage()
                                 })
-                                .padding(.top, 24)
+                                .padding(.top, 20)
                             } else {
                                 ForEach(conversation.messages) { message in
-                                    MessageBubbleView(message: message)
-                                        .id(message.id)
+                                    MessageBubbleView(
+                                        message: message,
+                                        onRetry: {
+                                            retryLastMessage()
+                                        }
+                                    )
+                                    .id(message.id)
                                 }
                             }
                             
-                            // 3D Animated Thinking Orb when streaming / thinking
-                            if isStreaming {
+                            // Single Unified 3D Thinking Indicator (No redundant boxes)
+                            if isStreaming && (conversation.messages.last?.content.isEmpty ?? true) {
                                 HStack(spacing: 12) {
-                                    ThinkingOrbView(size: 42, style: .globe)
+                                    ThinkingOrbView(size: 32, style: .globe)
                                     
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Newton is reasoning...")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(NewtonTheme.sand)
-                                        Text("Processing context and active orbits")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(NewtonTheme.textSecondary)
-                                    }
+                                    Text("Newton is reasoning...")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(NewtonTheme.sand)
+                                    
                                     Spacer()
                                 }
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
-                                .background(NewtonTheme.card.opacity(0.9))
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(NewtonTheme.sand.opacity(0.3), lineWidth: 0.8)
-                                )
-                                .padding(.horizontal, 16)
-                                .id("thinking_orb_card")
+                                .id("thinking_indicator")
                             }
                             
                             if let error = errorMessage {
@@ -118,7 +118,7 @@ public struct ChatView: View {
                                 .padding(12)
                                 .background(NewtonTheme.coralRed.opacity(0.15))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, 20)
                                 .id("error_bubble")
                             }
                             
@@ -126,7 +126,7 @@ public struct ChatView: View {
                                 .frame(height: 1)
                                 .id("bottom_anchor")
                         }
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 8)
                     }
                     .onChange(of: conversation.messages.count) { _ in
                         withAnimation {
@@ -143,16 +143,19 @@ public struct ChatView: View {
                     }
                 }
                 
-                // Input Bar
+                // Floating Studio Input Bar
                 MessageInputBar(
                     text: $inputText,
                     isStreaming: isStreaming,
+                    modelName: shortModelDisplayName,
+                    onModelTap: {
+                        showModelPicker = true
+                    },
                     onSend: sendMessage,
                     onStop: stopStreaming
                 )
             }
         }
-        .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -259,6 +262,15 @@ public struct ChatView: View {
         }
     }
     
+    private func retryLastMessage() {
+        guard let lastUserMsg = conversation.messages.last(where: { $0.role == .user }) else { return }
+        if conversation.messages.last?.role == .assistant {
+            conversation.messages.removeLast()
+        }
+        inputText = lastUserMsg.content
+        sendMessage()
+    }
+    
     private func stopStreaming() {
         currentStreamTask?.cancel()
         currentStreamTask = nil
@@ -271,68 +283,109 @@ public struct ChatView: View {
     }
 }
 
-public struct EmptyStateView: View {
+// MARK: - Newton Hero Welcome View (Matching Screenshot 5)
+
+public struct NewtonHeroWelcomeView: View {
     public let onPromptSelected: (String) -> Void
-    
-    let starterPrompts = [
-        "Explain how general relativity works with an analogy",
-        "Write a Swift actor to handle rate-limited API requests",
-        "What are the key advantages of DeepSeek R1 reasoning?",
-        "Help me brainstorm a scientific experiment in quantum computing"
-    ]
     
     public init(onPromptSelected: @escaping (String) -> Void) {
         self.onPromptSelected = onPromptSelected
     }
     
+    private struct CardItem: Identifiable {
+        let id = UUID()
+        let icon: String
+        let title: String
+        let subtitle: String
+        let prompt: String
+    }
+    
+    private let cards: [CardItem] = [
+        CardItem(
+            icon: "lightbulb.fill",
+            title: "Explain a Concept",
+            subtitle: "Quantum computing basics",
+            prompt: "Explain the fundamental principles of quantum computing and qubits with a clear analogy."
+        ),
+        CardItem(
+            icon: "chevron.left.forwardslash.chevron.right",
+            title: "Code & Debug",
+            subtitle: "Python web scraper script",
+            prompt: "Write a modern, robust Python script using asyncio and BeautifulSoup to scrape and parse data."
+        ),
+        CardItem(
+            icon: "doc.text.fill",
+            title: "Write & Draft",
+            subtitle: "Technical architecture spec",
+            prompt: "Draft a concise technical architecture specification for a high-performance streaming API."
+        ),
+        CardItem(
+            icon: "sparkles",
+            title: "Analyze & Compare",
+            subtitle: "Claude 3.5 vs DeepSeek R1",
+            prompt: "Compare the reasoning capabilities, architecture, and tradeoffs of Claude 3.5 Sonnet vs DeepSeek R1."
+        )
+    ]
+    
     public var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(NewtonTheme.sand.opacity(0.12))
-                    .frame(width: 68, height: 68)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 28))
-                    .foregroundColor(NewtonTheme.sand)
-            }
-            
+        VStack(spacing: 24) {
+            // Authentic Newton Brand Logo
             VStack(spacing: 6) {
-                Text("How can I help you today?")
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                ZStack {
+                    Circle()
+                        .fill(NewtonTheme.sand.opacity(0.14))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(NewtonTheme.sand)
+                }
+                
+                Text("Newton")
+                    .font(.system(size: 26, weight: .bold, design: .serif))
                     .foregroundColor(NewtonTheme.textPrimary)
                 
-                Text("Select a prompt or ask any scientific or code question")
-                    .font(.system(size: 13))
+                Text("What will you discover today?")
+                    .font(.system(size: 18, weight: .regular, design: .serif))
+                    .italic()
                     .foregroundColor(NewtonTheme.textSecondary)
             }
+            .padding(.top, 10)
             
-            VStack(spacing: 8) {
-                ForEach(starterPrompts, id: \.self) { prompt in
+            // 2x2 Grid of Pill Cards matching Newton Web
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ForEach(cards) { item in
                     Button(action: {
                         Haptics.selection()
-                        onPromptSelected(prompt)
+                        onPromptSelected(item.prompt)
                     }) {
-                        HStack {
-                            Text(prompt)
-                                .font(.system(size: 13))
-                                .foregroundColor(NewtonTheme.textPrimary)
-                                .multilineTextAlignment(.leading)
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(NewtonTheme.sand)
+                                Text(item.title)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(NewtonTheme.textPrimary)
+                            }
+                            
+                            Text(item.subtitle)
                                 .font(.system(size: 11))
                                 .foregroundColor(NewtonTheme.textSecondary)
+                                .lineLimit(1)
                         }
-                        .padding(14)
-                        .background(NewtonTheme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(NewtonTheme.card.opacity(0.85))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(NewtonTheme.border, lineWidth: 0.7)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(NewtonTheme.border, lineWidth: 0.8)
                         )
                     }
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 20)
         }
     }
 }
