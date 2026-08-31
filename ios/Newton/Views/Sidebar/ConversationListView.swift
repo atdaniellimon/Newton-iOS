@@ -12,11 +12,14 @@ public struct ConversationListView: View {
     @ObservedObject var settings = SettingsManager.shared
     
     @Binding public var selectedConversationId: String?
+    public var onSelectConversation: ((String) -> Void)? = nil
+    
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
     
-    public init(selectedConversationId: Binding<String?>) {
+    public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
+        self.onSelectConversation = onSelectConversation
     }
     
     private var filteredConversations: [Conversation] {
@@ -34,7 +37,39 @@ public struct ConversationListView: View {
             NewtonTheme.bgDark
                 .ignoresSafeArea()
             
+            // Subtle 3D background grid
+            Hero3DCanvasView()
+                .opacity(0.4)
+                .ignoresSafeArea()
+            
             VStack(spacing: 0) {
+                // Header with Logo
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20))
+                        .foregroundColor(NewtonTheme.sand)
+                    
+                    Text("Newton")
+                        .font(.system(size: 24, weight: .bold, design: .serif))
+                        .foregroundColor(NewtonTheme.textPrimary)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(NewtonTheme.textSecondary)
+                            .padding(8)
+                            .background(NewtonTheme.surfaceDark)
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                
                 // New Chat Button
                 Button(action: createNewChat) {
                     HStack {
@@ -43,6 +78,8 @@ public struct ConversationListView: View {
                         Text("New Chat")
                             .font(.system(size: 15, weight: .semibold))
                         Spacer()
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 13))
                     }
                     .foregroundColor(.black)
                     .padding(.horizontal, 16)
@@ -51,7 +88,7 @@ public struct ConversationListView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 
                 // Search Bar
                 HStack {
@@ -62,7 +99,7 @@ public struct ConversationListView: View {
                         .font(.system(size: 14))
                 }
                 .padding(10)
-                .background(NewtonTheme.surfaceDark)
+                .background(NewtonTheme.surfaceDark.opacity(0.85))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -77,16 +114,17 @@ public struct ConversationListView: View {
                         Button(action: {
                             Haptics.selection()
                             selectedConversationId = convo.id
+                            onSelectConversation?(convo.id)
                         }) {
                             HStack(spacing: 12) {
                                 Image(systemName: convo.provider.iconName)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(selectedConversationId == convo.id ? NewtonTheme.sand : NewtonTheme.textSecondary)
-                                    .frame(width: 20)
+                                    .font(.system(size: 15))
+                                    .foregroundColor(NewtonTheme.sand)
+                                    .frame(width: 24)
                                 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(convo.title)
-                                        .font(.system(size: 14, weight: selectedConversationId == convo.id ? .semibold : .regular))
+                                        .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(NewtonTheme.textPrimary)
                                         .lineLimit(1)
                                     
@@ -104,41 +142,21 @@ public struct ConversationListView: View {
                                 }
                                 
                                 Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(NewtonTheme.textSecondary.opacity(0.5))
                             }
-                            .padding(.vertical, 4)
+                            .padding(.vertical, 6)
                         }
-                        .listRowBackground(selectedConversationId == convo.id ? NewtonTheme.surfaceDark : NewtonTheme.cardDark)
+                        .listRowBackground(NewtonTheme.cardDark.opacity(0.85))
                     }
                     .onDelete(perform: storage.deleteConversation)
                 }
                 .scrollContentBackground(.hidden)
-                
-                Divider()
-                    .background(NewtonTheme.borderDark)
-                
-                // Bottom Settings Shortcut
-                HStack {
-                    Button(action: {
-                        showSettings = true
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "gearshape.fill")
-                                .foregroundColor(NewtonTheme.textSecondary)
-                            Text("Settings")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(NewtonTheme.textPrimary)
-                            Spacer()
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(NewtonTheme.cardDark)
             }
         }
-        .navigationTitle("Newton")
+        .navigationBarHidden(true)
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -151,6 +169,7 @@ public struct ConversationListView: View {
             modelId: settings.currentModelId
         )
         selectedConversationId = newConvo.id
+        onSelectConversation?(newConvo.id)
     }
     
     private func formatDate(_ date: Date) -> String {

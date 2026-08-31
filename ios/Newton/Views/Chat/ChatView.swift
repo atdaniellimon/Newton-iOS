@@ -28,6 +28,13 @@ public struct ChatView: View {
             NewtonTheme.bgDark
                 .ignoresSafeArea()
             
+            // 3D Undulating wave grid background
+            if conversation.messages.isEmpty {
+                Hero3DCanvasView()
+                    .ignoresSafeArea()
+                    .opacity(0.85)
+            }
+            
             VStack(spacing: 0) {
                 // Header Status Pill & Model info
                 HStack {
@@ -43,7 +50,7 @@ public struct ChatView: View {
                         showSettings = true
                     }) {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16))
+                            .font(.system(size: 15))
                             .foregroundColor(NewtonTheme.textSecondary)
                             .padding(8)
                             .background(NewtonTheme.surfaceDark)
@@ -59,18 +66,45 @@ public struct ChatView: View {
                 // Messages Scroll View
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 8) {
+                        LazyVStack(spacing: 12) {
                             if conversation.messages.isEmpty {
                                 EmptyStateView(onPromptSelected: { prompt in
                                     inputText = prompt
                                     sendMessage()
                                 })
-                                .padding(.top, 40)
+                                .padding(.top, 24)
                             } else {
                                 ForEach(conversation.messages) { message in
                                     MessageBubbleView(message: message)
                                         .id(message.id)
                                 }
+                            }
+                            
+                            // 3D Animated Thinking Orb when streaming / thinking
+                            if isStreaming {
+                                HStack(spacing: 12) {
+                                    ThinkingOrbView(size: 42, style: .globe)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Newton is reasoning...")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(NewtonTheme.sand)
+                                        Text("Processing context and active orbits")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(NewtonTheme.textSecondary)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(NewtonTheme.cardDark.opacity(0.9))
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(NewtonTheme.sand.opacity(0.3), lineWidth: 0.8)
+                                )
+                                .padding(.horizontal, 16)
+                                .id("thinking_orb_card")
                             }
                             
                             if let error = errorMessage {
@@ -101,6 +135,11 @@ public struct ChatView: View {
                     }
                     .onChange(of: conversation.messages.last?.content) { _ in
                         proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                    }
+                    .onChange(of: isStreaming) { _ in
+                        withAnimation {
+                            proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                        }
                     }
                 }
                 
@@ -133,13 +172,11 @@ public struct ChatView: View {
         let userMessage = Message(role: .user, content: userPrompt)
         conversation.messages.append(userMessage)
         
-        // Auto title conversation if default
         if conversation.title == "New Conversation" || conversation.title == "Welcome to Newton" {
             let words = userPrompt.split(separator: " ").prefix(5).joined(separator: " ")
             conversation.title = String(words)
         }
         
-        // Create streaming assistant message
         let assistantMessageId = UUID().uuidString
         let assistantPlaceholder = Message(id: assistantMessageId, role: .assistant, content: "", isStreaming: true)
         conversation.messages.append(assistantPlaceholder)
@@ -189,14 +226,12 @@ public struct ChatView: View {
                         fullResponse += token
                     }
                     
-                    // Update live message
                     if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
                         conversation.messages[index].content = fullResponse
                         conversation.messages[index].thinkingContent = currentThinking.isEmpty ? nil : currentThinking
                     }
                 }
                 
-                // Process orbits if any
                 let (finalContent, orbitResults) = await OrbitEngine.shared.processOrbitsInText(fullResponse)
                 
                 if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
@@ -233,67 +268,5 @@ public struct ChatView: View {
             conversation.messages[index].isStreaming = false
         }
         storage.updateConversation(conversation)
-    }
-}
-
-public struct EmptyStateView: View {
-    public let onPromptSelected: (String) -> Void
-    
-    let starterPrompts = [
-        "Explain how general relativity works with an analogy",
-        "Write a Swift actor to handle rate-limited API requests",
-        "What are the key advantages of DeepSeek R1 reasoning?",
-        "Help me brainstorm a scientific experiment in quantum computing"
-    ]
-    
-    public var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(NewtonTheme.sand.opacity(0.12))
-                    .frame(width: 68, height: 68)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 28))
-                    .foregroundColor(NewtonTheme.sand)
-            }
-            
-            VStack(spacing: 6) {
-                Text("How can I help you today?")
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
-                    .foregroundColor(NewtonTheme.textPrimary)
-                
-                Text("Select a prompt or ask any scientific or code question")
-                    .font(.system(size: 13))
-                    .foregroundColor(NewtonTheme.textSecondary)
-            }
-            
-            VStack(spacing: 8) {
-                ForEach(starterPrompts, id: \.self) { prompt in
-                    Button(action: {
-                        Haptics.selection()
-                        onPromptSelected(prompt)
-                    }) {
-                        HStack {
-                            Text(prompt)
-                                .font(.system(size: 13))
-                                .foregroundColor(NewtonTheme.textPrimary)
-                                .multilineTextAlignment(.leading)
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 11))
-                                .foregroundColor(NewtonTheme.textSecondary)
-                        }
-                        .padding(14)
-                        .background(NewtonTheme.cardDark)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(NewtonTheme.borderDark, lineWidth: 0.7)
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-        }
     }
 }

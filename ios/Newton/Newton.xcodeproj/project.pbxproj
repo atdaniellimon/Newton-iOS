@@ -30,6 +30,8 @@
 		A10021 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10021 /* SettingsView.swift */; };
 		A10022 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* ConversationListView.swift */; };
 		A10023 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* MainView.swift */; };
+		A10024 /* Hero3DCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10025 /* Hero3DCanvasView.swift */; };
+		A10025 /* ThinkingOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10026 /* ThinkingOrbView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -58,6 +60,8 @@
 		B10022 /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
 		B10023 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		B10024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10025 /* Hero3DCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hero3DCanvasView.swift; sourceTree = "<group>"; };
+		B10026 /* ThinkingOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingOrbView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +152,8 @@
 			children = (
 				B10013 /* StatusPillView.swift */,
 				B10014 /* CodeBlockView.swift */,
+				B10025 /* Hero3DCanvasView.swift */,
+				B10026 /* ThinkingOrbView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -272,6 +278,8 @@
 				A10021 /* SettingsView.swift in Sources */,
 				A10022 /* ConversationListView.swift in Sources */,
 				A10023 /* MainView.swift in Sources */,
+				A10024 /* Hero3DCanvasView.swift in Sources */,
+				A10025 /* ThinkingOrbView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
