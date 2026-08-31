@@ -447,27 +447,27 @@ public struct GeneratedImageCardView: View {
 public struct FormattedAssistantContent: View {
     public let content: String
     
+    private var blocks: [ContentBlock] {
+        parseContentBlocks(content)
+    }
+    
     public var body: some View {
-        let parsedBlocks = parseContentBlocks(content)
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(0..<parsedBlocks.count, id: \.self) { index in
-                let block = parsedBlocks[index]
-                switch block {
-                case .text(let text):
-                    Text(LocalizedStringKey(text))
+            ForEach(blocks) { block in
+                if block.isCode, let code = block.code {
+                    CodeBlockView(language: block.language ?? "", code: code)
+                } else if let txt = block.text {
+                    Text(LocalizedStringKey(txt))
                         .font(.system(size: 15, design: .serif))
                         .foregroundColor(NewtonTheme.textPrimary)
                         .lineSpacing(4)
-                        
-                case .code(let lang, let code):
-                    CodeBlockView(language: lang, code: code)
                 }
             }
         }
     }
     
     private func parseContentBlocks(_ raw: String) -> [ContentBlock] {
-        var blocks: [ContentBlock] = []
+        var resultBlocks: [ContentBlock] = []
         let pattern = "```([a-zA-Z0-9_-]*)\\n([\\s\\S]*?)```"
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return [.text(raw)]
@@ -482,13 +482,13 @@ public struct FormattedAssistantContent: View {
             if matchRange.location > currentIndex {
                 let textPart = nsString.substring(with: NSRange(location: currentIndex, length: matchRange.location - currentIndex))
                 if !textPart.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    blocks.append(.text(textPart))
+                    resultBlocks.append(.text(textPart))
                 }
             }
             
             let lang = match.numberOfRanges > 1 && match.range(at: 1).location != NSNotFound ? nsString.substring(with: match.range(at: 1)) : ""
             let code = match.numberOfRanges > 2 && match.range(at: 2).location != NSNotFound ? nsString.substring(with: match.range(at: 2)) : ""
-            blocks.append(.code(language: lang, code: code))
+            resultBlocks.append(.code(language: lang, code: code))
             
             currentIndex = matchRange.location + matchRange.length
         }
@@ -496,15 +496,26 @@ public struct FormattedAssistantContent: View {
         if currentIndex < nsString.length {
             let remainder = nsString.substring(from: currentIndex)
             if !remainder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                blocks.append(.text(remainder))
+                resultBlocks.append(.text(remainder))
             }
         }
         
-        return blocks.isEmpty ? [.text(raw)] : blocks
+        return resultBlocks.isEmpty ? [.text(raw)] : resultBlocks
     }
 }
 
-public enum ContentBlock {
-    case text(String)
-    case code(language: String, code: String)
+public struct ContentBlock: Identifiable {
+    public let id = UUID()
+    public let text: String?
+    public let language: String?
+    public let code: String?
+    public let isCode: Bool
+    
+    public static func text(_ str: String) -> ContentBlock {
+        ContentBlock(text: str, language: nil, code: nil, isCode: false)
+    }
+    
+    public static func code(language: String, code: String) -> ContentBlock {
+        ContentBlock(text: nil, language: language, code: code, isCode: true)
+    }
 }
