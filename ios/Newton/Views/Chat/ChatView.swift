@@ -3,7 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Matching Newton Web and Studio UI.
+//  Matching Newton Web and Studio UI with native Tool Calling.
 //
 
 import SwiftUI
@@ -208,29 +208,6 @@ public struct ChatView: View {
         }
     }
     
-    private func extractImagePrompt(from text: String) -> String? {
-        let patterns = [
-            "^/imagine\\s+(.+)$",
-            "^(?:genera|generame|crea|creame|haz)\\s+(?:una\\s+)?(?:imagen|foto|dibujo|grafico)\\s+(?:de|sobre|para)?\\s*(.+)$",
-            "^(?:generate|create|make)\\s+(?:an?\\s+)?(?:image|photo|drawing|picture)\\s+(?:of|about|for)?\\s*(.+)$",
-            "^(?:dibuja|dibujame|pinta|pintame|draw|paint)\\s+(?:a|un|una)?\\s*(.+)$"
-        ]
-        
-        for p in patterns {
-            if let regex = try? NSRegularExpression(pattern: p, options: [.caseInsensitive]) {
-                let ns = text as NSString
-                if let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)),
-                   match.numberOfRanges >= 2 {
-                    let extracted = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !extracted.isEmpty {
-                        return extracted
-                    }
-                }
-            }
-        }
-        return nil
-    }
-    
     private func sendMessage() {
         var userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         if userPrompt.isEmpty && attachedImage != nil {
@@ -266,31 +243,6 @@ public struct ChatView: View {
         
         if isFirstMessage {
             conversation.title = String(userPrompt.split(separator: " ").prefix(4).joined(separator: " "))
-        }
-        
-        // Check for direct Image Generation prompt match
-        if let imagePrompt = extractImagePrompt(from: userPrompt) {
-            let baseUrl = settings.effectiveBaseUrl(for: settings.currentProvider)
-            let apiKey = settings.getApiKey(for: settings.currentProvider)
-            
-            let assistantMessageId = UUID().uuidString
-            let placeholder = Message(id: assistantMessageId, role: .assistant, content: "Generating image: *\(imagePrompt)*...", isStreaming: true)
-            conversation.messages.append(placeholder)
-            storage.updateConversation(conversation)
-            
-            Task {
-                let imageUrl = await OrbitEngine.shared.generateImage(prompt: imagePrompt, baseUrl: baseUrl, apiKey: apiKey)
-                await MainActor.run {
-                    if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                        conversation.messages[idx].content = "Here is your generated image for *\(imagePrompt)*:"
-                        conversation.messages[idx].imageUrl = imageUrl
-                        conversation.messages[idx].isStreaming = false
-                    }
-                    storage.updateConversation(conversation)
-                    Haptics.success()
-                }
-            }
-            return
         }
         
         let assistantMessageId = UUID().uuidString
@@ -351,7 +303,8 @@ public struct ChatView: View {
                     }
                 }
                 
-                let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(fullResponse)
+                // Process tool calling (image generation, web search, calculator)
+                let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(fullResponse, baseUrl: baseUrl, apiKey: apiKey)
                 
                 await MainActor.run {
                     if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {

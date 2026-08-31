@@ -3,6 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
+//  Local JSON & iCloud Ubiquitous Key-Value synchronization.
 //
 
 import Foundation
@@ -13,6 +14,7 @@ public final class StorageManager: ObservableObject {
     @Published public var conversations: [Conversation] = []
     
     private let conversationsFileName = "newton_conversations_v1.json"
+    private let iCloudKey = "newton_cloud_conversations_v1"
     
     private var fileURL: URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -21,6 +23,18 @@ public final class StorageManager: ObservableObject {
     
     private init() {
         loadConversations()
+        setupCloudObserver()
+    }
+    
+    private func setupCloudObserver() {
+        NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: NSUbiquitousKeyValueStore.default,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadFromCloud()
+        }
+        NSUbiquitousKeyValueStore.default.synchronize()
     }
     
     public func createConversation(provider: AIProvider, modelId: String, title: String = "New Conversation") -> Conversation {
@@ -73,16 +87,40 @@ public final class StorageManager: ObservableObject {
         }
     }
     
-    private func saveConversations() {
+    public func saveConversations() {
         do {
             let data = try JSONEncoder().encode(conversations)
+            // 1. Save to Local File
             try data.write(to: fileURL, options: [.atomicWrite])
+            
+            // 2. Sync to iCloud Ubiquitous Key-Value Storage
+            NSUbiquitousKeyValueStore.default.set(data, forKey: iCloudKey)
+            NSUbiquitousKeyValueStore.default.synchronize()
         } catch {
             print("Error saving conversations: \(error)")
         }
     }
     
+    private func loadFromCloud() {
+        if let cloudData = NSUbiquitousKeyValueStore.default.data(forKey: iCloudKey),
+           let cloudConvos = try? JSONDecoder().decode([Conversation].self, from: cloudData),
+           !cloudConvos.isEmpty {
+            self.conversations = cloudConvos
+            sortConversations()
+        }
+    }
+    
     private func loadConversations() {
+        // 1. Try loading from iCloud first
+        if let cloudData = NSUbiquitousKeyValueStore.default.data(forKey: iCloudKey),
+           let cloudConvos = try? JSONDecoder().decode([Conversation].self, from: cloudData),
+           !cloudConvos.isEmpty {
+            self.conversations = cloudConvos
+            sortConversations()
+            return
+        }
+        
+        // 2. Try loading from Local File
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             let welcome = Conversation(
                 title: "Welcome to Newton",

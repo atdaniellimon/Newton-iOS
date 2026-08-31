@@ -7,97 +7,67 @@
 
 import Foundation
 import SwiftUI
-import Combine
 
 public final class SettingsManager: ObservableObject {
     public static let shared = SettingsManager()
     
-    @AppStorage("newton_current_provider") public var currentProviderRaw: String = AIProvider.openrouter.rawValue {
-        didSet { objectWillChange.send() }
-    }
+    @AppStorage("currentProvider") public var currentProviderRaw: String = AIProvider.openrouter.rawValue
+    @AppStorage("currentModelId") public var currentModelId: String = "anthropic/claude-3.5-sonnet"
+    @AppStorage("customBaseUrl") public var customBaseUrl: String = "http://127.0.0.1:8000/v1"
+    @AppStorage("ollamaBaseUrl") public var ollamaBaseUrl: String = "http://127.0.0.1:11434"
+    @AppStorage("customApiKey") public var customApiKey: String = ""
+    @AppStorage("temperature") public var temperature: Double = 0.7
+    @AppStorage("maxTokens") public var maxTokens: Int = 4096
+    @AppStorage("customSystemPrompt") public var customSystemPrompt: String = ""
+    @AppStorage("appTheme") public var appThemeRaw: String = "system"
     
-    @AppStorage("newton_base_url") public var customBaseUrl: String = "http://localhost:1234/v1" {
-        didSet { objectWillChange.send() }
-    }
-    
-    @AppStorage("newton_current_model") public var currentModelId: String = "anthropic/claude-3.5-sonnet" {
-        didSet { objectWillChange.send() }
-    }
-    
-    @AppStorage("newton_temperature") public var temperature: Double = 0.7 {
-        didSet { objectWillChange.send() }
-    }
-    
-    @AppStorage("newton_max_tokens") public var maxTokens: Int = 2048 {
-        didSet { objectWillChange.send() }
-    }
-    
-    @AppStorage("newton_custom_system_prompt") public var customSystemPrompt: String = "" {
-        didSet { objectWillChange.send() }
-    }
-    
-    @AppStorage("newton_app_theme") public var appThemeRaw: String = AppThemeMode.dark.rawValue {
-        didSet { objectWillChange.send() }
-    }
-    
-    public var appTheme: AppThemeMode {
-        get { AppThemeMode(rawValue: appThemeRaw) ?? .dark }
-        set { appThemeRaw = newValue.rawValue }
-    }
+    private init() {}
     
     public var currentProvider: AIProvider {
-        get {
-            AIProvider(rawValue: currentProviderRaw) ?? .openrouter
-        }
-        set {
-            currentProviderRaw = newValue.rawValue
-            currentModelId = newValue.defaultModelId
-        }
-    }
-    
-    public var currentApiKey: String {
-        get {
-            KeychainManager.shared.getApiKey(for: currentProvider)
-        }
-        set {
-            KeychainManager.shared.saveApiKey(newValue, for: currentProvider)
-            objectWillChange.send()
-        }
+        get { AIProvider(rawValue: currentProviderRaw) ?? .openrouter }
+        set { currentProviderRaw = newValue.rawValue }
     }
     
     public func getApiKey(for provider: AIProvider) -> String {
-        KeychainManager.shared.getApiKey(for: provider)
+        if provider == .custom {
+            return customApiKey
+        }
+        return KeychainManager.shared.getApiKey(for: provider)
     }
     
     public func setApiKey(_ key: String, for provider: AIProvider) {
-        KeychainManager.shared.saveApiKey(key, for: provider)
+        if provider == .custom {
+            customApiKey = key
+        } else {
+            KeychainManager.shared.saveApiKey(key, for: provider)
+        }
         objectWillChange.send()
     }
     
-    public func isConfigured() -> Bool {
-        if currentProvider == .ollama {
-            return true
-        }
-        if currentProvider == .openaiCompatible || currentProvider == .anthropicCompatible {
-            return !customBaseUrl.isEmpty || !currentApiKey.isEmpty
-        }
-        return !currentApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-    
     public func effectiveBaseUrl(for provider: AIProvider) -> String {
-        if provider.isCustomOrLocal && !customBaseUrl.isEmpty {
-            return customBaseUrl
+        switch provider {
+        case .custom:
+            return customBaseUrl.isEmpty ? "http://127.0.0.1:8000/v1" : customBaseUrl
+        case .ollama:
+            return ollamaBaseUrl.isEmpty ? "http://127.0.0.1:11434" : ollamaBaseUrl
+        default:
+            return provider.defaultBaseUrl
         }
-        return provider.defaultBaseUrl
     }
     
     public func defaultSystemPrompt() -> String {
-        if !customSystemPrompt.isEmpty {
+        if !customSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return customSystemPrompt
         }
         return """
-        You are Newton AI, an intelligent, scientific, and precise AI assistant.
-        Provide clear, accurate, and insightful responses. Use Markdown for formatting code and structure.
+        You are Newton, an insightful, concise, and highly capable AI assistant with deep reasoning and creative capabilities.
+        
+        You have access to real-time tools called Orbits. To use a tool, output its tag in your response:
+        - Image Generation: [ORBIT:generate_image]{"prompt": "detailed visual description in English"}[/ORBIT]
+        - Web Search: [ORBIT:web_search]{"query": "search query"}[/ORBIT]
+        - Calculator: [ORBIT:calculator]{"expression": "math expression"}[/ORBIT]
+        
+        When the user asks you to create, draw, paint, or generate an image, describe what you are creating and invoke the [ORBIT:generate_image]{"prompt": "..."}[/ORBIT] tool seamlessly.
         """
     }
 }

@@ -14,7 +14,7 @@ public final class OrbitEngine {
     private init() {}
     
     /// Process any [ORBIT:name]{...}[/ORBIT] in text or trigger image generation
-    public func processOrbitsInText(_ text: String) async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?) {
+    public func processOrbitsInText(_ text: String, baseUrl: String = "", apiKey: String = "") async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?) {
         var outputText = text
         var results: [OrbitExecutionResult] = []
         var detectedImageUrl: String? = nil
@@ -31,28 +31,29 @@ public final class OrbitEngine {
                 let orbitName = nsString.substring(with: match.range(at: 1))
                 let paramsJson = nsString.substring(with: match.range(at: 2))
                 
-                let result = await executeOrbit(name: orbitName, paramsJson: paramsJson)
+                let result = await executeOrbit(name: orbitName, paramsJson: paramsJson, baseUrl: baseUrl, apiKey: apiKey)
                 results.append(result)
                 
-                if orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" {
+                if orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" || orbitName.lowercased() == "generate_image" {
                     detectedImageUrl = result.result
                 }
                 
-                let replacement = (orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine") ? "" : "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
+                let replacement = (orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" || orbitName.lowercased() == "generate_image") ? "" : "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: replacement)
             }
         }
         
-        // 2. Detect markdown images or /imagine in output
-        if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?)\\)", options: []) {
-            let nsStr = outputText as NSString
-            if let firstMatch = imgRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsStr.length)) {
-                let urlStr = nsStr.substring(with: firstMatch.range(at: 1))
-                detectedImageUrl = urlStr
+        // 2. Detect direct markdown images
+        if detectedImageUrl == nil {
+            if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?|data:image/.*?)\\)", options: []) {
+                let nsStr = outputText as NSString
+                if let firstMatch = imgRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsStr.length)) {
+                    detectedImageUrl = nsStr.substring(with: firstMatch.range(at: 1))
+                }
             }
         }
         
-        return (outputText, results, detectedImageUrl)
+        return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl)
     }
     
     /// Generate an image from a prompt calling /v1/images/generations endpoint or falling back to Flux
@@ -67,7 +68,7 @@ public final class OrbitEngine {
             if let endpointUrl = URL(string: endpointStr) {
                 var request = URLRequest(url: endpointUrl)
                 request.httpMethod = "POST"
-                request.timeoutInterval = 30
+                request.timeoutInterval = 25
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 if !apiKey.isEmpty {
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -106,7 +107,7 @@ public final class OrbitEngine {
         return "https://image.pollinations.ai/prompt/\(encoded)?width=1024&height=1024&nologo=true&model=flux"
     }
     
-    public func executeOrbit(name: String, paramsJson: String) async -> OrbitExecutionResult {
+    public func executeOrbit(name: String, paramsJson: String, baseUrl: String = "", apiKey: String = "") async -> OrbitExecutionResult {
         let trimmedName = name.lowercased()
         
         var params: [String: Any] = [:]
@@ -116,9 +117,9 @@ public final class OrbitEngine {
         }
         
         switch trimmedName {
-        case "image_gen", "imagine", "draw":
+        case "image_gen", "imagine", "generate_image", "draw":
             let prompt = params["prompt"] as? String ?? paramsJson
-            let url = await generateImage(prompt: prompt)
+            let url = await generateImage(prompt: prompt, baseUrl: baseUrl, apiKey: apiKey)
             return OrbitExecutionResult(orbitName: "image_gen", params: paramsJson, result: url, isSuccess: true)
             
         case "web_search", "search":
