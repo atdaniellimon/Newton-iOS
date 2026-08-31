@@ -3,7 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Floating modern studio input bar with Camera, Photos, Files, and Web Search.
+//  Ultra-compact studio input bar with auto-expanding single-to-multi line behavior.
 //
 
 import SwiftUI
@@ -65,7 +65,7 @@ public struct MessageInputBar: View {
                                 Image(uiImage: img)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 36, height: 36)
+                                    .frame(width: 38, height: 38)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                 
                                 Text("Photo attached")
@@ -119,25 +119,14 @@ public struct MessageInputBar: View {
                     .padding(.top, 4)
                 }
                 
-                // Expanding text input field
-                ZStack(alignment: .topLeading) {
-                    if text.isEmpty {
-                        Text("Reply to Newton...")
-                            .font(.system(size: 15.5))
-                            .foregroundColor(NewtonTheme.textMuted)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 8)
-                    }
-                    
-                    TextEditor(text: $text)
-                        .focused($isFocused)
-                        .font(.system(size: 15.5))
-                        .foregroundColor(NewtonTheme.textPrimary)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 38, maxHeight: 110)
-                }
-                .padding(.horizontal, 8)
-                .padding(.top, 2)
+                // Auto-expanding text input field (starts as 1 single clean line)
+                TextField("Reply to Newton...", text: $text, axis: .vertical)
+                    .focused($isFocused)
+                    .lineLimit(1...5)
+                    .font(.system(size: 15.5))
+                    .foregroundColor(NewtonTheme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                 
                 // Bottom Action Row: (+) [Model Badge] ... (Send/Stop)
                 HStack(spacing: 8) {
@@ -162,9 +151,9 @@ public struct MessageInputBar: View {
                         ZStack {
                             Circle()
                                 .fill(NewtonTheme.surface)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 30, height: 30)
                             Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(NewtonTheme.textSecondary)
                         }
                     }
@@ -176,14 +165,14 @@ public struct MessageInputBar: View {
                     }) {
                         HStack(spacing: 4) {
                             Text(modelName)
-                                .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
                                 .foregroundColor(NewtonTheme.textPrimary)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 9))
+                                .font(.system(size: 8))
                                 .foregroundColor(NewtonTheme.textSecondary)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
                         .background(NewtonTheme.surface)
                         .clipShape(Capsule())
                     }
@@ -203,29 +192,29 @@ public struct MessageInputBar: View {
                         ZStack {
                             Circle()
                                 .fill(isStreaming ? NewtonTheme.coralRed : ((text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachedImage == nil) ? NewtonTheme.surface : NewtonTheme.sand))
-                                .frame(width: 34, height: 34)
+                                .frame(width: 32, height: 32)
                             
                             Image(systemName: isStreaming ? "stop.fill" : "arrow.up")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(isStreaming ? .white : ((text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachedImage == nil) ? NewtonTheme.textMuted : .black))
                         }
                     }
                     .disabled(!isStreaming && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachedImage == nil)
                 }
-                .padding(.horizontal, 6)
-                .padding(.bottom, 6)
+                .padding(.horizontal, 4)
+                .padding(.bottom, 2)
             }
             .padding(6)
             .background(NewtonTheme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(NewtonTheme.border, lineWidth: 0.8)
             )
-            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
             .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-            .padding(.top, 4)
+            .padding(.bottom, 6)
+            .padding(.top, 2)
         }
     }
 }

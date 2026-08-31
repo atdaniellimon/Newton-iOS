@@ -15,7 +15,6 @@ public struct MessageBubbleView: View {
     public var onEdit: ((String) -> Void)? = nil
     
     @State private var copied: Bool = false
-    @State private var showFullScreenImage: Bool = false
     
     public init(message: Message, onRetry: (() -> Void)? = nil, onEdit: ((String) -> Void)? = nil) {
         self.message = message
@@ -26,33 +25,42 @@ public struct MessageBubbleView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if message.role == .user {
-                // User Message Pill (Aligned to trailing with long press to edit)
+                // User Message Pill (Aligned to trailing with image attachment support)
                 HStack {
                     Spacer(minLength: 48)
                     
-                    Text(message.content)
-                        .font(.system(size: 15.5, weight: .regular))
-                        .foregroundColor(Color.black.opacity(0.9))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(NewtonTheme.userBubble)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .contextMenu {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        // User attached image preview
+                        if let imgStr = message.imageUrl {
+                            UserAttachedImageView(imageString: imgStr)
+                        }
+                        
+                        if !message.content.isEmpty {
+                            Text(message.content)
+                                .font(.system(size: 15.5, weight: .regular))
+                                .foregroundColor(Color.black.opacity(0.9))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(NewtonTheme.userBubble)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        }
+                    }
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = message.content
+                            Haptics.light()
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                        if let onEdit = onEdit {
                             Button {
-                                UIPasteboard.general.string = message.content
                                 Haptics.light()
+                                onEdit(message.content)
                             } label: {
-                                Label("Copy", systemImage: "doc.on.doc")
-                            }
-                            if let onEdit = onEdit {
-                                Button {
-                                    Haptics.light()
-                                    onEdit(message.content)
-                                } label: {
-                                    Label("Edit Message", systemImage: "pencil")
-                                }
+                                Label("Edit Message", systemImage: "pencil")
                             }
                         }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
@@ -122,6 +130,35 @@ public struct MessageBubbleView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 6)
             }
+        }
+    }
+}
+
+public struct UserAttachedImageView: View {
+    public let imageString: String
+    
+    public var body: some View {
+        if imageString.hasPrefix("data:image/"),
+           let commaIndex = imageString.firstIndex(of: ","),
+           let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
+           let uiImg = UIImage(data: data) {
+            Image(uiImage: uiImg)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: 220, maxHeight: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(NewtonTheme.border, lineWidth: 0.8)
+                )
+        } else if let url = URL(string: imageString) {
+            AsyncImage(url: url) { img in
+                img.resizable().scaledToFill()
+            } placeholder: {
+                ProgressView()
+            }
+            .frame(maxWidth: 220, maxHeight: 180)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 }

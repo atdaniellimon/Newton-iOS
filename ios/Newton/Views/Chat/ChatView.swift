@@ -204,22 +204,33 @@ public struct ChatView: View {
     private func sendMessage() {
         var userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         if userPrompt.isEmpty && attachedImage != nil {
-            userPrompt = "Please analyze this attached image."
+            userPrompt = "Please analyze this image."
         }
         if userPrompt.isEmpty && attachedFileName != nil {
-            userPrompt = "Please examine the contents of this file."
+            userPrompt = "Please examine this attached file: \(attachedFileName ?? "")."
         }
-        guard !userPrompt.isEmpty else { return }
+        guard !userPrompt.isEmpty || attachedImage != nil else { return }
         
         inputText = ""
-        let hadImage = attachedImage
-        let hadFile = attachedFileName
+        
+        // Prepare image base64 if attached
+        var imgBase64DataUrl: String? = nil
+        if let img = attachedImage, let jpegData = img.jpegData(compressionQuality: 0.75) {
+            imgBase64DataUrl = "data:image/jpeg;base64,\(jpegData.base64EncodedString())"
+        }
+        
+        // Prepare file content if text file
+        if let fileData = attachedFileData, let textContent = String(data: fileData, encoding: .utf8) {
+            userPrompt += "\n\n```\(attachedFileName ?? "file")\n\(textContent)\n```"
+        }
+        
         attachedImage = nil
         attachedFileName = nil
         attachedFileData = nil
         errorMessage = nil
         
-        let userMessage = Message(role: .user, content: userPrompt)
+        var userMessage = Message(role: .user, content: userPrompt)
+        userMessage.imageUrl = imgBase64DataUrl
         conversation.messages.append(userMessage)
         
         if conversation.title == "New Conversation" || conversation.title == "Welcome to Newton" {
