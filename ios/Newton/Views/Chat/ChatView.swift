@@ -25,7 +25,7 @@ public struct ChatView: View {
     
     public var body: some View {
         ZStack {
-            NewtonTheme.bgDark
+            NewtonTheme.bg
                 .ignoresSafeArea()
             
             // 3D Undulating wave grid background
@@ -53,7 +53,7 @@ public struct ChatView: View {
                             .font(.system(size: 15))
                             .foregroundColor(NewtonTheme.textSecondary)
                             .padding(8)
-                            .background(NewtonTheme.surfaceDark)
+                            .background(NewtonTheme.surface)
                             .clipShape(Circle())
                     }
                 }
@@ -61,7 +61,7 @@ public struct ChatView: View {
                 .padding(.vertical, 8)
                 
                 Divider()
-                    .background(NewtonTheme.borderDark)
+                    .background(NewtonTheme.border)
                 
                 // Messages Scroll View
                 ScrollViewReader { proxy in
@@ -97,7 +97,7 @@ public struct ChatView: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
-                                .background(NewtonTheme.cardDark.opacity(0.9))
+                                .background(NewtonTheme.card.opacity(0.9))
                                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -268,5 +268,71 @@ public struct ChatView: View {
             conversation.messages[index].isStreaming = false
         }
         storage.updateConversation(conversation)
+    }
+}
+
+public struct EmptyStateView: View {
+    public let onPromptSelected: (String) -> Void
+    
+    let starterPrompts = [
+        "Explain how general relativity works with an analogy",
+        "Write a Swift actor to handle rate-limited API requests",
+        "What are the key advantages of DeepSeek R1 reasoning?",
+        "Help me brainstorm a scientific experiment in quantum computing"
+    ]
+    
+    public init(onPromptSelected: @escaping (String) -> Void) {
+        self.onPromptSelected = onPromptSelected
+    }
+    
+    public var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(NewtonTheme.sand.opacity(0.12))
+                    .frame(width: 68, height: 68)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 28))
+                    .foregroundColor(NewtonTheme.sand)
+            }
+            
+            VStack(spacing: 6) {
+                Text("How can I help you today?")
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundColor(NewtonTheme.textPrimary)
+                
+                Text("Select a prompt or ask any scientific or code question")
+                    .font(.system(size: 13))
+                    .foregroundColor(NewtonTheme.textSecondary)
+            }
+            
+            VStack(spacing: 8) {
+                ForEach(starterPrompts, id: \.self) { prompt in
+                    Button(action: {
+                        Haptics.selection()
+                        onPromptSelected(prompt)
+                    }) {
+                        HStack {
+                            Text(prompt)
+                                .font(.system(size: 13))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                                .multilineTextAlignment(.leading)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 11))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                        }
+                        .padding(14)
+                        .background(NewtonTheme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(NewtonTheme.border, lineWidth: 0.7)
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+        }
     }
 }
