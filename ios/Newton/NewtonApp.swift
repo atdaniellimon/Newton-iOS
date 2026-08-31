@@ -15,9 +15,20 @@ struct NewtonApp: App {
     var body: some Scene {
         WindowGroup {
             MainView()
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(colorScheme)
                 .environmentObject(settings)
                 .environmentObject(storage)
+        }
+    }
+    
+    private var colorScheme: ColorScheme? {
+        switch settings.appTheme {
+        case .dark:
+            return .dark
+        case .light:
+            return .light
+        case .system:
+            return nil
         }
     }
 }

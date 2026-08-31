@@ -13,45 +13,36 @@ public final class SettingsManager: ObservableObject {
     public static let shared = SettingsManager()
     
     @AppStorage("newton_current_provider") public var currentProviderRaw: String = AIProvider.openrouter.rawValue {
-        didSet {
-            objectWillChange.send()
-        }
+        didSet { objectWillChange.send() }
     }
     
     @AppStorage("newton_base_url") public var customBaseUrl: String = "http://localhost:1234/v1" {
-        didSet {
-            objectWillChange.send()
-        }
+        didSet { objectWillChange.send() }
     }
     
     @AppStorage("newton_current_model") public var currentModelId: String = "anthropic/claude-3.5-sonnet" {
-        didSet {
-            objectWillChange.send()
-        }
+        didSet { objectWillChange.send() }
     }
     
     @AppStorage("newton_temperature") public var temperature: Double = 0.7 {
-        didSet {
-            objectWillChange.send()
-        }
+        didSet { objectWillChange.send() }
     }
     
     @AppStorage("newton_max_tokens") public var maxTokens: Int = 2048 {
-        didSet {
-            objectWillChange.send()
-        }
+        didSet { objectWillChange.send() }
     }
     
     @AppStorage("newton_custom_system_prompt") public var customSystemPrompt: String = "" {
-        didSet {
-            objectWillChange.send()
-        }
+        didSet { objectWillChange.send() }
     }
     
-    @AppStorage("newton_app_theme") public var appTheme: String = "dark" {
-        didSet {
-            objectWillChange.send()
-        }
+    @AppStorage("newton_app_theme") public var appThemeRaw: String = AppThemeMode.dark.rawValue {
+        didSet { objectWillChange.send() }
+    }
+    
+    public var appTheme: AppThemeMode {
+        get { AppThemeMode(rawValue: appThemeRaw) ?? .dark }
+        set { appThemeRaw = newValue.rawValue }
     }
     
     public var currentProvider: AIProvider {

@@ -23,7 +23,7 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationView {
             ZStack {
-                NewtonTheme.bgDark
+                NewtonTheme.bg
                     .ignoresSafeArea()
                 
                 Form {
@@ -46,7 +46,20 @@ public struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
+                    
+                    // Theme Mode Selector
+                    Section(header: Text("APPEARANCE").foregroundColor(NewtonTheme.textSecondary)) {
+                        Picker("Theme", selection: $settings.appTheme) {
+                            ForEach(AppThemeMode.allCases) { mode in
+                                Label(mode.displayName, systemImage: mode.iconName)
+                                    .tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.vertical, 2)
+                    }
+                    .listRowBackground(NewtonTheme.card)
                     
                     // Provider Selection
                     Section(header: Text("AI PROVIDER").foregroundColor(NewtonTheme.textSecondary)) {
@@ -62,7 +75,7 @@ public struct SettingsView: View {
                             testResult = nil
                         }
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
                     
                     // API Key Input
                     Section(header: Text("API KEY").foregroundColor(NewtonTheme.textSecondary)) {
@@ -90,7 +103,7 @@ public struct SettingsView: View {
                             settings.setApiKey(newKey, for: settings.currentProvider)
                         }
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
                     
                     // Base URL Input (for custom/local endpoints)
                     if settings.currentProvider.isCustomOrLocal {
@@ -104,7 +117,7 @@ public struct SettingsView: View {
                                 .textInputAutocapitalization(.never)
                                 .disableAutocorrection(true)
                         }
-                        .listRowBackground(NewtonTheme.cardDark)
+                        .listRowBackground(NewtonTheme.card)
                     }
                     
                     // Model Selection
@@ -127,7 +140,7 @@ public struct SettingsView: View {
                             }
                         }
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
                     
                     // Hyperparameters
                     Section(header: Text("PARAMETERS").foregroundColor(NewtonTheme.textSecondary)) {
@@ -164,7 +177,7 @@ public struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
                     
                     // System Prompt
                     Section(header: Text("CUSTOM SYSTEM PROMPT").foregroundColor(NewtonTheme.textSecondary)) {
@@ -174,7 +187,7 @@ public struct SettingsView: View {
                             .frame(minHeight: 80)
                             .scrollContentBackground(.hidden)
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
                     
                     // Test Connection
                     Section {
@@ -205,7 +218,7 @@ public struct SettingsView: View {
                             }
                         }
                     }
-                    .listRowBackground(NewtonTheme.cardDark)
+                    .listRowBackground(NewtonTheme.card)
                 }
                 .scrollContentBackground(.hidden)
             }
