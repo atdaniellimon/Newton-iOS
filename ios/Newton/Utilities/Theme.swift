@@ -30,6 +30,14 @@ public enum AppThemeMode: String, CaseIterable, Identifiable {
         case .system: return "circle.righthalf.filled"
         }
     }
+    
+    public var colorScheme: ColorScheme? {
+        switch self {
+        case .dark: return .dark
+        case .light: return .light
+        case .system: return nil
+        }
+    }
 }
 
 public struct NewtonTheme {
