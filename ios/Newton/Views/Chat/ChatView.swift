@@ -9,6 +9,7 @@
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import PDFKit
 
 private enum ActiveModalSheet: Identifiable {
     case camera
@@ -270,14 +271,23 @@ public struct ChatView: View {
         }
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: [.item, .text, .pdf, .sourceCode, .image],
+            allowedContentTypes: [.item, .content, .data, .text, .plainText, .pdf, .sourceCode, .image],
             allowsMultipleSelection: false
         ) { result in
             switch result {
             case .success(let urls):
                 guard let selectedUrl = urls.first else { return }
+                let accessing = selectedUrl.startAccessingSecurityScopedResource()
+                defer {
+                    if accessing { selectedUrl.stopAccessingSecurityScopedResource() }
+                }
                 attachedFileName = selectedUrl.lastPathComponent
-                attachedFileData = try? Data(contentsOf: selectedUrl)
+                if let data = try? Data(contentsOf: selectedUrl) {
+                    attachedFileData = data
+                    if let img = UIImage(data: data) {
+                        attachedImage = img
+                    }
+                }
             case .failure(let error):
                 print("File import error: \(error)")
             }
@@ -305,9 +315,9 @@ public struct ChatView: View {
             userPrompt = "Describe and explain the details, text, and information shown in the attached content."
         }
         if userPrompt.isEmpty && attachedFileName != nil {
-            userPrompt = "Please examine the contents of this file: \(attachedFileName ?? "")."
+            userPrompt = "Please examine and explain the contents of the attached file: \(attachedFileName ?? "")."
         }
-        guard !userPrompt.isEmpty || attachedImage != nil else { return }
+        guard !userPrompt.isEmpty || attachedImage != nil || attachedFileData != nil else { return }
         
         let isFirstMessage = conversation.messages.isEmpty
         inputText = ""
@@ -318,9 +328,21 @@ public struct ChatView: View {
             imgBase64DataUrl = "data:image/jpeg;base64,\(jpegData.base64EncodedString())"
         }
         
-        // Prepare file content if text file
-        if let fileData = attachedFileData, let textContent = String(data: fileData, encoding: .utf8) {
-            userPrompt += "\n\n```\(attachedFileName ?? "file")\n\(textContent)\n```"
+        // Prepare file content if text, code, or PDF
+        if let fileData = attachedFileData {
+            if let textContent = String(data: fileData, encoding: .utf8) {
+                userPrompt += "\n\nFile Attached (\(attachedFileName ?? "Document")):\n```\n\(textContent)\n```"
+            } else if let pdfDoc = PDFDocument(data: fileData) {
+                var extractedPdf = ""
+                for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
+                    if let page = pdfDoc.page(at: pageIdx), let str = page.string {
+                        extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
+                    }
+                }
+                if !extractedPdf.isEmpty {
+                    userPrompt += "\n\nExtracted Text from Attached PDF (\(attachedFileName ?? "Document.pdf")):\n```\n\(extractedPdf)\n```"
+                }
+            }
         }
         
         attachedImage = nil

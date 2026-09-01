@@ -40,6 +40,23 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         self.updatedAt = updatedAt
     }
     
+    enum CodingKeys: String, CodingKey {
+        case id, title, provider, modelId, messages, isPinned, isGhost, createdAt, updatedAt
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "New Conversation"
+        provider = try container.decodeIfPresent(AIProvider.self, forKey: .provider) ?? .openrouter
+        modelId = try container.decodeIfPresent(String.self, forKey: .modelId) ?? "anthropic/claude-3.5-sonnet"
+        messages = try container.decodeIfPresent([Message].self, forKey: .messages) ?? []
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        isGhost = try container.decodeIfPresent(Bool.self, forKey: .isGhost) ?? false
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+    }
+    
     public static func == (lhs: Conversation, rhs: Conversation) -> Bool {
         return lhs.id == rhs.id &&
                lhs.title == rhs.title &&

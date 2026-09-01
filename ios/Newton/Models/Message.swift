@@ -27,6 +27,19 @@ public struct OrbitExecutionResult: Identifiable, Codable, Equatable, Hashable {
         self.result = result
         self.isSuccess = isSuccess
     }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, orbitName, params, result, isSuccess
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        orbitName = try container.decodeIfPresent(String.self, forKey: .orbitName) ?? "orbit"
+        params = try container.decodeIfPresent(String.self, forKey: .params) ?? ""
+        result = try container.decodeIfPresent(String.self, forKey: .result) ?? ""
+        isSuccess = try container.decodeIfPresent(Bool.self, forKey: .isSuccess) ?? true
+    }
 }
 
 public struct Message: Identifiable, Codable, Equatable, Hashable {
@@ -59,13 +72,29 @@ public struct Message: Identifiable, Codable, Equatable, Hashable {
         self.isStreaming = isStreaming
     }
     
+    enum CodingKeys: String, CodingKey {
+        case id, role, content, thinkingContent, imageUrl, orbitResults, createdAt, isStreaming
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        role = try container.decodeIfPresent(MessageRole.self, forKey: .role) ?? .assistant
+        content = try container.decodeIfPresent(String.self, forKey: .content) ?? ""
+        thinkingContent = try container.decodeIfPresent(String.self, forKey: .thinkingContent)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        orbitResults = try container.decodeIfPresent([OrbitExecutionResult].self, forKey: .orbitResults) ?? []
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
+    }
+    
     public static func == (lhs: Message, rhs: Message) -> Bool {
         return lhs.id == rhs.id &&
                lhs.role == rhs.role &&
                lhs.content == rhs.content &&
                lhs.thinkingContent == rhs.thinkingContent &&
                lhs.imageUrl == rhs.imageUrl &&
-               lhs.isStreaming == rhs.isStreaming &&
-               lhs.orbitResults == rhs.orbitResults
+               lhs.orbitResults == rhs.orbitResults &&
+               lhs.isStreaming == rhs.isStreaming
     }
 }

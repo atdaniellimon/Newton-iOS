@@ -56,7 +56,7 @@ public final class StorageManager: ObservableObject {
         return createConversation(provider: provider, modelId: modelId, title: title)
     }
     
-    public func createGhostConversation(title: String = "Ghost Session 👻") -> Conversation {
+    public func createGhostConversation(title: String = "Ghost Session") -> Conversation {
         let provider = SettingsManager.shared.currentProvider
         let modelId = SettingsManager.shared.currentModelId
         let ghostConvo = Conversation(
@@ -140,7 +140,6 @@ public final class StorageManager: ObservableObject {
         if let cloudData = NSUbiquitousKeyValueStore.default.data(forKey: iCloudKey),
            let cloudConvos = try? JSONDecoder().decode([Conversation].self, from: cloudData),
            !cloudConvos.isEmpty {
-            // Retain any in-memory ghost sessions
             let ghosts = self.conversations.filter { $0.isGhost }
             self.conversations = ghosts + cloudConvos
             sortConversations()
@@ -152,9 +151,11 @@ public final class StorageManager: ObservableObject {
             do {
                 let data = try Data(contentsOf: fileURL)
                 let loaded = try JSONDecoder().decode([Conversation].self, from: data)
-                self.conversations = loaded
-                sortConversations()
-                return
+                if !loaded.isEmpty {
+                    self.conversations = loaded
+                    sortConversations()
+                    return
+                }
             } catch {
                 print("Error loading local conversations: \(error)")
             }

@@ -60,7 +60,7 @@ public final class StorageManager: ObservableObject {
         return createConversation(provider: provider, modelId: modelId, title: title)
     }
     
-    public func createGhostConversation(title: String = "Ghost Session 👻") -> Conversation {
+    public func createGhostConversation(title: String = "Ghost Session") -> Conversation {
         let provider = SettingsManager.shared.currentProvider
         let modelId = SettingsManager.shared.currentModelId
         let ghostConvo = Conversation(
@@ -155,9 +155,11 @@ public final class StorageManager: ObservableObject {
             do {
                 let data = try Data(contentsOf: fileURL)
                 let loaded = try JSONDecoder().decode([Conversation].self, from: data)
-                self.conversations = loaded
-                sortConversations()
-                return
+                if !loaded.isEmpty {
+                    self.conversations = loaded
+                    sortConversations()
+                    return
+                }
             } catch {
                 print("Error loading local conversations: \(error)")
             }

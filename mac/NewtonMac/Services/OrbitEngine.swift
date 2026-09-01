@@ -38,9 +38,7 @@ public final class OrbitEngine {
                     detectedImageUrl = result.result
                 }
                 
-                let isCardOrbit = ["image_gen", "imagine", "generate_image", "generate_pdf", "pdf", "create_pdf", "make_pdf"].contains(orbitName.lowercased())
-                let replacement = isCardOrbit ? "" : "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
-                outputText = outputText.replacingOccurrences(of: fullMatch, with: replacement)
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
             }
         }
         
@@ -64,7 +62,25 @@ public final class OrbitEngine {
             }
         }
         
-        // 3. Fallback: Intent matching from user prompt
+        // 3. Process raw search dumps if returned in text
+        if outputText.contains("Citation ID:") || outputText.contains("Found ") && outputText.contains("results\n") {
+            let searchDumpPattern = "(?s)Found \\d+ results.*?(\\n\\n[A-Z]|$)"
+            if let dumpRegex = try? NSRegularExpression(pattern: searchDumpPattern, options: []) {
+                let nsOut = outputText as NSString
+                if let match = dumpRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsOut.length)) {
+                    let dumpText = nsOut.substring(with: match.range(at: 0))
+                    results.append(OrbitExecutionResult(orbitName: "web_search", params: "", result: dumpText, isSuccess: true))
+                    outputText = outputText.replacingOccurrences(of: dumpText, with: "")
+                }
+            }
+        }
+        
+        // Clean up remaining raw citation IDs
+        if let citRegex = try? NSRegularExpression(pattern: "\\[?Citation ID:\\s*([a-zA-Z0-9_-]+)\\]?", options: [.caseInsensitive]) {
+            outputText = citRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        
+        // 4. Fallback: Intent matching from user prompt
         if detectedImageUrl == nil && !userPrompt.isEmpty {
             let imgIntentPattern = "(?i)(?:/imagine\\s+(.+)|(?:me\\s+)?(?:puedes\\s+)?(?:hacer|haces|hazme|haz|genera[rs]?|gener[aá]me|generarme|crea[rs]?|cre[aá]me|crearme|dibuja[rs]?|dibujame|pinta[rs]?|pintame|ilustra[rs]?|renderiza[rs]?|generate|create|draw|paint|make)\\s*(?:me|te|nos)?\\s*(?:una?\\s+|an?\\s+)?(?:imagen|foto|dibujo|gr[aá]fico|ilustraci[oó]n|image|photo|drawing|picture)?\\s*(?:de|sobre|para|of|about|for)?\\s*(.+))"
             
