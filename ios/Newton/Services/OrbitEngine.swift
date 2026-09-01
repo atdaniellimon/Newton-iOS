@@ -82,9 +82,8 @@ public final class OrbitEngine {
                     
                     detectedImageUrl = await generateImage(prompt: promptToGenerate, baseUrl: baseUrl, apiKey: apiKey)
                     
-                    // Replace refusal or empty response with friendly caption
                     if outputText.isEmpty || outputText.contains("No pude generar") || outputText.contains("no puedo generar") || outputText.contains("no tengo la capacidad") || outputText.contains("Parece que no puedo") {
-                        outputText = "Aquí tienes la imagen generada de **\(promptToGenerate)**:"
+                        outputText = "¡Claro que sí! Aquí tienes una imagen de **\(promptToGenerate)**:"
                     }
                 }
             }
@@ -98,7 +97,7 @@ public final class OrbitEngine {
                 if let match = refRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsOut.length)) {
                     let subject = nsOut.substring(with: match.range(at: 1)).trimmingCharacters(in: CharacterSet(charactersIn: "?!., \t\n"))
                     detectedImageUrl = await generateImage(prompt: subject, baseUrl: baseUrl, apiKey: apiKey)
-                    outputText = "Aquí tienes la imagen generada de **\(subject)**:"
+                    outputText = "¡Claro que sí! Aquí tienes una imagen de **\(subject)**:"
                 }
             }
         }
@@ -116,7 +115,7 @@ public final class OrbitEngine {
         return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl)
     }
     
-    /// Generate an image from a prompt calling /v1/images/generations endpoint or falling back to Flux
+    /// Generate an image from a prompt calling endpoint or downloading high-res data URL
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -137,7 +136,8 @@ public final class OrbitEngine {
                 let payload: [String: Any] = [
                     "prompt": cleanPrompt,
                     "n": 1,
-                    "size": "1024x1024"
+                    "size": "1024x1024",
+                    "response_format": "b64_json"
                 ]
                 
                 if let bodyData = try? JSONSerialization.data(withJSONObject: payload) {
@@ -148,11 +148,16 @@ public final class OrbitEngine {
                         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                            let dataArr = json["data"] as? [[String: Any]],
                            let first = dataArr.first {
-                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
-                                return imgUrl
-                            }
                             if let b64 = first["b64_json"] as? String, !b64.isEmpty {
                                 return "data:image/png;base64,\(b64)"
+                            }
+                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
+                                // Download remote URL directly into base64 to ensure instant rendering
+                                if let (dlData, _) = try? await URLSession.shared.data(from: URL(string: imgUrl)!),
+                                   let _ = UIImage(data: dlData) {
+                                    return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
+                                }
+                                return imgUrl
                             }
                         }
                     }
@@ -160,11 +165,27 @@ public final class OrbitEngine {
             }
         }
         
-        // 2. High-Quality Flux / Pollinations AI Fallback
-        guard let encoded = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            return ""
+        // 2. High-Quality Direct Download Fallback
+        if let encoded = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)?
+            .replacingOccurrences(of: " ", with: "%20")
+            .replacingOccurrences(of: "?", with: "") {
+            
+            let directUrlStr = "https://image.pollinations.ai/prompt/\(encoded)?width=768&height=768&nologo=true"
+            if let directUrl = URL(string: directUrlStr) {
+                var dlRequest = URLRequest(url: directUrl)
+                dlRequest.timeoutInterval = 20
+                dlRequest.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+                
+                if let (dlData, dlResp) = try? await URLSession.shared.data(for: dlRequest),
+                   let http = dlResp as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                   let _ = UIImage(data: dlData) {
+                    return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
+                }
+                return directUrlStr
+            }
         }
-        return "https://image.pollinations.ai/prompt/\(encoded)?width=1024&height=1024&nologo=true&model=flux"
+        
+        return ""
     }
     
     public func executeOrbit(name: String, paramsJson: String, baseUrl: String = "", apiKey: String = "") async -> OrbitExecutionResult {
