@@ -242,9 +242,15 @@ public struct NewtonCodeChatView: View {
         [ORBIT:run_command]{"command": "ls -la"}[/ORBIT]
         
         ==================================================
+        NATURAL MULTILINGUAL ADAPTATION (CRITICAL)
+        ==================================================
+        - ALWAYS detect and respond in the EXACT same language used by the user (Spanish, English, French, German, etc.).
+        - If the user writes in Spanish, your explanations and thought process MUST be in natural, fluent Spanish.
+        
+        ==================================================
         CRITICAL AGENTIC BEHAVIOR RULES
         ==================================================
-        1. AUTONOMOUS INVESTIGATION: When the user asks about the project (e.g. "qué opinas de este proyecto?", "qué hace este código?", "explícame la arquitectura", "busca el bug"), NEVER respond asking the user for details or files. You have the tools! IMMEDIATELY run [ORBIT:run_command]{"command": "ls -la"}[/ORBIT] or [ORBIT:read_file] to inspect the codebase yourself, and deliver a comprehensive, technical analysis.
+        1. AUTONOMOUS INVESTIGATION: When the user asks about the project (e.g. "qué opinas de este proyecto?", "qué hace este código?", "explícame la arquitectura", "busca el bug"), NEVER respond asking the user for details or files. You have the tools! IMMEDIATELY run [ORBIT:run_command]{"command": "ls -la"}[/ORBIT] or [ORBIT:read_file] to inspect the codebase yourself, and deliver a comprehensive, technical analysis in the user's language.
         2. DO NOT DECLINE ACTIONS: When asked to modify, create, build, or fix code, use your orbits directly.
         3. BE CONCISE & PROFESSIONAL: Deliver clean, high-performance code and architectural insight.
         """

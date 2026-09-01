@@ -199,18 +199,9 @@ public final class LLMService {
                 "content": effectiveSystemPrompt
             ])
             
-            for (index, msg) in messages.enumerated() {
+            for msg in messages {
                 let role = msg.role.rawValue
-                var textContent = msg.content
-                
-                // Reinforce Singularity identity & Orbits capability on initial user prompt
-                if index == 0 && msg.role == .user {
-                    if effectiveSystemPrompt.contains("Code Engine") || effectiveSystemPrompt.contains("run_command") {
-                        textContent = "[CODE ENGINE ACTIVE: You have full native filesystem and bash access: [ORBIT:run_command]{\"command\": \"...\"}[/ORBIT], [ORBIT:read_file]{\"path\": \"...\"}[/ORBIT], [ORBIT:write_file], [ORBIT:edit_file]. When asked about the project or code, NEVER ask the user for details—use [ORBIT:run_command]{\"command\": \"ls -la\"} or [ORBIT:read_file] immediately to analyze the repository.]\n\n\(textContent)"
-                    } else {
-                        textContent = "[IDENTITY & ORBITS: You are Newton (Singularity). You have the tool [ORBIT:generate_image]{\"prompt\": \"...\"}[/ORBIT] to create images. If the user asks for an image, invoke it directly.]\n\n\(textContent)"
-                    }
-                }
+                let textContent = msg.content
                 
                 if let imgDataUrl = msg.imageUrl, !imgDataUrl.isEmpty {
                     let contentArray: [[String: Any]] = [

@@ -106,38 +106,7 @@ public final class OrbitEngine {
             outputText = genImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
         }
         
-        // 4. Fallback: Intent matching from user prompt (EXPLICIT image requests only)
-        if detectedImageUrl == nil && !userPrompt.isEmpty {
-            let lower = userPrompt.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            let isCapabilityQuestion = lower.contains("que puedes hacer") || lower.contains("qué puedes hacer") || lower.contains("que sabes hacer") || lower.contains("qué sabes hacer") || lower.contains("quien eres") || lower.contains("quién eres") || lower.hasPrefix("hola")
-            
-            if !isCapabilityQuestion {
-                let imgIntentPattern = "(?i)(?:^/imagine\\s+(.+)|(?:dibuja[rs]?|dib[uú]jame|pinta[rs]?|pintame|ilustra[rs]?|renderiza[rs]?|draw|paint|illustrate)\\s+(?:una?\\s+|an?\\s+)?(.+)|(?:(?:me\\s+)?(?:puedes\\s+)?(?:hacer|hazme|haz|genera[rs]?|gener[aá]me|crea[rs]?|cre[aá]me|make|generate|create)\\s+(?:me|nos)?\\s*(?:una?\\s+|an?\\s+)(?:imagen|foto|dibujo|gr[aá]fico|ilustraci[oó]n|image|photo|picture|drawing|artwork|render)\\s*(?:de|sobre|para|of|about|for)?\\s*(.+)))"
-                
-                if let intentRegex = try? NSRegularExpression(pattern: imgIntentPattern, options: []) {
-                    let nsPrompt = userPrompt as NSString
-                    if let match = intentRegex.firstMatch(in: userPrompt, options: [], range: NSRange(location: 0, length: nsPrompt.length)) {
-                        var subject = ""
-                        for idx in 1..<match.numberOfRanges {
-                            if match.range(at: idx).location != NSNotFound {
-                                subject = nsPrompt.substring(with: match.range(at: idx))
-                                break
-                            }
-                        }
-                        
-                        let cleanSubj = subject.trimmingCharacters(in: CharacterSet(charactersIn: "?!., \t\n"))
-                        if !cleanSubj.isEmpty {
-                            detectedImageUrl = await generateImage(prompt: cleanSubj, baseUrl: baseUrl, apiKey: apiKey)
-                            if outputText.isEmpty || outputText.contains("No pude generar") || outputText.contains("no puedo generar") || outputText.contains("no tengo la capacidad") || outputText.contains("Parece que no puedo") {
-                                outputText = "¡Claro que sí! Aquí tienes una imagen de **\(cleanSubj)**:"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 5. Detect direct markdown images
+        // 4. Detect direct markdown images if output by the model
         if detectedImageUrl == nil {
             if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?|data:image/.*?)\\)", options: []) {
                 let nsStr = outputText as NSString
