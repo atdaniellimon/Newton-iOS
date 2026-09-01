@@ -87,7 +87,7 @@ public struct ImageGenerationPlaceholderView: View {
                     } else {
                         Text("Diffusion model in progress • 1024×1024")
                             .font(.system(size: 11))
-                            .foregroundColor(NewtonTheme.textTertiary)
+                            .foregroundColor(NewtonTheme.textSecondary.opacity(0.7))
                     }
                 }
             }
