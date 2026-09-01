@@ -47,6 +47,7 @@
 		A10038 /* NewtonLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10039 /* NewtonLiveActivityWidget.swift */; };
 		A10039 /* NewtonWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10040 /* NewtonWidgets.swift */; };
 		A10040 /* ImageGenerationPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10041 /* ImageGenerationPlaceholderView.swift */; };
+		A10041 /* iCloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10042 /* iCloudSyncService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -92,6 +93,7 @@
 		B10039 /* NewtonLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonLiveActivityWidget.swift; sourceTree = "<group>"; };
 		B10040 /* NewtonWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonWidgets.swift; sourceTree = "<group>"; };
 		B10041 /* ImageGenerationPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageGenerationPlaceholderView.swift; sourceTree = "<group>"; };
+		B10042 /* iCloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudSyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -160,6 +162,7 @@
 				B10034 /* WatchConnectivityManager.swift */,
 				B10037 /* NewtonActivityAttributes.swift */,
 				B10038 /* LiveActivityManager.swift */,
+				B10042 /* iCloudSyncService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -340,6 +343,7 @@
 				A10038 /* NewtonLiveActivityWidget.swift in Sources */,
 				A10039 /* NewtonWidgets.swift in Sources */,
 				A10040 /* ImageGenerationPlaceholderView.swift in Sources */,
+				A10041 /* iCloudSyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
