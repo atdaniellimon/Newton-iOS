@@ -12,6 +12,7 @@ import AppKit
 public struct MacSettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var storage = StorageManager.shared
+    @ObservedObject var syncService = iCloudSyncService.shared
     @State private var showingClearCacheAlert: Bool = false
     
     public init() {}
@@ -55,6 +56,50 @@ public struct MacSettingsView: View {
                             .foregroundColor(NewtonTheme.textPrimary)
                         
                         Toggle("Auto-Scroll To Bottom During Streaming", isOn: $settings.autoScrollOnStream)
+                    }
+                    .padding(14)
+                    .background(NewtonTheme.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
+                    )
+                    
+                    // iCloud Synchronization
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Image(systemName: "icloud.fill")
+                                .foregroundColor(NewtonTheme.sand)
+                            Text("iCloud Synchronization")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 6) {
+                                if syncService.isSyncing {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Circle()
+                                        .fill(NewtonTheme.forestGreen)
+                                        .frame(width: 8, height: 8)
+                                }
+                                Text(syncService.syncStatusText)
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundColor(NewtonTheme.textSecondary)
+                            }
+                        }
+                        
+                        Divider()
+                            .padding(.vertical, 2)
+                        
+                        Button("Sync with iCloud Now") {
+                            syncService.triggerManualSync()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(syncService.isSyncing)
                     }
                     .padding(14)
                     .background(NewtonTheme.card)

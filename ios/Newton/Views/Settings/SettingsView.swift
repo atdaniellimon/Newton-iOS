@@ -11,6 +11,7 @@ import SwiftUI
 public struct SettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var storage = StorageManager.shared
+    @ObservedObject var syncService = iCloudSyncService.shared
     @Environment(\.dismiss) private var dismiss
     
     @State private var showingClearCacheAlert: Bool = false
@@ -72,6 +73,41 @@ public struct SettingsView: View {
                                 Text("Auto-Scroll During Generation")
                             }
                         }
+                    }
+                    .listRowBackground(NewtonTheme.card)
+                    
+                    // iCloud Synchronization
+                    Section(header: Text("ICLOUD SYNCHRONIZATION").foregroundColor(NewtonTheme.textSecondary)) {
+                        HStack {
+                            Label("iCloud Status", systemImage: "icloud.fill")
+                                .foregroundColor(NewtonTheme.textPrimary)
+                            Spacer()
+                            HStack(spacing: 6) {
+                                if syncService.isSyncing {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Circle()
+                                        .fill(NewtonTheme.forestGreen)
+                                        .frame(width: 8, height: 8)
+                                }
+                                Text(syncService.syncStatusText)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(NewtonTheme.textSecondary)
+                            }
+                        }
+                        
+                        Button {
+                            syncService.triggerManualSync()
+                            Haptics.medium()
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text("Sync with iCloud Now")
+                            }
+                            .foregroundColor(NewtonTheme.sand)
+                        }
+                        .disabled(syncService.isSyncing)
                     }
                     .listRowBackground(NewtonTheme.card)
                     
