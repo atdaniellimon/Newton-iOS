@@ -3,11 +3,19 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  Full-height unified sidebar integrated with macOS traffic light controls.
+//  Full-height unified sidebar with native macOS segmented control aligned with window traffic lights.
 //
 
 import SwiftUI
 import AppKit
+
+public enum SidebarTab: String, CaseIterable, Identifiable {
+    case code = "code"
+    case chat = "chat"
+    case settings = "settings"
+    
+    public var id: String { rawValue }
+}
 
 public struct MacConversationListView: View {
     @Binding public var selectedConversation: Conversation?
@@ -16,6 +24,7 @@ public struct MacConversationListView: View {
     @StateObject private var settings = SettingsManager.shared
     @Environment(\.colorScheme) private var colorScheme
     
+    @State private var selectedSidebarTab: SidebarTab = .chat
     @State private var searchText: String = ""
     @State private var hoveredConversationId: String? = nil
     
@@ -39,12 +48,8 @@ public struct MacConversationListView: View {
     
     public var body: some View {
         VStack(spacing: 12) {
-            // Space reserved for native macOS traffic light window controls
-            Color.clear
-                .frame(height: 28)
-            
-            // Top Navigation Segmented Pill
-            topNavigationPill
+            // Top Row: Aligned directly with macOS traffic light buttons
+            topHeaderRow
             
             // Search Bar Capsule
             searchBar
@@ -67,54 +72,33 @@ public struct MacConversationListView: View {
     }
     
     @ViewBuilder
-    private var topNavigationPill: some View {
-        HStack(spacing: 6) {
-            // Newton Code </> Button
-            Button(action: {}) {
-                Text("</>")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundColor(isDark ? Color(red: 0.75, green: 0.80, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.48))
-                    .frame(width: 34, height: 32)
-            }
-            .buttonStyle(.plain)
-            .help("Newton Code & Programming Engine")
+    private var topHeaderRow: some View {
+        HStack(spacing: 8) {
+            // Space reserved for native macOS window controls (traffic lights)
+            Color.clear
+                .frame(width: 66, height: 26)
             
-            // Active Chat Tab (Dark Navy / Sand Capsule)
-            Button(action: {}) {
-                ZStack {
-                    Capsule()
-                        .fill(isDark ? NewtonTheme.sand : Color(red: 0.06, green: 0.09, blue: 0.16))
-                        .frame(width: 52, height: 32)
-                    
-                    Image(systemName: "bubble.left.fill")
-                        .font(.system(size: 12.5))
-                        .foregroundColor(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : .white)
+            // Native macOS Segmented Control (identical to Settings theme picker)
+            Picker("", selection: $selectedSidebarTab) {
+                Text("</>")
+                    .tag(SidebarTab.code)
+                Image(systemName: "bubble.left")
+                    .tag(SidebarTab.chat)
+                Image(systemName: "gearshape")
+                    .tag(SidebarTab.settings)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: selectedSidebarTab) { newTab in
+                if newTab == .settings {
+                    showSettingsSheet = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        selectedSidebarTab = .chat
+                    }
                 }
             }
-            .buttonStyle(.plain)
-            
-            // Settings Gear Button
-            Button(action: {
-                showSettingsSheet = true
-            }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundColor(isDark ? Color(red: 0.75, green: 0.80, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.48))
-                    .frame(width: 34, height: 32)
-            }
-            .buttonStyle(.plain)
-            .help("Settings & Engine Preferences")
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(isDark ? Color(red: 0.15, green: 0.19, blue: 0.25) : Color(red: 0.92, green: 0.94, blue: 0.97))
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .stroke(isDark ? Color(red: 0.22, green: 0.26, blue: 0.34) : Color(red: 0.86, green: 0.88, blue: 0.92), lineWidth: 0.8)
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
+        .padding(.top, 12)
     }
     
     @ViewBuilder
