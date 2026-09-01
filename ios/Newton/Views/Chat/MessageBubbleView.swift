@@ -106,6 +106,16 @@ public struct MessageBubbleView: View {
                                     .foregroundColor(copied ? NewtonTheme.forestGreen : NewtonTheme.textSecondary)
                             }
                             
+                            // TTS Speak Aloud Button
+                            Button(action: {
+                                Haptics.light()
+                                SpeechService.shared.toggleSpeech(for: message.id, text: message.content)
+                            }) {
+                                Image(systemName: (SpeechService.shared.isSpeaking && SpeechService.shared.currentlySpeakingMessageId == message.id) ? "speaker.wave.3.fill" : "speaker.wave.2")
+                                    .font(.system(size: 13))
+                                    .foregroundColor((SpeechService.shared.isSpeaking && SpeechService.shared.currentlySpeakingMessageId == message.id) ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                            }
+                            
                             ShareLink(item: message.content) {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 13))

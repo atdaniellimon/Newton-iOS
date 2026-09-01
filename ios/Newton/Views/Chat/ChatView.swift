@@ -41,6 +41,8 @@ public struct ChatView: View {
     @State private var errorMessage: String? = nil
     @State private var activeSheet: ActiveModalSheet? = nil
     @State private var showFileImporter: Bool = false
+    @State private var showVoiceCall: Bool = false
+    @State private var exportFileUrl: URL? = nil
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
@@ -161,6 +163,53 @@ public struct ChatView: View {
         }
         .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                // Live Voice Call Button
+                Button {
+                    Haptics.medium()
+                    showVoiceCall = true
+                } label: {
+                    Image(systemName: "waveform.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(NewtonTheme.sand)
+                }
+                
+                // Export Menu (PDF / Markdown)
+                Menu {
+                    Button {
+                        Haptics.light()
+                        if let pdfUrl = ConversationExportManager.shared.exportToPDF(conversation: conversation) {
+                            exportFileUrl = pdfUrl
+                        }
+                    } label: {
+                        Label("Export as PDF", systemImage: "doc.richtext")
+                    }
+                    
+                    Button {
+                        Haptics.light()
+                        if let mdUrl = ConversationExportManager.shared.exportToMarkdown(conversation: conversation) {
+                            exportFileUrl = mdUrl
+                        }
+                    } label: {
+                        Label("Export as Markdown", systemImage: "text.quote")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 18))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showVoiceCall) {
+            VoiceCallView(conversation: conversation)
+        }
+        .sheet(item: Binding(
+            get: { exportFileUrl.map { IdentifiableURL(url: $0) } },
+            set: { exportFileUrl = $0?.url }
+        )) { item in
+            ActivityShareView(activityItems: [item.url])
+        }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .camera:
@@ -515,4 +564,21 @@ public struct NewtonHeroWelcomeView: View {
             .padding(.horizontal, 20)
         }
     }
+}
+
+public struct IdentifiableURL: Identifiable {
+    public let id = UUID()
+    public let url: URL
+}
+
+public struct ActivityShareView: UIViewControllerRepresentable {
+    public let activityItems: [Any]
+    public let applicationActivities: [UIActivity]? = nil
+    
+    public func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        return controller
+    }
+    
+    public func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
