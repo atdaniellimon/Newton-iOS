@@ -78,7 +78,7 @@ public struct StartVoiceCallIntent: AppIntent {
     public func perform() async throws -> some IntentResult {
         if let url = URL(string: "newton://voice") {
             #if os(iOS)
-            UIApplication.shared.open(url)
+            await UIApplication.shared.open(url)
             #elseif os(macOS)
             NSWorkspace.shared.open(url)
             #endif
@@ -99,7 +99,7 @@ public struct StartGhostSessionIntent: AppIntent {
     public func perform() async throws -> some IntentResult {
         if let url = URL(string: "newton://ghost") {
             #if os(iOS)
-            UIApplication.shared.open(url)
+            await UIApplication.shared.open(url)
             #elseif os(macOS)
             NSWorkspace.shared.open(url)
             #endif
