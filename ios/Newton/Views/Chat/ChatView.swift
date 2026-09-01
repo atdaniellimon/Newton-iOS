@@ -378,7 +378,7 @@ public struct ChatView: View {
             let apiKey = settings.getApiKey(for: provider)
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
-            let systemPrompt = settings.defaultSystemPrompt()
+            let systemPrompt = SettingsManager.singularitySystemPrompt
             
             do {
                 let stream = LLMService.shared.streamCompletion(
