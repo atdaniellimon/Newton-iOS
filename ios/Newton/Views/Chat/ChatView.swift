@@ -149,6 +149,33 @@ public struct ChatView: View {
                         }
                         .padding(.vertical, 10)
                     }
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                                    }
+                                }) {
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(NewtonTheme.sand)
+                                        .frame(width: 36, height: 36)
+                                        .background(NewtonTheme.card.opacity(0.95))
+                                        .clipShape(Circle())
+                                        .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(NewtonTheme.border, lineWidth: 0.8)
+                                        )
+                                }
+                                .padding(.trailing, 16)
+                                .padding(.bottom, 12)
+                            }
+                        }
+                    )
                     .onChange(of: conversation.messages.count) { _ in
                         withAnimation {
                             proxy.scrollTo("bottom_anchor", anchor: .bottom)
@@ -162,30 +189,56 @@ public struct ChatView: View {
                             proxy.scrollTo("bottom_anchor", anchor: .bottom)
                         }
                     }
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                        }
+                    }
                     .scrollDismissesKeyboard(.interactively)
                 }
                 
-                // Ultra-Compact Studio Input Bar
-                MessageInputBar(
-                    text: $inputText,
-                    attachedImage: $attachedImage,
-                    attachedFileName: $attachedFileName,
-                    isStreaming: isStreaming,
-                    onTriggerCamera: {
-                        activeSheet = .camera
-                    },
-                    onTriggerPhotos: {
-                        activeSheet = .photoLibrary
-                    },
-                    onTriggerFiles: {
-                        showFileImporter = true
-                    },
-                    onTriggerWebSearch: {
-                        inputText += "[ORBIT:web_search]{\"query\": \"\"}[/ORBIT]"
-                    },
-                    onSend: sendMessage,
-                    onStop: stopStreaming
-                )
+                // Ultra-Compact Studio Input Bar OR Terminated Banner
+                if isTerminated {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(NewtonTheme.coralRed)
+                        Text("Session ended by Newton.")
+                            .font(.system(size: 13, weight: .semibold, design: .serif))
+                            .foregroundColor(NewtonTheme.textSecondary)
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 20)
+                    .background(NewtonTheme.card)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(NewtonTheme.coralRed.opacity(0.4), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                } else {
+                    MessageInputBar(
+                        text: $inputText,
+                        attachedImage: $attachedImage,
+                        attachedFileName: $attachedFileName,
+                        isStreaming: isStreaming,
+                        onTriggerCamera: {
+                            activeSheet = .camera
+                        },
+                        onTriggerPhotos: {
+                            activeSheet = .photoLibrary
+                        },
+                        onTriggerFiles: {
+                            showFileImporter = true
+                        },
+                        onTriggerWebSearch: {
+                            inputText += "[ORBIT:web_search]{\"query\": \"\"}[/ORBIT]"
+                        },
+                        onSend: sendMessage,
+                        onStop: stopStreaming
+                    )
+                }
             }
         }
         .navigationTitle(conversation.title)
@@ -294,6 +347,12 @@ public struct ChatView: View {
         }
     }
     
+    private var isTerminated: Bool {
+        conversation.messages.contains { msg in
+            msg.orbits.contains { $0.orbitName.lowercased() == "kick" || $0.orbitName.lowercased() == "terminate" }
+        }
+    }
+    
     private func editMessage(_ msg: Message) {
         if let idx = conversation.messages.firstIndex(where: { $0.id == msg.id }) {
             inputText = msg.content
@@ -310,14 +369,43 @@ public struct ChatView: View {
     }
     
     private func sendMessage() {
-        var userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if userPrompt.isEmpty && attachedImage != nil {
-            userPrompt = "Describe and explain the details, text, and information shown in the attached content."
+        let rawInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var displayPrompt = rawInput
+        var backendPayloadPrompt = rawInput
+        
+        let hasFile = attachedFileData != nil
+        let fileName = attachedFileName ?? "Document"
+        
+        if displayPrompt.isEmpty && attachedImage != nil {
+            displayPrompt = "Describe and analyze this image."
+            backendPayloadPrompt = displayPrompt
         }
-        if userPrompt.isEmpty && attachedFileName != nil {
-            userPrompt = "Please examine and explain the contents of the attached file: \(attachedFileName ?? "")."
+        
+        if hasFile {
+            if displayPrompt.isEmpty {
+                displayPrompt = "📎 \(fileName)"
+            } else {
+                displayPrompt = "\(displayPrompt)\n\n📎 \(fileName)"
+            }
+            
+            if let fileData = attachedFileData {
+                if let textContent = String(data: fileData, encoding: .utf8) {
+                    backendPayloadPrompt += "\n\n[File Attached: \(fileName)]:\n```\n\(textContent)\n```"
+                } else if let pdfDoc = PDFDocument(data: fileData) {
+                    var extractedPdf = ""
+                    for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
+                        if let page = pdfDoc.page(at: pageIdx), let str = page.string {
+                            extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
+                        }
+                    }
+                    if !extractedPdf.isEmpty {
+                        backendPayloadPrompt += "\n\n[Extracted Text from Attached PDF: \(fileName)]:\n```\n\(extractedPdf)\n```"
+                    }
+                }
+            }
         }
-        guard !userPrompt.isEmpty || attachedImage != nil || attachedFileData != nil else { return }
+        
+        guard !displayPrompt.isEmpty || attachedImage != nil || attachedFileData != nil else { return }
         
         let isFirstMessage = conversation.messages.isEmpty
         inputText = ""
@@ -328,34 +416,17 @@ public struct ChatView: View {
             imgBase64DataUrl = "data:image/jpeg;base64,\(jpegData.base64EncodedString())"
         }
         
-        // Prepare file content if text, code, or PDF
-        if let fileData = attachedFileData {
-            if let textContent = String(data: fileData, encoding: .utf8) {
-                userPrompt += "\n\nFile Attached (\(attachedFileName ?? "Document")):\n```\n\(textContent)\n```"
-            } else if let pdfDoc = PDFDocument(data: fileData) {
-                var extractedPdf = ""
-                for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
-                    if let page = pdfDoc.page(at: pageIdx), let str = page.string {
-                        extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
-                    }
-                }
-                if !extractedPdf.isEmpty {
-                    userPrompt += "\n\nExtracted Text from Attached PDF (\(attachedFileName ?? "Document.pdf")):\n```\n\(extractedPdf)\n```"
-                }
-            }
-        }
-        
         attachedImage = nil
         attachedFileName = nil
         attachedFileData = nil
         errorMessage = nil
         
-        var userMessage = Message(role: .user, content: userPrompt)
+        var userMessage = Message(role: .user, content: displayPrompt)
         userMessage.imageUrl = imgBase64DataUrl
         conversation.messages.append(userMessage)
         
         if isFirstMessage {
-            conversation.title = String(userPrompt.split(separator: " ").prefix(4).joined(separator: " "))
+            conversation.title = String(rawInput.isEmpty ? fileName : rawInput.split(separator: " ").prefix(4).joined(separator: " "))
         }
         
         let assistantMessageId = UUID().uuidString
@@ -364,7 +435,13 @@ public struct ChatView: View {
         storage.updateConversation(conversation)
         
         isStreaming = true
-        LiveActivityManager.shared.startActivity(type: "reasoning", query: userPrompt, initialStatus: "Newton is reasoning...")
+        LiveActivityManager.shared.startActivity(type: "reasoning", query: displayPrompt, initialStatus: "Newton is reasoning...")
+        
+        // Prepare payload messages
+        var messagesToSend = Array(conversation.messages.dropLast())
+        if let lastIdx = messagesToSend.indices.last, messagesToSend[lastIdx].role == .user {
+            messagesToSend[lastIdx].content = backendPayloadPrompt
+        }
         
         // Run with Background Task Protection
         NotificationManager.shared.beginBackgroundTask(name: "NewtonStreamTask") {
@@ -382,7 +459,7 @@ public struct ChatView: View {
             
             do {
                 let stream = LLMService.shared.streamCompletion(
-                    messages: conversation.messages.dropLast(),
+                    messages: messagesToSend,
                     provider: provider,
                     modelId: modelId,
                     baseUrl: baseUrl,

@@ -195,31 +195,89 @@ public struct MacChatView: View {
                                     .id(message.id)
                                 }
                             }
-                            .padding(.horizontal, 40)
-                            .padding(.vertical, 20)
+                            Color.clear
+                                .frame(height: 1)
+                                .id("mac_bottom_anchor")
                         }
-                        .onChange(of: conversation.messages.count) { _ in
-                            if let lastId = conversation.messages.last?.id {
-                                withAnimation {
-                                    proxy.scrollTo(lastId, anchor: .bottom)
+                        .overlay(
+                            VStack {
+                                Spacer()
+                                HStack {
+                                    Spacer()
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
+                                        }
+                                    }) {
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(NewtonTheme.sand)
+                                            .frame(width: 32, height: 32)
+                                            .background(NewtonTheme.card.opacity(0.95))
+                                            .clipShape(Circle())
+                                            .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(NewtonTheme.border, lineWidth: 0.8)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.trailing, 24)
+                                    .padding(.bottom, 12)
                                 }
+                            }
+                        )
+                        .onChange(of: conversation.messages.count) { _ in
+                            withAnimation {
+                                proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
+                            }
+                        }
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
                             }
                         }
                     }
                 }
                 
-                // Floating Bottom Input Bar Card
-                MacMessageInputBar(
-                    text: $inputText,
-                    isStreaming: isStreaming,
-                    onSend: sendMessage,
-                    onStop: stopStreaming,
-                    onAttachFile: openFilePicker
-                )
+                // Floating Bottom Input Bar Card OR Terminated Banner
+                if isTerminated {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(NewtonTheme.coralRed)
+                        Text("Session ended by Newton.")
+                            .font(.system(size: 13, weight: .semibold, design: .serif))
+                            .foregroundColor(NewtonTheme.textSecondary)
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 24)
+                    .background(NewtonTheme.card)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(NewtonTheme.coralRed.opacity(0.4), lineWidth: 1)
+                    )
+                    .padding(.bottom, 14)
+                } else {
+                    MacMessageInputBar(
+                        text: $inputText,
+                        isStreaming: isStreaming,
+                        onSend: sendMessage,
+                        onStop: stopStreaming,
+                        onAttachFile: openFilePicker
+                    )
+                }
             }
         }
         .popover(isPresented: $showModelSheet) {
             MacModelPickerPopover()
+        }
+    }
+    
+    private var isTerminated: Bool {
+        conversation.messages.contains { msg in
+            msg.orbitResults.contains { $0.orbitName.lowercased() == "kick" || $0.orbitName.lowercased() == "terminate" }
         }
     }
     

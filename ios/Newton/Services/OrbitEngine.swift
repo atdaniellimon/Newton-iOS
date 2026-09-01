@@ -80,12 +80,13 @@ public final class OrbitEngine {
             }
         }
         
-        // 3. Process raw search dumps if returned in text (e.g., "Found 12 results ... Citation ID: ...")
-        if outputText.contains("Citation ID:") || outputText.contains("Found ") && outputText.contains("results\n") {
-            let searchDumpPattern = "(?s)Found \\d+ results.*?(\\n\\n[A-Z]|$)"
-            if let dumpRegex = try? NSRegularExpression(pattern: searchDumpPattern, options: []) {
+        // 3. Process raw search dumps if returned in text
+        if outputText.contains("URL: http") || outputText.contains("Citation ID:") || (outputText.contains("Found ") && outputText.contains("results")) {
+            let searchDumpPattern = "(?s)(?:Found \\d+ results|URL:\\s*https?://).*?(?=\\n\\n[A-Z¿¡]|$)"
+            if let dumpRegex = try? NSRegularExpression(pattern: searchDumpPattern, options: [.caseInsensitive]) {
                 let nsOut = outputText as NSString
-                if let match = dumpRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsOut.length)) {
+                let matches = dumpRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsOut.length))
+                for match in matches {
                     let dumpText = nsOut.substring(with: match.range(at: 0))
                     results.append(OrbitExecutionResult(orbitName: "web_search", params: "", result: dumpText, isSuccess: true))
                     outputText = outputText.replacingOccurrences(of: dumpText, with: "")
@@ -93,10 +94,27 @@ public final class OrbitEngine {
             }
         }
         
-        // Clean up remaining raw citation IDs: e.g. [Citation ID: f172] -> [1], [2]
+        // Clean up remaining raw search scrape artifacts
+        if let scrapeRegex = try? NSRegularExpression(pattern: "(?m)^(?:URL:|Last Updated:|title:|keywords:|description:|\\[Publicidad\\]).*$", options: [.caseInsensitive]) {
+            outputText = scrapeRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        
+        // Clean up remaining raw citation IDs: e.g. [Citation ID: f172]
         if let citRegex = try? NSRegularExpression(pattern: "\\[?Citation ID:\\s*([a-zA-Z0-9_-]+)\\]?", options: [.caseInsensitive]) {
             outputText = citRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
         }
+        
+        // Clean up artificial [CONFIDENCE: ...] and [PREMISE] -> [LOGIC] -> [CONCLUSION] boilerplate
+        if let confRegex = try? NSRegularExpression(pattern: "\\[CONFIDENCE:\\s*\\w+\\]\\s*[-—:]?\\s*", options: [.caseInsensitive]) {
+            outputText = confRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        if let logicRegex = try? NSRegularExpression(pattern: "\\[PREMISE\\]\\s*→\\s*\\[LOGIC\\]\\s*→\\s*\\[CONCLUSION\\]", options: [.caseInsensitive]) {
+            outputText = logicRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        
+        // Clean up repetitive identity clauses if present
+        outputText = outputText.replacingOccurrences(of: ", de la familia de modelos Newton", with: "")
+        outputText = outputText.replacingOccurrences(of: ", from the Newton model family", with: "")
         
         // 4. Fallback: Intent matching from user prompt
         if detectedImageUrl == nil && !userPrompt.isEmpty {
