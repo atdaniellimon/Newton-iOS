@@ -14,7 +14,7 @@ public final class SettingsManager: ObservableObject {
     
     @AppStorage("currentProvider") public var currentProviderRaw: String = AIProvider.openrouter.rawValue
     @AppStorage("currentModelId") public var currentModelId: String = "anthropic/claude-3.5-sonnet"
-    @AppStorage("customBaseUrl") public var customBaseUrl: String = "http://127.0.0.1:8000/v1"
+    @AppStorage("customBaseUrl") public var customBaseUrl: String = "http://127.0.0.1:8765/v1"
     @AppStorage("customApiKey") public var customApiKey: String = ""
     @AppStorage("temperature") public var temperature: Double = 0.7
     @AppStorage("maxTokens") public var maxTokens: Int = 4096

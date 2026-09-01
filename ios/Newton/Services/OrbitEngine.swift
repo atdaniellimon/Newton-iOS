@@ -19,6 +19,23 @@ public final class OrbitEngine {
         var results: [OrbitExecutionResult] = []
         var detectedImageUrl: String? = nil
         
+        // 0. Prioridad 1: Detectar si el modelo ya incluyó una imagen Markdown o URL directa de Meta AI
+        if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?|data:image/.*?)\\)", options: []) {
+            let nsStr = outputText as NSString
+            if let firstMatch = imgRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsStr.length)) {
+                detectedImageUrl = nsStr.substring(with: firstMatch.range(at: 1))
+            }
+        }
+        
+        if detectedImageUrl == nil {
+            if let scontentRegex = try? NSRegularExpression(pattern: "(https://[a-zA-Z0-9.-]+\\.fbcdn\\.net/[^\\s\"'<>\n\r\t]+)", options: []) {
+                let nsStr = outputText as NSString
+                if let firstMatch = scontentRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsStr.length)) {
+                    detectedImageUrl = nsStr.substring(with: firstMatch.range(at: 1))
+                }
+            }
+        }
+        
         // 1. Process explicit [ORBIT:name]...[/ORBIT]
         let pattern = "\\[ORBIT:(\\w+)\\]([\\s\\S]*?)(?:\\[/ORBIT\\]|$)"
         if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
@@ -103,16 +120,6 @@ public final class OrbitEngine {
             }
         }
         
-        // 5. Detect direct markdown images
-        if detectedImageUrl == nil {
-            if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?|data:image/.*?)\\)", options: []) {
-                let nsStr = outputText as NSString
-                if let firstMatch = imgRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsStr.length)) {
-                    detectedImageUrl = nsStr.substring(with: firstMatch.range(at: 1))
-                }
-            }
-        }
-        
         return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl)
     }
     
@@ -120,71 +127,69 @@ public final class OrbitEngine {
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // 1. Try calling the provider's /v1/images/generations with a fast 4s timeout
-        if !baseUrl.isEmpty && !baseUrl.contains("localhost") && !baseUrl.contains("127.0.0.1") {
-            let cleanBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
+        // 1. Determinar la URL del API (soporta servidor local 8765, túnel Cloudflare y custom URL)
+        var activeBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        if activeBase.isEmpty {
+            activeBase = SettingsManager.shared.customBaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if activeBase.isEmpty {
+            activeBase = "http://127.0.0.1:8765/v1"
+        }
+        
+        let cleanBase = activeBase.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let endpointStr: String
+        if cleanBase.hasSuffix("/v1/images/generations") || cleanBase.hasSuffix("/images/generations") {
+            endpointStr = cleanBase
+        } else if cleanBase.hasSuffix("/v1") {
+            endpointStr = "\(cleanBase)/images/generations"
+        } else {
+            endpointStr = "\(cleanBase)/v1/images/generations"
+        }
+        
+        // 2. Llamar directamente a tu API /v1/images/generations con 30 segundos de timeout
+        if let endpointUrl = URL(string: endpointStr) {
+            var request = URLRequest(url: endpointUrl)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 30
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            let activeKey = apiKey.isEmpty ? SettingsManager.shared.customApiKey : apiKey
+            if !activeKey.isEmpty {
+                request.setValue("Bearer \(activeKey)", forHTTPHeaderField: "Authorization")
+            }
             
-            if let endpointUrl = URL(string: endpointStr) {
-                var request = URLRequest(url: endpointUrl)
-                request.httpMethod = "POST"
-                request.timeoutInterval = 4
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                if !apiKey.isEmpty {
-                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                }
-                
-                let payload: [String: Any] = [
-                    "prompt": cleanPrompt,
-                    "n": 1,
-                    "size": "768x768",
-                    "response_format": "b64_json"
-                ]
-                
-                if let bodyData = try? JSONSerialization.data(withJSONObject: payload) {
-                    request.httpBody = bodyData
-                    if let (data, response) = try? await URLSession.shared.data(for: request),
-                       let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) {
-                        
-                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let dataArr = json["data"] as? [[String: Any]],
-                           let first = dataArr.first {
-                            if let b64 = first["b64_json"] as? String, !b64.isEmpty {
-                                return "data:image/png;base64,\(b64)"
-                            }
-                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty, let urlObj = URL(string: imgUrl) {
-                                if let (dlData, _) = try? await URLSession.shared.data(from: urlObj),
-                                   let _ = UIImage(data: dlData) {
-                                    return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
-                                }
-                                return imgUrl
-                            }
+            let payload: [String: Any] = [
+                "prompt": cleanPrompt,
+                "n": 1,
+                "size": "1024x1024",
+                "model": "dall-e-3"
+            ]
+            
+            if let bodyData = try? JSONSerialization.data(withJSONObject: payload) {
+                request.httpBody = bodyData
+                if let (data, response) = try? await URLSession.shared.data(for: request),
+                   let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) {
+                    
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let dataArr = json["data"] as? [[String: Any]],
+                       let first = dataArr.first {
+                        if let b64 = first["b64_json"] as? String, !b64.isEmpty {
+                            return "data:image/png;base64,\(b64)"
+                        }
+                        if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
+                            return imgUrl
                         }
                     }
                 }
             }
         }
         
-        // 2. High-Performance Turbo Image Generator
+        // 3. Fallback de emergencia a modelo de alta calidad FLUX
         let encodedPrompt = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)?
             .replacingOccurrences(of: " ", with: "%20")
             .replacingOccurrences(of: "?", with: "") ?? "artwork"
         
-        let turboUrlStr = "https://image.pollinations.ai/prompt/\(encodedPrompt)?width=768&height=768&nologo=true&model=turbo"
-        if let turboUrl = URL(string: turboUrlStr) {
-            var dlRequest = URLRequest(url: turboUrl)
-            dlRequest.timeoutInterval = 15
-            dlRequest.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
-            
-            if let (dlData, dlResp) = try? await URLSession.shared.data(for: dlRequest),
-               let http = dlResp as? HTTPURLResponse, (200...299).contains(http.statusCode),
-               let _ = UIImage(data: dlData) {
-                return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
-            }
-            return turboUrlStr
-        }
-        
-        return ""
+        let fluxUrlStr = "https://image.pollinations.ai/prompt/\(encodedPrompt)?width=1024&height=1024&nologo=true&model=flux"
+        return fluxUrlStr
     }
     
     public func executeOrbit(name: String, paramsJson: String, baseUrl: String = "", apiKey: String = "") async -> OrbitExecutionResult {
