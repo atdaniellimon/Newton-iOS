@@ -1,0 +1,374 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		M10001 /* NewtonMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10001 /* NewtonMacApp.swift */; };
+		M10002 /* AIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10002 /* AIProvider.swift */; };
+		M10003 /* AIModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10003 /* AIModel.swift */; };
+		M10004 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10004 /* Message.swift */; };
+		M10005 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10005 /* Conversation.swift */; };
+		M10006 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10006 /* KeychainManager.swift */; };
+		M10007 /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10007 /* SettingsManager.swift */; };
+		M10008 /* LLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10008 /* LLMService.swift */; };
+		M10009 /* StorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10009 /* StorageManager.swift */; };
+		M10010 /* OrbitEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10010 /* OrbitEngine.swift */; };
+		M10011 /* ConversationExportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10011 /* ConversationExportManager.swift */; };
+		M10012 /* SpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10012 /* SpeechService.swift */; };
+		M10013 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10013 /* Theme.swift */; };
+		M10014 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10014 /* Haptics.swift */; };
+		M10015 /* MacHero3DCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10015 /* MacHero3DCanvasView.swift */; };
+		M10016 /* MacOrbitCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10016 /* MacOrbitCardView.swift */; };
+		M10017 /* MacMessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10017 /* MacMessageBubbleView.swift */; };
+		M10018 /* MacMessageInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10018 /* MacMessageInputBar.swift */; };
+		M10019 /* MacChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10019 /* MacChatView.swift */; };
+		M10020 /* MacConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10020 /* MacConversationListView.swift */; };
+		M10021 /* MacSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10021 /* MacSettingsView.swift */; };
+		M10022 /* MacMenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10022 /* MacMenuBarView.swift */; };
+		M10023 /* MainMacSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N10023 /* MainMacSplitView.swift */; };
+		M10024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = N10024 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		P10001 /* Newton.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Newton.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		N10001 /* NewtonMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonMacApp.swift; sourceTree = "<group>"; };
+		N10002 /* AIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvider.swift; sourceTree = "<group>"; };
+		N10003 /* AIModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModel.swift; sourceTree = "<group>"; };
+		N10004 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
+		N10005 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
+		N10006 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		N10007 /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
+		N10008 /* LLMService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
+		N10009 /* StorageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageManager.swift; sourceTree = "<group>"; };
+		N10010 /* OrbitEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitEngine.swift; sourceTree = "<group>"; };
+		N10011 /* ConversationExportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationExportManager.swift; sourceTree = "<group>"; };
+		N10012 /* SpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechService.swift; sourceTree = "<group>"; };
+		N10013 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		N10014 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		N10015 /* MacHero3DCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacHero3DCanvasView.swift; sourceTree = "<group>"; };
+		N10016 /* MacOrbitCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacOrbitCardView.swift; sourceTree = "<group>"; };
+		N10017 /* MacMessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMessageBubbleView.swift; sourceTree = "<group>"; };
+		N10018 /* MacMessageInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMessageInputBar.swift; sourceTree = "<group>"; };
+		N10019 /* MacChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacChatView.swift; sourceTree = "<group>"; };
+		N10020 /* MacConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacConversationListView.swift; sourceTree = "<group>"; };
+		N10021 /* MacSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsView.swift; sourceTree = "<group>"; };
+		N10022 /* MacMenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMenuBarView.swift; sourceTree = "<group>"; };
+		N10023 /* MainMacSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMacSplitView.swift; sourceTree = "<group>"; };
+		N10024 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		Q10001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		R10001 = {
+			isa = PBXGroup;
+			children = (
+				R10002 /* NewtonMac */,
+				R10003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		R10002 /* NewtonMac */ = {
+			isa = PBXGroup;
+			children = (
+				N10001 /* NewtonMacApp.swift */,
+				N10024 /* Assets.xcassets */,
+				R10004 /* Models */,
+				R10005 /* Services */,
+				R10006 /* Utilities */,
+				R10007 /* Views */,
+			);
+			sourceTree = "<group>";
+		};
+		R10003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				P10001 /* Newton.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		R10004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				N10002 /* AIProvider.swift */,
+				N10003 /* AIModel.swift */,
+				N10004 /* Message.swift */,
+				N10005 /* Conversation.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		R10005 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				N10006 /* KeychainManager.swift */,
+				N10007 /* SettingsManager.swift */,
+				N10008 /* LLMService.swift */,
+				N10009 /* StorageManager.swift */,
+				N10010 /* OrbitEngine.swift */,
+				N10011 /* ConversationExportManager.swift */,
+				N10012 /* SpeechService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		R10006 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				N10013 /* Theme.swift */,
+				N10014 /* Haptics.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		R10007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				N10023 /* MainMacSplitView.swift */,
+				N10015 /* MacHero3DCanvasView.swift */,
+				N10016 /* MacOrbitCardView.swift */,
+				N10017 /* MacMessageBubbleView.swift */,
+				N10018 /* MacMessageInputBar.swift */,
+				N10019 /* MacChatView.swift */,
+				N10020 /* MacConversationListView.swift */,
+				N10021 /* MacSettingsView.swift */,
+				N10022 /* MacMenuBarView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		S10001 /* Newton */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T10001 /* Build configuration list for PBXNativeTarget "Newton" */;
+			buildPhases = (
+				U10001 /* Sources */,
+				Q10001 /* Frameworks */,
+				V10001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Newton;
+			productName = Newton;
+			productReference = P10001 /* Newton.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		W10001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					S10001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = X10001 /* Build configuration list for PBXProject "NewtonMac" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = R10001;
+			productRefGroup = R10003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				S10001 /* Newton */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		V10001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				M10024 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		U10001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				M10001 /* NewtonMacApp.swift in Sources */,
+				M10002 /* AIProvider.swift in Sources */,
+				M10003 /* AIModel.swift in Sources */,
+				M10004 /* Message.swift in Sources */,
+				M10005 /* Conversation.swift in Sources */,
+				M10006 /* KeychainManager.swift in Sources */,
+				M10007 /* SettingsManager.swift in Sources */,
+				M10008 /* LLMService.swift in Sources */,
+				M10009 /* StorageManager.swift in Sources */,
+				M10010 /* OrbitEngine.swift in Sources */,
+				M10011 /* ConversationExportManager.swift in Sources */,
+				M10012 /* SpeechService.swift in Sources */,
+				M10013 /* Theme.swift in Sources */,
+				M10014 /* Haptics.swift in Sources */,
+				M10015 /* MacHero3DCanvasView.swift in Sources */,
+				M10016 /* MacOrbitCardView.swift in Sources */,
+				M10017 /* MacMessageBubbleView.swift in Sources */,
+				M10018 /* MacMessageInputBar.swift in Sources */,
+				M10019 /* MacChatView.swift in Sources */,
+				M10020 /* MacConversationListView.swift in Sources */,
+				M10021 /* MacSettingsView.swift in Sources */,
+				M10022 /* MacMenuBarView.swift in Sources */,
+				M10023 /* MainMacSplitView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		Y10001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		Y10002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		Y10003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Newton;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Newton. All rights reserved.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Newton requires microphone access for hands-free voice conversations.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.newton.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		Y10004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Newton;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Newton. All rights reserved.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Newton requires microphone access for hands-free voice conversations.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.newton.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		T10001 /* Build configuration list for PBXNativeTarget "Newton" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				Y10003 /* Debug */,
+				Y10004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		X10001 /* Build configuration list for PBXProject "NewtonMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				Y10001 /* Debug */,
+				Y10002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = W10001 /* Project object */;
+}

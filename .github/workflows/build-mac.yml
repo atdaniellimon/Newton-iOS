@@ -1,0 +1,41 @@
+name: Build Newton macOS DMG
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    name: Build macOS DMG & App
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Run Mac Build Script
+        run: |
+          chmod +x mac/build_mac.sh
+          ./mac/build_mac.sh
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Newton-macOS-Universal-DMG
+          path: build/Newton-Mac.dmg
+          retention-days: 14
+
+      - name: Upload ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Newton-macOS-Universal-ZIP
+          path: build/Newton-Mac.zip
+          retention-days: 14
