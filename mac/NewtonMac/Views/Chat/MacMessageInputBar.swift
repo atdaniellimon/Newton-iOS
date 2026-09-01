@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  Compact, auto-expanding input bar with Enter-to-send (Shift+Enter newline) and zero black background artifacts.
+//  Fully focusable, auto-expanding input bar with Enter to send, Shift+Enter for newline, and transparent background.
 //
 
 import SwiftUI
@@ -18,7 +18,7 @@ public struct MacMessageInputBar: View {
     
     @Environment(\.colorScheme) private var colorScheme
     @State private var isWebSearchEnabled: Bool = false
-    @State private var dynamicHeight: CGFloat = 24
+    @State private var dynamicHeight: CGFloat = 26
     
     public init(
         text: Binding<String>,
@@ -43,7 +43,7 @@ public struct MacMessageInputBar: View {
     public var body: some View {
         VStack(spacing: 6) {
             // Floating Input Container
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 // Auto-growing Text Input
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
@@ -51,7 +51,7 @@ public struct MacMessageInputBar: View {
                             .font(.system(size: 13.5))
                             .foregroundColor(isDark ? Color(red: 0.50, green: 0.55, blue: 0.62) : Color(red: 0.60, green: 0.65, blue: 0.72))
                             .padding(.horizontal, 14)
-                            .padding(.top, 10)
+                            .padding(.top, 8)
                             .allowsHitTesting(false)
                     }
                     
@@ -65,9 +65,9 @@ public struct MacMessageInputBar: View {
                             }
                         }
                     )
-                    .frame(height: max(24, min(dynamicHeight, 130)))
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
+                    .frame(height: max(26, min(dynamicHeight, 130)))
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
                 }
                 
                 // Bottom Toolbar (Attachments, Search, Send)
@@ -172,19 +172,31 @@ public struct MacAutoGrowingTextView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         
-        let textView = CustomNSTextView()
-        textView.delegate = context.coordinator
-        textView.isRichText = false
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        
+        let textContainer = NSTextContainer(containerSize: NSSize(width: 100, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.widthTracksTextView = true
+        textContainer.lineFragmentPadding = 4
+        layoutManager.addTextContainer(textContainer)
+        
+        let textView = CustomNSTextView(frame: .zero, textContainer: textContainer)
+        textView.minSize = NSSize(width: 0.0, height: 22)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.isEditable = true
+        textView.isSelectable = true
         textView.allowsUndo = true
+        textView.isRichText = false
         textView.drawsBackground = false
         textView.backgroundColor = .clear
         textView.font = NSFont.systemFont(ofSize: 13.5)
-        textView.textColor = colorScheme == .dark ? NSColor(red: 0.94, green: 0.96, blue: 0.98, alpha: 1.0) : NSColor(red: 0.08, green: 0.11, blue: 0.16, alpha: 1.0)
+        textView.textColor = colorScheme == .dark ? NSColor.white : NSColor(red: 0.08, green: 0.11, blue: 0.16, alpha: 1.0)
         textView.insertionPointColor = colorScheme == .dark ? NSColor.white : NSColor.black
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.lineFragmentPadding = 4
+        textView.delegate = context.coordinator
         textView.onCommit = onCommit
         
         scrollView.documentView = textView
@@ -198,7 +210,7 @@ public struct MacAutoGrowingTextView: NSViewRepresentable {
             textView.string = text
         }
         
-        textView.textColor = colorScheme == .dark ? NSColor(red: 0.94, green: 0.96, blue: 0.98, alpha: 1.0) : NSColor(red: 0.08, green: 0.11, blue: 0.16, alpha: 1.0)
+        textView.textColor = colorScheme == .dark ? NSColor.white : NSColor(red: 0.08, green: 0.11, blue: 0.16, alpha: 1.0)
         textView.insertionPointColor = colorScheme == .dark ? NSColor.white : NSColor.black
         textView.onCommit = onCommit
         
@@ -211,7 +223,7 @@ public struct MacAutoGrowingTextView: NSViewRepresentable {
         guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
-        let newHeight = max(24, min(usedRect.height + 6, 130))
+        let newHeight = max(26, min(usedRect.height + 4, 130))
         if abs(dynamicHeight - newHeight) > 1 {
             dynamicHeight = newHeight
         }
@@ -234,6 +246,10 @@ public struct MacAutoGrowingTextView: NSViewRepresentable {
 
 public class CustomNSTextView: NSTextView {
     public var onCommit: (() -> Void)? = nil
+    
+    public override var acceptsFirstResponder: Bool {
+        return true
+    }
     
     public override func keyDown(with event: NSEvent) {
         if event.keyCode == 36 { // Return Key

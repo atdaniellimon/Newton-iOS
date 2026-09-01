@@ -73,14 +73,16 @@ public struct MacChatView: View {
     }
     
     private var modelDisplayName: String {
-        if settings.currentModelId.contains("sonnet") {
+        if settings.currentModelId.contains("singularity") {
+            return "Singularity"
+        } else if settings.currentModelId.contains("sonnet") {
             return "Newton I"
         } else if settings.currentModelId.contains("r1") {
             return "Newton R1"
         } else if settings.currentModelId.contains("gpt-4o") {
             return "Newton Omni"
         }
-        return "Newton I"
+        return "Singularity"
     }
     
     @ViewBuilder
@@ -138,7 +140,7 @@ public struct MacChatView: View {
             Spacer()
         }
         .padding(.horizontal, 28)
-        .padding(.top, 14)
+        .padding(.top, 28)
         .padding(.bottom, 6)
     }
     
@@ -521,6 +523,13 @@ public struct MacModelPickerPopover: View {
                 .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.50, green: 0.55, blue: 0.62))
                 .padding(.horizontal, 8)
                 .padding(.top, 6)
+            
+            Button(action: {
+                settings.currentModelId = "newton-singularity"
+            }) {
+                modelRow(name: "Singularity", desc: "Newton Singularity Model Core", isSelected: settings.currentModelId.contains("singularity"))
+            }
+            .buttonStyle(.plain)
             
             Button(action: {
                 settings.currentModelId = "claude-3-5-sonnet-20241022"

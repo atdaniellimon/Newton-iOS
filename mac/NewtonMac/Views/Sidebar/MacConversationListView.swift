@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  1:1 Faithful replication of the Newton Web sidebar with full Light & Dark mode adaptation.
+//  Full-height unified sidebar integrated with macOS traffic light controls.
 //
 
 import SwiftUI
@@ -39,6 +39,10 @@ public struct MacConversationListView: View {
     
     public var body: some View {
         VStack(spacing: 12) {
+            // Space reserved for native macOS traffic light window controls
+            Color.clear
+                .frame(height: 28)
+            
             // Top Navigation Segmented Pill
             topNavigationPill
             
@@ -52,15 +56,14 @@ public struct MacConversationListView: View {
             conversationList
         }
         .frame(width: 260)
-        .background(isDark ? Color(red: 0.12, green: 0.15, blue: 0.19) : Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(maxHeight: .infinity)
+        .background(isDark ? Color(red: 0.11, green: 0.14, blue: 0.18) : Color(red: 0.96, green: 0.97, blue: 0.99))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isDark ? Color(red: 0.20, green: 0.24, blue: 0.30) : Color(red: 0.89, green: 0.91, blue: 0.94), lineWidth: 1)
+            Rectangle()
+                .fill(isDark ? Color(red: 0.18, green: 0.22, blue: 0.28) : Color(red: 0.88, green: 0.90, blue: 0.94))
+                .frame(width: 1),
+            alignment: .trailing
         )
-        .shadow(color: Color.black.opacity(isDark ? 0.25 : 0.04), radius: 10, x: 0, y: 3)
-        .padding(.leading, 16)
-        .padding(.vertical, 16)
     }
     
     @ViewBuilder
@@ -103,15 +106,14 @@ public struct MacConversationListView: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(isDark ? Color(red: 0.16, green: 0.20, blue: 0.26) : Color(red: 0.95, green: 0.96, blue: 0.98))
+        .background(isDark ? Color(red: 0.15, green: 0.19, blue: 0.25) : Color(red: 0.92, green: 0.94, blue: 0.97))
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
+                .stroke(isDark ? Color(red: 0.22, green: 0.26, blue: 0.34) : Color(red: 0.86, green: 0.88, blue: 0.92), lineWidth: 0.8)
         )
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.top, 14)
     }
     
     @ViewBuilder
@@ -137,11 +139,11 @@ public struct MacConversationListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(isDark ? Color(red: 0.16, green: 0.20, blue: 0.26) : Color(red: 0.98, green: 0.98, blue: 0.99))
+        .background(isDark ? Color(red: 0.15, green: 0.19, blue: 0.25) : Color.white)
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.90, green: 0.92, blue: 0.95), lineWidth: 0.8)
+                .stroke(isDark ? Color(red: 0.22, green: 0.26, blue: 0.34) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
         )
         .padding(.horizontal, 14)
     }
@@ -239,7 +241,7 @@ public struct MacConversationListView: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? (isDark ? Color(red: 0.18, green: 0.22, blue: 0.28) : Color(red: 0.94, green: 0.96, blue: 0.98)) : (isHovered ? (isDark ? Color(red: 0.15, green: 0.18, blue: 0.24) : Color(red: 0.97, green: 0.98, blue: 0.99)) : Color.clear))
+                    .fill(isSelected ? (isDark ? Color(red: 0.17, green: 0.21, blue: 0.28) : Color(red: 0.90, green: 0.92, blue: 0.96)) : (isHovered ? (isDark ? Color(red: 0.14, green: 0.17, blue: 0.23) : Color(red: 0.94, green: 0.95, blue: 0.98)) : Color.clear))
             )
         }
         .buttonStyle(.plain)
