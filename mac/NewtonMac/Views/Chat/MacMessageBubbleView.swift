@@ -3,6 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
+//  Message bubble with 3D Thinking Orb when generating responses.
 //
 
 import SwiftUI
@@ -12,7 +13,10 @@ public struct MacMessageBubbleView: View {
     public let message: Message
     public var onRetry: (() -> Void)? = nil
     
+    @Environment(\.colorScheme) private var colorScheme
     @State private var copied: Bool = false
+    
+    private var isDark: Bool { colorScheme == .dark }
     
     public var body: some View {
         HStack(alignment: .top) {
@@ -51,6 +55,18 @@ public struct MacMessageBubbleView: View {
                         MacThinkingCardView(content: thinking)
                     }
                     
+                    // Live Generating / Thinking 3D Orb Indicator
+                    if message.isStreaming && message.content.isEmpty {
+                        HStack(spacing: 10) {
+                            ThinkingOrbView(size: 26, style: .globe)
+                            
+                            Text("Newton is reasoning...")
+                                .font(.system(size: 13, weight: .medium, design: .serif))
+                                .foregroundColor(NewtonTheme.sand)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    
                     // Orbit results (PDF, Web Search, Calculator)
                     ForEach(message.orbitResults) { orbit in
                         MacOrbitCardView(result: orbit)
@@ -70,6 +86,17 @@ public struct MacMessageBubbleView: View {
                     if !message.content.isEmpty {
                         MacFormattedAssistantContent(content: message.content)
                             .textSelection(.enabled)
+                        
+                        // Mini streaming indicator orb while tokens are flowing
+                        if message.isStreaming {
+                            HStack(spacing: 6) {
+                                ThinkingOrbView(size: 14, style: .orbits)
+                                Text("Synthesizing...")
+                                    .font(.system(size: 11, design: .serif))
+                                    .foregroundColor(NewtonTheme.sand.opacity(0.8))
+                            }
+                            .padding(.top, 2)
+                        }
                     }
                     
                     // Action Buttons Bar (Copy, Speak, Retry)
@@ -87,7 +114,7 @@ public struct MacMessageBubbleView: View {
                                     .font(.system(size: 11))
                             }
                             .buttonStyle(.plain)
-                            .foregroundColor(copied ? NewtonTheme.forestGreen : NewtonTheme.textSecondary)
+                            .foregroundColor(copied ? NewtonTheme.forestGreen : (isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : NewtonTheme.textSecondary))
                             
                             Button(action: {
                                 SpeechService.shared.toggleSpeech(for: message.id, text: message.content)
@@ -96,38 +123,32 @@ public struct MacMessageBubbleView: View {
                                     .font(.system(size: 11))
                             }
                             .buttonStyle(.plain)
-                            .foregroundColor((SpeechService.shared.isSpeaking && SpeechService.shared.currentlySpeakingMessageId == message.id) ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                            .foregroundColor((SpeechService.shared.isSpeaking && SpeechService.shared.currentlySpeakingMessageId == message.id) ? NewtonTheme.sand : (isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : NewtonTheme.textSecondary))
                             
-                            if let retry = onRetry {
-                                Button(action: {
-                                    retry()
-                                }) {
-                                    Image(systemName: "arrow.clockwise")
+                            if let onRetry = onRetry {
+                                Button(action: onRetry) {
+                                    Image(systemName: "arrow.counterclockwise")
                                         .font(.system(size: 11))
                                 }
                                 .buttonStyle(.plain)
-                                .foregroundColor(NewtonTheme.textSecondary)
+                                .foregroundColor(isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : NewtonTheme.textSecondary)
                             }
-                            
-                            Spacer()
                         }
-                        .padding(.top, 2)
+                        .padding(.top, 4)
                     }
                 }
+                .padding(.leading, 8)
                 
                 Spacer(minLength: 40)
             }
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 4)
     }
     
-    private func decodeBase64ToNSImage(_ str: String) -> NSImage? {
-        var base64 = str
-        if let commaIndex = str.firstIndex(of: ",") {
-            base64 = String(str[str.index(after: commaIndex)...])
-        }
-        guard let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters) else { return nil }
+    private func decodeBase64ToNSImage(_ base64Str: String) -> NSImage? {
+        let clean = base64Str.replacingOccurrences(of: "data:image/png;base64,", with: "")
+            .replacingOccurrences(of: "data:image/jpeg;base64,", with: "")
+        guard let data = Data(base64Encoded: clean) else { return nil }
         return NSImage(data: data)
     }
 }
@@ -135,85 +156,46 @@ public struct MacMessageBubbleView: View {
 public struct MacThinkingCardView: View {
     public let content: String
     @State private var isExpanded: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var isDark: Bool { colorScheme == .dark }
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isExpanded.toggle()
                 }
             }) {
                 HStack(spacing: 6) {
-                    Image(systemName: "brain.head.profile")
+                    Image(systemName: "brain")
                         .font(.system(size: 11))
                         .foregroundColor(NewtonTheme.sand)
                     
-                    Text(isExpanded ? "Hide Thinking Process" : "View Thinking Process")
-                        .font(.system(size: 11, weight: .medium, design: .serif))
-                        .foregroundColor(NewtonTheme.textSecondary)
+                    Text("Thought Process")
+                        .font(.system(size: 11.5, weight: .semibold, design: .serif))
+                        .foregroundColor(isDark ? Color(red: 0.85, green: 0.88, blue: 0.94) : Color(red: 0.30, green: 0.35, blue: 0.40))
+                    
+                    Spacer()
                     
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9))
-                        .foregroundColor(NewtonTheme.textTertiary)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.50, green: 0.55, blue: 0.60))
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.95, green: 0.96, blue: 0.98))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
             
             if isExpanded {
                 Text(content)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(NewtonTheme.textSecondary)
+                    .font(.system(size: 11.5, design: .monospaced))
+                    .foregroundColor(isDark ? Color(red: 0.75, green: 0.80, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.45))
                     .padding(10)
-                    .background(NewtonTheme.surface.opacity(0.5))
+                    .background(isDark ? Color(red: 0.12, green: 0.14, blue: 0.18) : Color(red: 0.97, green: 0.98, blue: 0.99))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-        }
-    }
-}
-
-public struct MacGeneratedImageView: View {
-    public let urlStr: String
-    @State private var nsImage: NSImage? = nil
-    
-    public var body: some View {
-        Group {
-            if let img = nsImage {
-                Image(nsImage: img)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: 480, maxHeight: 360)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(NewtonTheme.border, lineWidth: 0.8)
-                    )
-            } else {
-                MacImageGenerationPlaceholderView()
-            }
-        }
-        .task(id: urlStr) {
-            loadImage()
-        }
-    }
-    
-    private func loadImage() {
-        if urlStr.hasPrefix("data:image/") {
-            var base64 = urlStr
-            if let comma = urlStr.firstIndex(of: ",") {
-                base64 = String(urlStr[urlStr.index(after: comma)...])
-            }
-            if let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters),
-               let img = NSImage(data: data) {
-                self.nsImage = img
-            }
-        } else if let url = URL(string: urlStr) {
-            Task {
-                if let (data, _) = try? await URLSession.shared.data(from: url),
-                   let img = NSImage(data: data) {
-                    await MainActor.run {
-                        self.nsImage = img
-                    }
-                }
             }
         }
     }
@@ -221,24 +203,42 @@ public struct MacGeneratedImageView: View {
 
 public struct MacFormattedAssistantContent: View {
     public let content: String
+    @Environment(\.colorScheme) private var colorScheme
     
-    private var cleanContent: String {
-        var text = content
-        let orbitPattern = "\\[ORBIT:[\\w\\-_]+\\][\\s\\S]*?(?:\\[/ORBIT\\]|$)"
-        if let regex = try? NSRegularExpression(pattern: orbitPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        let jsonPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```"
-        if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    private var isDark: Bool { colorScheme == .dark }
     
     public var body: some View {
-        Text(LocalizedStringKey(cleanContent))
-            .font(.system(size: 14.5, design: .serif))
-            .foregroundColor(NewtonTheme.textPrimary)
+        Text(content)
+            .font(.system(size: 14, weight: .regular, design: .serif))
+            .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.98) : Color(red: 0.08, green: 0.11, blue: 0.16))
             .lineSpacing(4)
+    }
+}
+
+public struct MacGeneratedImageView: View {
+    public let urlStr: String
+    
+    public var body: some View {
+        if let url = URL(string: urlStr) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .frame(width: 240, height: 240)
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 420)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                case .failure:
+                    Text("Failed to load generated image")
+                        .font(.system(size: 11))
+                        .foregroundColor(NewtonTheme.coralRed)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        }
     }
 }

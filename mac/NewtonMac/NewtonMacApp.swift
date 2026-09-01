@@ -3,6 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
+//  Modern header-less window with unified traffic light controls.
 //
 
 import SwiftUI
@@ -16,9 +17,11 @@ struct NewtonMacApp: App {
     var body: some Scene {
         WindowGroup {
             MainMacSplitView()
-                .frame(minWidth: 800, minHeight: 520)
-                .preferredColorScheme(settings.appTheme == .light ? .light : (settings.appTheme == .dark ? .dark : nil))
+                .frame(minWidth: 840, minHeight: 540)
+                .background(WindowAccessor())
+                .preferredColorScheme(settings.appTheme.colorScheme)
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Conversation") {
@@ -41,4 +44,24 @@ struct NewtonMacApp: App {
         }
         #endif
     }
+}
+
+public struct WindowAccessor: NSViewRepresentable {
+    public init() {}
+    
+    public func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.titleVisibility = .hidden
+                window.titlebarAppearsTransparent = true
+                window.styleMask.insert(.fullSizeContentView)
+                window.isMovableByWindowBackground = true
+                window.backgroundColor = .clear
+            }
+        }
+        return view
+    }
+    
+    public func updateNSView(_ nsView: NSView, context: Context) {}
 }
