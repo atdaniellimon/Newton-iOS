@@ -42,6 +42,9 @@
 		A10033 /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10034 /* WatchConnectivityManager.swift */; };
 		A10034 /* VoiceCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10035 /* VoiceCallView.swift */; };
 		A10035 /* NewtonWatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10036 /* NewtonWatchView.swift */; };
+		A10036 /* NewtonActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10037 /* NewtonActivityAttributes.swift */; };
+		A10037 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10038 /* LiveActivityManager.swift */; };
+		A10038 /* NewtonLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10039 /* NewtonLiveActivityWidget.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -82,6 +85,9 @@
 		B10034 /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityManager.swift; sourceTree = "<group>"; };
 		B10035 /* VoiceCallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallView.swift; sourceTree = "<group>"; };
 		B10036 /* NewtonWatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonWatchView.swift; sourceTree = "<group>"; };
+		B10037 /* NewtonActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonActivityAttributes.swift; sourceTree = "<group>"; };
+		B10038 /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
+		B10039 /* NewtonLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonLiveActivityWidget.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +154,8 @@
 				B10032 /* SpeechService.swift */,
 				B10033 /* ConversationExportManager.swift */,
 				B10034 /* WatchConnectivityManager.swift */,
+				B10037 /* NewtonActivityAttributes.swift */,
+				B10038 /* LiveActivityManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -183,6 +191,7 @@
 				B10028 /* ImagePicker.swift */,
 				B10030 /* ArtGalleryView.swift */,
 				B10036 /* NewtonWatchView.swift */,
+				B10039 /* NewtonLiveActivityWidget.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -320,6 +329,9 @@
 				A10033 /* WatchConnectivityManager.swift in Sources */,
 				A10034 /* VoiceCallView.swift in Sources */,
 				A10035 /* NewtonWatchView.swift in Sources */,
+				A10036 /* NewtonActivityAttributes.swift in Sources */,
+				A10037 /* LiveActivityManager.swift in Sources */,
+				A10038 /* NewtonLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -377,7 +389,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -432,7 +444,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -447,7 +459,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Newton;
 				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
@@ -455,6 +467,7 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Newton requires photo library access to attach images to prompts.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Newton requires microphone access for Live Voice Mode and hands-free conversations.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Newton requires speech recognition to transcribe your voice during voice calls.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -464,7 +477,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0;
+				MARKETING_VERSION = 3.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.newton.ai;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -478,7 +491,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Newton;
 				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
@@ -486,6 +499,7 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Newton requires photo library access to attach images to prompts.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Newton requires microphone access for Live Voice Mode and hands-free conversations.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Newton requires speech recognition to transcribe your voice during voice calls.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -495,7 +509,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0;
+				MARKETING_VERSION = 3.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.newton.ai;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

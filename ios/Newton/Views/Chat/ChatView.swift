@@ -300,6 +300,7 @@ public struct ChatView: View {
         storage.updateConversation(conversation)
         
         isStreaming = true
+        LiveActivityManager.shared.startActivity(type: "reasoning", query: userPrompt, initialStatus: "Newton is reasoning...")
         
         // Run with Background Task Protection
         NotificationManager.shared.beginBackgroundTask(name: "NewtonStreamTask") {
@@ -370,6 +371,7 @@ public struct ChatView: View {
                     
                     storage.updateConversation(conversation)
                     Haptics.success()
+                    LiveActivityManager.shared.updateActivity(status: "Thought Complete", progress: 1.0, isComplete: true)
                 }
                 
                 // Trigger background AI title generation if first message

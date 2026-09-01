@@ -176,4 +176,93 @@ public final class ConversationExportManager {
             return nil
         }
     }
+    
+    // MARK: - Generate Custom PDF Document from Title & Content
+    
+    public func generateCustomDocumentPDF(title: String, content: String) -> URL? {
+        let pageWidth: CGFloat = 612
+        let pageHeight: CGFloat = 792
+        let margin: CGFloat = 44
+        let contentWidth = pageWidth - (margin * 2)
+        
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [
+            kCGPDFContextCreator: "Newton Singularity",
+            kCGPDFContextTitle: title
+        ] as [String: Any]
+        
+        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        let cleanTitle = title.isEmpty ? "Newton_Document" : title.replacingOccurrences(of: "/", with: "-")
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileUrl = tempDir.appendingPathComponent("\(cleanTitle).pdf")
+        
+        do {
+            try renderer.writePDF(to: fileUrl, withActions: { context in
+                context.beginPage()
+                var currentY: CGFloat = margin
+                
+                func checkPageBreak(neededHeight: CGFloat) {
+                    if currentY + neededHeight > pageHeight - margin {
+                        context.beginPage()
+                        currentY = margin
+                    }
+                }
+                
+                // Document Header
+                let brandAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 10, weight: .bold),
+                    .foregroundColor: UIColor(red: 0.88, green: 0.74, blue: 0.50, alpha: 1.0)
+                ]
+                "NEWTON REPORT // GENERATED DOCUMENT".draw(at: CGPoint(x: margin, y: currentY), withAttributes: brandAttributes)
+                currentY += 18
+                
+                let titleAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22),
+                    .foregroundColor: UIColor(red: 0.15, green: 0.18, blue: 0.20, alpha: 1.0)
+                ]
+                title.draw(in: CGRect(x: margin, y: currentY, width: contentWidth, height: 60), withAttributes: titleAttributes)
+                currentY += 36
+                
+                // Divider
+                let path = UIBezierPath()
+                path.move(to: CGPoint(x: margin, y: currentY))
+                path.addLine(to: CGPoint(x: pageWidth - margin, y: currentY))
+                UIColor(red: 0.82, green: 0.79, blue: 0.74, alpha: 0.8).setStroke()
+                path.lineWidth = 1
+                path.stroke()
+                currentY += 24
+                
+                // Paragraphs
+                let paragraphs = content.components(separatedBy: "\n\n")
+                for para in paragraphs {
+                    let isHeading = para.hasPrefix("#")
+                    let cleanPara = para.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespaces)
+                    
+                    let attributes: [NSAttributedString.Key: Any] = isHeading ? [
+                        .font: UIFont.boldSystemFont(ofSize: 14),
+                        .foregroundColor: UIColor(red: 0.15, green: 0.18, blue: 0.20, alpha: 1.0)
+                    ] : [
+                        .font: UIFont(name: "Georgia", size: 12) ?? UIFont.systemFont(ofSize: 12),
+                        .foregroundColor: UIColor(red: 0.22, green: 0.25, blue: 0.28, alpha: 1.0)
+                    ]
+                    
+                    let bounding = NSString(string: cleanPara).boundingRect(
+                        with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude),
+                        options: [.usesLineFragmentOrigin, .usesFontLeading],
+                        attributes: attributes,
+                        context: nil
+                    )
+                    
+                    checkPageBreak(neededHeight: bounding.height + 14)
+                    cleanPara.draw(in: CGRect(x: margin, y: currentY, width: contentWidth, height: bounding.height), withAttributes: attributes)
+                    currentY += bounding.height + 14
+                }
+            })
+            return fileUrl
+        } catch {
+            return nil
+        }
+    }
 }

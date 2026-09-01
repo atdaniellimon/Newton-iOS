@@ -3,7 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Handles speech recognition (STT), audio metering, and speech synthesis (TTS).
+//  Handles natural speech recognition (STT), audio metering, and neural TTS speech synthesis.
 //
 
 import Foundation
@@ -11,11 +11,12 @@ import AVFoundation
 import Speech
 import SwiftUI
 
-public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
+public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
     public static let shared = SpeechService()
     
     // TTS
     private let synthesizer = AVSpeechSynthesizer()
+    private var audioPlayer: AVAudioPlayer?
     @Published public var isSpeaking: Bool = false
     @Published public var currentlySpeakingMessageId: String? = nil
     
@@ -34,12 +35,12 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         synthesizer.delegate = self
     }
     
-    // MARK: - Text-to-Speech (TTS)
+    // MARK: - Natural Human-Like Text-to-Speech (TTS)
     
     public func speak(text: String, messageId: String? = nil) {
         stopSpeaking()
         
-        // Clean markdown syntax from spoken text
+        // Clean markdown and tool syntax
         let cleanText = text
             .replacingOccurrences(of: "\\[ORBIT:[^\\]]+\\][\\s\\S]*?\\[/ORBIT\\]", with: "", options: .regularExpression)
             .replacingOccurrences(of: "```[\\s\\S]*?```", with: "Bloque de código.", options: .regularExpression)
@@ -48,6 +49,31 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         
         guard !cleanText.isEmpty else { return }
         
+        self.currentlySpeakingMessageId = messageId
+        self.isSpeaking = true
+        
+        // 1. Try Neural OpenAI/Proxy TTS if available
+        let settings = SettingsManager.shared
+        let baseUrl = settings.effectiveBaseUrl(for: settings.currentProvider)
+        let apiKey = settings.currentApiKey
+        
+        if !baseUrl.isEmpty && (baseUrl.contains("openai.com") || baseUrl.contains("openrouter") || baseUrl.contains("8765") || baseUrl.contains("8000")) {
+            Task {
+                if let audioData = await fetchNeuralTTS(text: cleanText, baseUrl: baseUrl, apiKey: apiKey) {
+                    await playAudioData(audioData)
+                    return
+                } else {
+                    await MainActor.run {
+                        self.playAppleEnhancedTTS(cleanText: cleanText)
+                    }
+                }
+            }
+        } else {
+            playAppleEnhancedTTS(cleanText: cleanText)
+        }
+    }
+    
+    private func playAppleEnhancedTTS(cleanText: String) {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
             try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
@@ -56,26 +82,86 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         }
         
         let utterance = AVSpeechUtterance(string: cleanText)
-        utterance.rate = 0.52
-        utterance.pitchMultiplier = 1.05
+        utterance.rate = 0.50
+        utterance.pitchMultiplier = 1.0
         utterance.volume = 1.0
+        utterance.preUtteranceDelay = 0.05
         
-        // Match language
-        if cleanText.contains("the ") || cleanText.contains("and ") || cleanText.contains("is ") {
-            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        // Select best available enhanced/premium voice
+        let isEnglish = cleanText.contains("the ") || cleanText.contains("and ") || cleanText.contains("is ")
+        let targetLocale = isEnglish ? "en-US" : "es-MX"
+        
+        let allVoices = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.starts(with: isEnglish ? "en" : "es") }
+        
+        // Prioritize premium or enhanced voices
+        if let premiumVoice = allVoices.first(where: { $0.quality == .premium }) {
+            utterance.voice = premiumVoice
+        } else if let enhancedVoice = allVoices.first(where: { $0.quality == .enhanced }) {
+            utterance.voice = enhancedVoice
         } else {
-            utterance.voice = AVSpeechSynthesisVoice(language: "es-MX") ?? AVSpeechSynthesisVoice(language: "es-ES")
+            utterance.voice = AVSpeechSynthesisVoice(language: targetLocale) ?? AVSpeechSynthesisVoice(language: "es-ES")
         }
         
-        self.currentlySpeakingMessageId = messageId
-        self.isSpeaking = true
         synthesizer.speak(utterance)
+    }
+    
+    private func fetchNeuralTTS(text: String, baseUrl: String, apiKey: String) async -> Data? {
+        let cleanBase = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let ttsEndpoint = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/audio/speech" : "\(cleanBase)/v1/audio/speech"
+        
+        guard let url = URL(string: ttsEndpoint) else { return nil }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 8
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let payload: [String: Any] = [
+            "model": "tts-1",
+            "input": text.prefix(1000),
+            "voice": "nova"
+        ]
+        
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+        request.httpBody = body
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200, !data.isEmpty {
+                return data
+            }
+        } catch {
+            return nil
+        }
+        return nil
+    }
+    
+    @MainActor
+    private func playAudioData(_ data: Data) {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+            try AVAudioSession.sharedInstance().setActive(true)
+            audioPlayer = try AVAudioPlayer(data: data)
+            audioPlayer?.delegate = self
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.play()
+            self.isSpeaking = true
+        } catch {
+            playAppleEnhancedTTS(cleanText: "")
+        }
     }
     
     public func stopSpeaking() {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
+        if let player = audioPlayer, player.isPlaying {
+            player.stop()
+        }
+        audioPlayer = nil
         self.isSpeaking = false
         self.currentlySpeakingMessageId = nil
     }
@@ -88,7 +174,7 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         }
     }
     
-    // AVSpeechSynthesizerDelegate
+    // Delegates
     public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         DispatchQueue.main.async {
             self.isSpeaking = false
@@ -96,7 +182,7 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         }
     }
     
-    public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         DispatchQueue.main.async {
             self.isSpeaking = false
             self.currentlySpeakingMessageId = nil
@@ -152,7 +238,6 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
             
-            // Calculate audio amplitude level for 3D orb reactive motion
             guard let channelData = buffer.floatChannelData?[0] else { return }
             let channelDataValue = Array(UnsafeBufferPointer(start: channelData, count: Int(buffer.frameLength)))
             var rms: Float = 0.0

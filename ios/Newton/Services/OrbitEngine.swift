@@ -218,6 +218,15 @@ public final class OrbitEngine {
             let nowStr = formatter.string(from: Date())
             return OrbitExecutionResult(orbitName: "time", params: paramsJson, result: nowStr, isSuccess: true)
             
+        case "generate_pdf", "pdf", "create_pdf", "make_pdf":
+            let title = params["title"] as? String ?? "Documento Newton"
+            let content = params["content"] as? String ?? paramsJson
+            if let pdfUrl = ConversationExportManager.shared.generateCustomDocumentPDF(title: title, content: content) {
+                return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "📄 Documento PDF generado: **\(title).pdf**\nListo para ver y compartir.", isSuccess: true)
+            } else {
+                return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "Error al compilar el PDF.", isSuccess: false)
+            }
+            
         default:
             return OrbitExecutionResult(orbitName: name, params: paramsJson, result: "Orbit \(name) executed with params: \(paramsJson)", isSuccess: true)
         }

@@ -52,6 +52,10 @@ public final class SettingsManager: ObservableObject {
        - Sintaxis: [ORBIT:calculator]{"expression": "operación matemática"}[/ORBIT]
        - Úsala para resolver cálculos numéricos exactos o expresiones complejas.
     
+    4. CREACIÓN DE DOCUMENTOS PDF EDITORIALES (`generate_pdf`):
+       - Sintaxis: [ORBIT:generate_pdf]{"title": "Título del Documento", "content": "Contenido completo estructurado en Markdown con subtítulos y párrafos"}[/ORBIT]
+       - Úsala cuando el usuario te pida crear, redactar o generar un PDF, informe, reporte o libro digital.
+    
     ==================================================
     DIRECTIVAS DE ESTILO Y RAZONAMIENTO:
     ==================================================
