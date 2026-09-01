@@ -349,7 +349,7 @@ public struct ChatView: View {
     
     private var isTerminated: Bool {
         conversation.messages.contains { msg in
-            msg.orbits.contains { $0.orbitName.lowercased() == "kick" || $0.orbitName.lowercased() == "terminate" }
+            msg.orbitResults.contains { $0.orbitName.lowercased() == "kick" || $0.orbitName.lowercased() == "terminate" }
         }
     }
     
@@ -405,6 +405,7 @@ public struct ChatView: View {
             }
         }
         
+        let userPrompt = displayPrompt
         guard !displayPrompt.isEmpty || attachedImage != nil || attachedFileData != nil else { return }
         
         let isFirstMessage = conversation.messages.isEmpty
