@@ -9,98 +9,119 @@ import SwiftUI
 import AppKit
 
 public struct MacSettingsView: View {
-    @StateObject private var settings = SettingsManager.shared
+    @ObservedObject var settings = SettingsManager.shared
     @State private var apiKeyInput: String = ""
-    @State private var baseUrlInput: String = ""
     
     public init() {}
     
     public var body: some View {
         TabView {
-            // General Settings Tab
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Provider & Model Section
+                    // Newton Singularity Cloud Engine Status
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("AI Provider & Model")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(NewtonTheme.textPrimary)
-                        
-                        Picker("Provider:", selection: $settings.currentProviderRaw) {
-                            ForEach(AIProvider.allCases) { provider in
-                                Text(provider.displayName).tag(provider.rawValue)
+                        HStack {
+                            ZStack {
+                                Circle()
+                                    .fill(NewtonTheme.sand.opacity(0.15))
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: "bolt.horizontal.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(NewtonTheme.sand)
                             }
-                        }
-                        .pickerStyle(.menu)
-                        
-                        Picker("Model:", selection: $settings.currentModelId) {
-                            ForEach(DefaultModelCatalog.models(for: settings.currentProvider)) { model in
-                                Text("\(model.name) (\(model.id))").tag(model.id)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Newton Singularity Engine")
+                                    .font(.system(size: 13.5, weight: .bold, design: .serif))
+                                    .foregroundColor(NewtonTheme.textPrimary)
+                                
+                                Text("Connected to Cloud Endpoint")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(NewtonTheme.textSecondary)
                             }
+                            
+                            Spacer()
+                            
+                            Text("LIVE")
+                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(NewtonTheme.forestGreen)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(NewtonTheme.forestGreen.opacity(0.12))
+                                .clipShape(Capsule())
                         }
-                        .pickerStyle(.menu)
+                        
+                        Divider()
+                            .padding(.vertical, 4)
+                        
+                        HStack {
+                            Text("Endpoint:")
+                                .font(.system(size: 11.5, weight: .medium))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                                .frame(width: 80, alignment: .leading)
+                            
+                            Text(SettingsManager.hardcodedEndpoint)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                                .lineLimit(1)
+                        }
                     }
                     .padding(14)
                     .background(NewtonTheme.card)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
+                    )
                     
-                    // Credentials Section
+                    // Authentication
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Credentials & Endpoints")
+                        Text("Authorization (Optional)")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(NewtonTheme.textPrimary)
                         
                         HStack {
                             Text("API Key:")
                                 .frame(width: 80, alignment: .leading)
-                            SecureField("Enter API Key...", text: $apiKeyInput)
+                            SecureField("Optional Bearer Token...", text: $apiKeyInput)
                                 .textFieldStyle(.roundedBorder)
                         }
                         
-                        HStack {
-                            Text("Base URL:")
-                                .frame(width: 80, alignment: .leading)
-                            TextField("http://127.0.0.1:8000/v1", text: $baseUrlInput)
-                                .textFieldStyle(.roundedBorder)
+                        Button("Save Authorization") {
+                            settings.setApiKey(apiKeyInput, for: settings.currentProvider)
                         }
-                        
-                        HStack(spacing: 10) {
-                            Button("Preset: Ollama") {
-                                baseUrlInput = "http://127.0.0.1:11434/v1"
-                            }
-                            .buttonStyle(.bordered)
-                            
-                            Button("Preset: LM Studio") {
-                                baseUrlInput = "http://127.0.0.1:1234/v1"
-                            }
-                            .buttonStyle(.bordered)
-                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .padding(.top, 4)
                     }
                     .padding(14)
                     .background(NewtonTheme.card)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
+                    )
                     
-                    // Generation Parameters Section
+                    // Theme
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Inference Parameters")
+                        Text("Appearance")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(NewtonTheme.textPrimary)
                         
-                        HStack {
-                            Text("Temperature: \(String(format: "%.2f", settings.temperature))")
-                                .frame(width: 140, alignment: .leading)
-                            Slider(value: $settings.temperature, in: 0.0...1.0, step: 0.05)
+                        Picker("App Theme:", selection: $settings.appThemeRaw) {
+                            ForEach(AppThemeMode.allCases, id: \.rawValue) { mode in
+                                Text(mode.displayName).tag(mode.rawValue)
+                            }
                         }
-                        
-                        HStack {
-                            Text("Max Tokens: \(settings.maxTokens)")
-                                .frame(width: 140, alignment: .leading)
-                            Stepper("", value: $settings.maxTokens, in: 512...32768, step: 512)
-                        }
+                        .pickerStyle(.radioGroup)
                     }
                     .padding(14)
                     .background(NewtonTheme.card)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(NewtonTheme.border, lineWidth: 0.8)
+                    )
                 }
                 .padding(20)
             }
@@ -110,43 +131,33 @@ public struct MacSettingsView: View {
             
             // About Tab
             VStack(spacing: 16) {
-                Spacer()
-                Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
-                    .resizable()
-                    .frame(width: 72, height: 72)
+                ZStack {
+                    Circle()
+                        .fill(NewtonTheme.sand.opacity(0.12))
+                        .frame(width: 64, height: 64)
+                    
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 28))
+                        .foregroundColor(NewtonTheme.sand)
+                }
                 
-                Text("Newton for macOS")
-                    .font(.system(size: 18, weight: .bold, design: .serif))
-                
-                Text("Version 1.0 (Universal Binary • Monterey 12.0+)")
-                    .font(.system(size: 12))
-                    .foregroundColor(NewtonTheme.textSecondary)
-                
-                Text("Designed for deep reasoning, mathematical analysis, and desktop automation.")
-                    .font(.system(size: 11))
-                    .foregroundColor(NewtonTheme.textTertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                Spacer()
+                VStack(spacing: 4) {
+                    Text("Newton Singularity")
+                        .font(.system(size: 18, weight: .bold, design: .serif))
+                    
+                    Text("macOS Universal Edition • Monterey 12.0+")
+                        .font(.system(size: 12))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
             }
-            .padding(30)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .tabItem {
                 Label("About", systemImage: "info.circle")
             }
         }
-        .frame(width: 480, height: 420)
+        .frame(width: 480, height: 380)
         .onAppear {
-            apiKeyInput = settings.getApiKey(for: settings.currentProvider)
-            baseUrlInput = settings.customBaseUrl
-        }
-        .onChange(of: apiKeyInput) { newVal in
-            settings.setApiKey(newVal, for: settings.currentProvider)
-        }
-        .onChange(of: baseUrlInput) { newVal in
-            settings.customBaseUrl = newVal
-        }
-        .onChange(of: settings.currentProviderRaw) { _ in
-            apiKeyInput = settings.getApiKey(for: settings.currentProvider)
+            apiKeyInput = settings.currentApiKey
         }
     }
 }

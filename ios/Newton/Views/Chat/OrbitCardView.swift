@@ -23,6 +23,8 @@ public struct OrbitCardView: View {
             PDFDocumentCardView(result: result)
         } else if name == "web_search" || name == "search" || name == "search_web" {
             WebSearchSourcesCardView(result: result)
+        } else if name == "kick" || name == "terminate" {
+            KickProtocolCardView(result: result)
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -56,6 +58,61 @@ public struct OrbitCardView: View {
         }
     }
 }
+
+public struct KickProtocolCardView: View {
+    public let result: OrbitExecutionResult
+    
+    private var kickReason: String {
+        if let data = result.params.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let reason = json["reason"] as? String, !reason.isEmpty {
+            return reason
+        }
+        if let titleRegex = try? NSRegularExpression(pattern: "\"reason\"\\s*:\\s*\"([^\"]+)\""),
+           let match = titleRegex.firstMatch(in: result.params, range: NSRange(location: 0, length: (result.params as NSString).length)),
+           match.numberOfRanges > 1 {
+            return (result.params as NSString).substring(with: match.range(at: 1))
+        }
+        return result.result.isEmpty ? "Operational boundary violations or systematic refusal." : result.result
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.octagon.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(NewtonTheme.coralRed)
+                
+                Text("Session ended by Newton")
+                    .font(.system(size: 13, weight: .bold, design: .serif))
+                    .foregroundColor(NewtonTheme.coralRed)
+                
+                Spacer()
+                
+                Text("TERMINATED")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(NewtonTheme.coralRed)
+                    .clipShape(Capsule())
+            }
+            
+            Text("Reason: \(kickReason)")
+                .font(.system(size: 12, design: .serif))
+                .foregroundColor(NewtonTheme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .background(NewtonTheme.coralRed.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(NewtonTheme.coralRed.opacity(0.4), lineWidth: 1)
+        )
+    }
+}
+
 
 public struct WebSearchSourceItem: Identifiable {
     public let id: String

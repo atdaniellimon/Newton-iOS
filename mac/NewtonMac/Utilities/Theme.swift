@@ -14,6 +14,7 @@ public enum AppThemeMode: String, CaseIterable, Identifiable {
     case dark = "Dark"
     
     public var id: String { rawValue }
+    public var displayName: String { rawValue }
 }
 
 public struct NewtonTheme {

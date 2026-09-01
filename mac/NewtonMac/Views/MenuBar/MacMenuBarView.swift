@@ -92,7 +92,7 @@ public struct MacMenuBarView: View {
                     apiKey: apiKey,
                     temperature: 0.7,
                     maxTokens: 1024,
-                    systemPrompt: settings.defaultSystemPrompt()
+                    systemPrompt: SettingsManager.singularitySystemPrompt
                 )
                 
                 for try await token in stream {

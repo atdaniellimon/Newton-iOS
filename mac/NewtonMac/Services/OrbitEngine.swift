@@ -265,6 +265,15 @@ public final class OrbitEngine {
                 return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "Error al generar el PDF.", isSuccess: false)
             }
             
+        case "kick", "terminate":
+            var reason = "Operational boundary violations or systematic refusal."
+            if let data = paramsJson.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let r = json["reason"] as? String, !r.isEmpty {
+                reason = r
+            }
+            return OrbitExecutionResult(orbitName: "kick", params: paramsJson, result: reason, isSuccess: true)
+            
         default:
             return OrbitExecutionResult(orbitName: name, params: paramsJson, result: "Orbit \(name) executed with params: \(paramsJson)", isSuccess: true)
         }
