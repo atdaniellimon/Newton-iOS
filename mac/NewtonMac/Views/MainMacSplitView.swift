@@ -61,6 +61,7 @@ public struct MainMacSplitView: View {
                 }
             }
         }
+        .ignoresSafeArea(.all, edges: .top)
         .background(colorScheme == .dark ? Color(red: 0.08, green: 0.10, blue: 0.13) : Color(red: 0.98, green: 0.98, blue: 0.99))
         .preferredColorScheme(settings.appTheme.colorScheme)
         .onAppear {

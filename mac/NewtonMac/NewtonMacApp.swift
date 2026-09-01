@@ -22,6 +22,7 @@ struct NewtonMacApp: App {
         WindowGroup {
             MainMacSplitView()
                 .frame(minWidth: 840, minHeight: 540)
+                .ignoresSafeArea(.all, edges: .top)
                 .background(WindowAccessor())
                 .preferredColorScheme(settings.appTheme.colorScheme)
         }

@@ -103,8 +103,7 @@ public struct MacConversationListView: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.top, 0)
-        .frame(height: 38)
+        .padding(.top, 14)
     }
     
     // MARK: - Chat Mode Sidebar Content
