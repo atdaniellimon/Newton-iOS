@@ -202,7 +202,7 @@ public struct ChatView: View {
             }
         }
         .fullScreenCover(isPresented: $showVoiceCall) {
-            VoiceCallView(conversation: conversation)
+            VoiceCallView(conversation: $conversation)
         }
         .sheet(item: Binding(
             get: { exportFileUrl.map { IdentifiableURL(url: $0) } },

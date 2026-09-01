@@ -10,7 +10,7 @@ import SwiftUI
 import AVFoundation
 
 public struct VoiceCallView: View {
-    @ObservedObject var conversation: Conversation
+    @Binding var conversation: Conversation
     @Environment(\.dismiss) private var dismiss
     
     @StateObject private var speechService = SpeechService.shared
@@ -23,8 +23,8 @@ public struct VoiceCallView: View {
     @State private var isMuted: Bool = false
     @State private var silenceTimer: Timer? = nil
     
-    public init(conversation: Conversation) {
-        self.conversation = conversation
+    public init(conversation: Binding<Conversation>) {
+        self._conversation = conversation
     }
     
     public var body: some View {
