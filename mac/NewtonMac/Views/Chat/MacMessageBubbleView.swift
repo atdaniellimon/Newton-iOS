@@ -56,6 +56,11 @@ public struct MacMessageBubbleView: View {
                         MacOrbitCardView(result: orbit)
                     }
                     
+                    // Live Image Synthesis Placeholder in Progress
+                    if message.imageUrl == nil && message.isStreaming && message.content.contains("generate_image") {
+                        MacImageGenerationPlaceholderView()
+                    }
+                    
                     // Generated Image if present
                     if let imgUrlStr = message.imageUrl {
                         MacGeneratedImageView(urlStr: imgUrlStr)
@@ -183,8 +188,7 @@ public struct MacGeneratedImageView: View {
                             .stroke(NewtonTheme.border, lineWidth: 0.8)
                     )
             } else {
-                ProgressView()
-                    .frame(width: 140, height: 140)
+                MacImageGenerationPlaceholderView()
             }
         }
         .task(id: urlStr) {

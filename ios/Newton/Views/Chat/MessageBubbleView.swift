@@ -74,6 +74,11 @@ public struct MessageBubbleView: View {
                         OrbitCardView(result: orbit)
                     }
                     
+                    // Live Image Synthesis Placeholder in Progress
+                    if message.imageUrl == nil && message.isStreaming && message.content.contains("generate_image") {
+                        ImageGenerationPlaceholderView()
+                    }
+                    
                     // Generated Image (tap to open full screen)
                     if let imgUrlStr = message.imageUrl {
                         Button {
@@ -369,15 +374,7 @@ public struct GeneratedImageCardView: View {
                             .stroke(NewtonTheme.border, lineWidth: 0.8)
                     )
             } else if isLoading {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Rendering high-res image...")
-                        .font(.system(size: 13, design: .serif))
-                        .foregroundColor(NewtonTheme.textSecondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 220)
-                .background(NewtonTheme.card)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                ImageGenerationPlaceholderView()
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "photo.badge.exclamationmark")

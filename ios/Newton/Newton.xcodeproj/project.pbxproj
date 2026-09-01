@@ -46,6 +46,7 @@
 		A10037 /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10038 /* LiveActivityManager.swift */; };
 		A10038 /* NewtonLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10039 /* NewtonLiveActivityWidget.swift */; };
 		A10039 /* NewtonWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10040 /* NewtonWidgets.swift */; };
+		A10040 /* ImageGenerationPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10041 /* ImageGenerationPlaceholderView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -90,6 +91,7 @@
 		B10038 /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		B10039 /* NewtonLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonLiveActivityWidget.swift; sourceTree = "<group>"; };
 		B10040 /* NewtonWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonWidgets.swift; sourceTree = "<group>"; };
+		B10041 /* ImageGenerationPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageGenerationPlaceholderView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -195,6 +197,7 @@
 				B10036 /* NewtonWatchView.swift */,
 				B10039 /* NewtonLiveActivityWidget.swift */,
 				B10040 /* NewtonWidgets.swift */,
+				B10041 /* ImageGenerationPlaceholderView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -336,6 +339,7 @@
 				A10037 /* LiveActivityManager.swift in Sources */,
 				A10038 /* NewtonLiveActivityWidget.swift in Sources */,
 				A10039 /* NewtonWidgets.swift in Sources */,
+				A10040 /* ImageGenerationPlaceholderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
