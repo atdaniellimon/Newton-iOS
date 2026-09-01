@@ -43,10 +43,11 @@ public struct MacConversationListView: View {
     private var isDark: Bool { colorScheme == .dark }
     
     private var filteredConversations: [Conversation] {
+        let generalChats = storage.conversations.filter { $0.workspacePath == nil }
         if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return storage.conversations
+            return generalChats
         } else {
-            return storage.conversations.filter {
+            return generalChats.filter {
                 $0.title.localizedCaseInsensitiveContains(searchText) ||
                 $0.messages.contains { $0.content.localizedCaseInsensitiveContains(searchText) }
             }
@@ -185,7 +186,9 @@ public struct MacConversationListView: View {
             HStack(spacing: 8) {
                 Button(action: {
                     var newConvo = storage.createConversation()
+                    newConvo.workspacePath = workspace.activeWorkspacePath
                     newConvo.title = "Task in \(workspace.activeProjectName)"
+                    storage.updateConversation(newConvo)
                     selectedConversation = newConvo
                 }) {
                     HStack(spacing: 5) {
@@ -241,7 +244,9 @@ public struct MacConversationListView: View {
                                     workspace.activeWorkspacePath = proj.path
                                     workspace.activeProjectName = proj.name
                                     var newConvo = storage.createConversation()
+                                    newConvo.workspacePath = proj.path
                                     newConvo.title = "Task in \(proj.name)"
+                                    storage.updateConversation(newConvo)
                                     selectedConversation = newConvo
                                 }) {
                                     Image(systemName: "plus")
@@ -253,35 +258,44 @@ public struct MacConversationListView: View {
                             }
                             .padding(.horizontal, 14)
                             
-                            // Sample Project Tasks
-                            VStack(alignment: .leading, spacing: 2) {
-                                ForEach(storage.conversations.prefix(3)) { convo in
-                                    Button(action: {
-                                        workspace.activeWorkspacePath = proj.path
-                                        workspace.activeProjectName = proj.name
-                                        selectedConversation = convo
-                                    }) {
-                                        HStack(spacing: 6) {
-                                            Circle()
-                                                .stroke(isDark ? Color(red: 0.45, green: 0.50, blue: 0.58) : Color(red: 0.65, green: 0.70, blue: 0.76), lineWidth: 1)
-                                                .frame(width: 5, height: 5)
-                                            
-                                            Text(convo.title.isEmpty ? "Task" : convo.title)
-                                                .font(.system(size: 12))
-                                                .foregroundColor(selectedConversation?.id == convo.id ? (isDark ? NewtonTheme.sand : Color.black) : (isDark ? Color(red: 0.80, green: 0.84, blue: 0.90) : Color(red: 0.30, green: 0.35, blue: 0.42)))
-                                                .lineLimit(1)
-                                            
-                                            Spacer()
+                            // Specific Project Tasks only
+                            let projectTasks = storage.conversations.filter { $0.workspacePath == proj.path || $0.workspacePath == proj.name }
+                            if projectTasks.isEmpty {
+                                Text("No tasks yet")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(isDark ? Color(red: 0.45, green: 0.50, blue: 0.58) : Color.gray)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 2)
+                            } else {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    ForEach(projectTasks) { convo in
+                                        Button(action: {
+                                            workspace.activeWorkspacePath = proj.path
+                                            workspace.activeProjectName = proj.name
+                                            selectedConversation = convo
+                                        }) {
+                                            HStack(spacing: 6) {
+                                                Circle()
+                                                    .stroke(isDark ? Color(red: 0.45, green: 0.50, blue: 0.58) : Color(red: 0.65, green: 0.70, blue: 0.76), lineWidth: 1)
+                                                    .frame(width: 5, height: 5)
+                                                
+                                                Text(convo.title.isEmpty ? "Task" : convo.title)
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(selectedConversation?.id == convo.id ? (isDark ? NewtonTheme.sand : Color.black) : (isDark ? Color(red: 0.80, green: 0.84, blue: 0.90) : Color(red: 0.30, green: 0.35, blue: 0.42)))
+                                                    .lineLimit(1)
+                                                
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 5)
+                                            .background(selectedConversation?.id == convo.id ? (isDark ? Color(red: 0.16, green: 0.20, blue: 0.27) : Color(red: 0.90, green: 0.92, blue: 0.96)) : Color.clear)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         }
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 5)
-                                        .background(selectedConversation?.id == convo.id ? (isDark ? Color(red: 0.16, green: 0.20, blue: 0.27) : Color(red: 0.90, green: 0.92, blue: 0.96)) : Color.clear)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
+                                .padding(.horizontal, 6)
                             }
-                            .padding(.horizontal, 6)
                         }
                     }
                 }

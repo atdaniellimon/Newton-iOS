@@ -265,15 +265,12 @@ public final class NewtonCodeWorkspaceManager: ObservableObject {
         if let savedPerm = UserDefaults.standard.string(forKey: permissionKey), let perm = CodePermissionMode(rawValue: savedPerm) {
             self.permissionMode = perm
         }
-        if let data = UserDefaults.standard.data(forKey: projectsKey), let decoded = try? JSONDecoder().decode([CodeProject].self, from: data) {
+        if let data = UserDefaults.standard.data(forKey: projectsKey), let decoded = try? JSONDecoder().decode([CodeProject].self, from: data), !decoded.isEmpty {
             self.projects = decoded
         } else {
-            // Default sample projects
+            // Default to current active workspace
             self.projects = [
-                CodeProject(name: "Moke Newton", path: "/Volumes/Daniel/projects/Newton/Moke Newton"),
-                CodeProject(name: "interceptor-ios", path: "/Volumes/Daniel/projects/interceptor-ios"),
-                CodeProject(name: "RobloxPSVita", path: "/Volumes/Daniel/projects/RobloxPSVita"),
-                CodeProject(name: "Triad39", path: "/Volumes/Daniel/projects/Triad39")
+                CodeProject(name: "Moke Newton", path: "/Volumes/Daniel/projects/Newton/Moke Newton")
             ]
         }
     }

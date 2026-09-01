@@ -19,7 +19,9 @@ public struct OrbitCardView: View {
     
     public var body: some View {
         let name = result.orbitName.lowercased()
-        if name == "generate_pdf" || name == "pdf" || name == "create_pdf" || name == "make_pdf" {
+        if name == "image_gen" || name == "generate_image" || name == "imagine" || name == "draw" {
+            EmptyView()
+        } else if name == "generate_pdf" || name == "pdf" || name == "create_pdf" || name == "make_pdf" {
             PDFDocumentCardView(result: result)
         } else if name == "web_search" || name == "search" || name == "search_web" {
             WebSearchSourcesCardView(result: result)

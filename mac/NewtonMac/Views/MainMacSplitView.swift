@@ -38,6 +38,7 @@ public struct MainMacSplitView: View {
                         inputPrompt: $dashboardPrompt,
                         onStartTask: { prompt in
                             var newConvo = storage.createConversation()
+                            newConvo.workspacePath = workspace.activeWorkspacePath
                             newConvo.title = String(prompt.prefix(28))
                             let userMsg = Message(role: .user, content: prompt)
                             newConvo.messages.append(userMsg)

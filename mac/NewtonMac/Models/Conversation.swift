@@ -15,6 +15,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
     public var messages: [Message]
     public var isPinned: Bool
     public var isGhost: Bool
+    public var workspacePath: String?
     public let createdAt: Date
     public var updatedAt: Date
     
@@ -26,6 +27,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         messages: [Message] = [],
         isPinned: Bool = false,
         isGhost: Bool = false,
+        workspacePath: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -36,12 +38,13 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         self.messages = messages
         self.isPinned = isPinned
         self.isGhost = isGhost
+        self.workspacePath = workspacePath
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, title, provider, modelId, messages, isPinned, isGhost, createdAt, updatedAt
+        case id, title, provider, modelId, messages, isPinned, isGhost, workspacePath, createdAt, updatedAt
     }
     
     public init(from decoder: Decoder) throws {
@@ -53,6 +56,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         messages = try container.decodeIfPresent([Message].self, forKey: .messages) ?? []
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
         isGhost = try container.decodeIfPresent(Bool.self, forKey: .isGhost) ?? false
+        workspacePath = try container.decodeIfPresent(String.self, forKey: .workspacePath)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
