@@ -479,13 +479,18 @@ public struct MacChatView: View {
                     baseUrl: baseUrl,
                     apiKey: apiKey
                 )
-                
                 if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
                     conversation.messages[idx].content = orbitResults.processedText
                     conversation.messages[idx].orbitResults = orbitResults.results
                     conversation.messages[idx].imageUrl = orbitResults.imageUrl
                     conversation.messages[idx].isStreaming = false
                     storage.updateConversation(conversation)
+                    
+                    // Notify if unfocused
+                    NotificationService.shared.sendCompletionNotification(
+                        title: "Newton Singularity",
+                        body: orbitResults.processedText
+                    )
                 }
             } catch {
                 if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {

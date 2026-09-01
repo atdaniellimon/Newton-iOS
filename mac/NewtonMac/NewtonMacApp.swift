@@ -14,6 +14,10 @@ struct NewtonMacApp: App {
     @StateObject private var storage = StorageManager.shared
     @StateObject private var settings = SettingsManager.shared
     
+    init() {
+        _ = NotificationService.shared
+    }
+    
     var body: some Scene {
         WindowGroup {
             MainMacSplitView()

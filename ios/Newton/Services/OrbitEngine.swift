@@ -218,13 +218,7 @@ public final class OrbitEngine {
             }
         }
         
-        // 3. Fallback de emergencia a modelo de alta calidad FLUX
-        let encodedPrompt = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)?
-            .replacingOccurrences(of: " ", with: "%20")
-            .replacingOccurrences(of: "?", with: "") ?? "artwork"
-        
-        let fluxUrlStr = "https://image.pollinations.ai/prompt/\(encodedPrompt)?width=1024&height=1024&nologo=true&model=flux"
-        return fluxUrlStr
+        return ""
     }
     
     public func executeOrbit(name: String, paramsJson: String, baseUrl: String = "", apiKey: String = "") async -> OrbitExecutionResult {

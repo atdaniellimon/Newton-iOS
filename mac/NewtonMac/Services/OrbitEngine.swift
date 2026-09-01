@@ -150,72 +150,51 @@ public final class OrbitEngine {
         return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl)
     }
     
-    /// Generate an image from a prompt calling endpoint or downloading high-res data URL
+    /// Generate an image from a prompt calling ONLY the official API endpoint
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetBase = !baseUrl.isEmpty ? baseUrl : SettingsManager.hardcodedEndpoint
+        let cleanBase = targetBase.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
         
-        // 1. Try calling the provider's /v1/images/generations with a fast 4s timeout
-        if !baseUrl.isEmpty && !baseUrl.contains("localhost") && !baseUrl.contains("127.0.0.1") {
-            let cleanBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
-            
-            if let endpointUrl = URL(string: endpointStr) {
-                var request = URLRequest(url: endpointUrl)
-                request.httpMethod = "POST"
-                request.timeoutInterval = 4
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                if !apiKey.isEmpty {
-                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                }
-                
-                let payload: [String: Any] = [
-                    "prompt": cleanPrompt,
-                    "n": 1,
-                    "size": "768x768",
-                    "response_format": "b64_json"
-                ]
-                
-                if let bodyData = try? JSONSerialization.data(withJSONObject: payload) {
-                    request.httpBody = bodyData
-                    if let (data, response) = try? await URLSession.shared.data(for: request),
-                       let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) {
-                        
-                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let dataArr = json["data"] as? [[String: Any]],
-                           let first = dataArr.first {
-                            if let b64 = first["b64_json"] as? String, !b64.isEmpty {
-                                return "data:image/png;base64,\(b64)"
-                            }
-                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty, let urlObj = URL(string: imgUrl) {
-                                if let (dlData, _) = try? await URLSession.shared.data(from: urlObj),
-                                   let _ = NSImage(data: dlData) {
-                                    return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
-                                }
-                                return imgUrl
-                            }
-                        }
-                    }
-                }
-            }
+        guard let endpointUrl = URL(string: endpointStr) else { return "" }
+        
+        var request = URLRequest(url: endpointUrl)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 45
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
         
-        // 2. High-Performance Turbo Image Generator
-        let encodedPrompt = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)?
-            .replacingOccurrences(of: " ", with: "%20")
-            .replacingOccurrences(of: "?", with: "") ?? "artwork"
+        let payload: [String: Any] = [
+            "prompt": cleanPrompt,
+            "n": 1,
+            "size": "1024x1024",
+            "response_format": "b64_json"
+        ]
         
-        let turboUrlStr = "https://image.pollinations.ai/prompt/\(encodedPrompt)?width=768&height=768&nologo=true&model=turbo"
-        if let turboUrl = URL(string: turboUrlStr) {
-            var dlRequest = URLRequest(url: turboUrl)
-            dlRequest.timeoutInterval = 15
-            dlRequest.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", forHTTPHeaderField: "User-Agent")
-            
-            if let (dlData, dlResp) = try? await URLSession.shared.data(for: dlRequest),
-               let http = dlResp as? HTTPURLResponse, (200...299).contains(http.statusCode),
-               let _ = NSImage(data: dlData) {
-                return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: payload) else { return "" }
+        request.httpBody = bodyData
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
+                return ""
             }
-            return turboUrlStr
+            
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let dataArr = json["data"] as? [[String: Any]],
+               let first = dataArr.first {
+                if let b64 = first["b64_json"] as? String, !b64.isEmpty {
+                    return "data:image/png;base64,\(b64)"
+                }
+                if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
+                    return imgUrl
+                }
+            }
+        } catch {
+            print("Official Image API error: \(error)")
         }
         
         return ""

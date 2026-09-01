@@ -55,8 +55,8 @@ public struct MacConversationListView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 12) {
-            // Top Row: Aligned directly with macOS traffic light buttons
+        VStack(spacing: 6) {
+            // Top Row: Aligned directly with macOS traffic light buttons at the very top
             topHeaderRow
             
             if selectedSidebarTab == .code {
@@ -67,6 +67,7 @@ public struct MacConversationListView: View {
                 chatSidebarContent
             }
         }
+        .padding(.top, 0)
         .frame(width: 260)
         .frame(maxHeight: .infinity)
         .background(isDark ? Color(red: 0.10, green: 0.12, blue: 0.16) : Color(red: 0.96, green: 0.97, blue: 0.99))
@@ -81,12 +82,12 @@ public struct MacConversationListView: View {
     // MARK: - Top Header Row (Aligned with macOS Traffic Lights)
     @ViewBuilder
     private var topHeaderRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Color.clear
-                .frame(width: 66, height: 24)
+                .frame(width: 68, height: 28)
             
             Picker("", selection: $selectedSidebarTab) {
-                Image(systemName: "message")
+                Image(systemName: "bubble.left.fill")
                     .tag(SidebarTab.chat)
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .tag(SidebarTab.code)
@@ -101,8 +102,9 @@ public struct MacConversationListView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
+        .padding(.horizontal, 10)
+        .padding(.top, 0)
+        .frame(height: 38)
     }
     
     // MARK: - Chat Mode Sidebar Content

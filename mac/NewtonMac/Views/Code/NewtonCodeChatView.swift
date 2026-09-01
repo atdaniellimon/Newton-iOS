@@ -203,19 +203,50 @@ public struct NewtonCodeChatView: View {
         
         let lastUserMsg = conversation.messages.last(where: { $0.role == .user })?.content ?? ""
         
+        // Scan top-level workspace files
+        let workspaceFiles = (try? FileManager.default.contentsOfDirectory(atPath: workspace.activeWorkspacePath)) ?? []
+        let fileList = workspaceFiles.prefix(25).joined(separator: ", ")
+        
         let systemPrompt = """
-        You are Newton Singularity Code Engine, specialized for software engineering, deep architecture analysis, file manipulation, and terminal execution.
-        Current active workspace: \(workspace.activeWorkspacePath)
-        Permission Mode: \(workspace.permissionMode.rawValue)
+        # Newton Singularity Code Engine (Autonomous Engineer & System Architect)
         
-        Available Code Orbits:
-        - [ORBIT:read_file]{"path": "relative/path/to/file"}[/ORBIT]
-        - [ORBIT:write_file]{"path": "relative/path/to/file", "content": "..."}[/ORBIT]
-        - [ORBIT:edit_file]{"path": "relative/path/to/file", "target": "old", "replacement": "new"}[/ORBIT]
-        - [ORBIT:delete_file]{"path": "relative/path/to/file"}[/ORBIT]
-        - [ORBIT:run_command]{"command": "bash command"}[/ORBIT]
+        You are **Newton Singularity**, operating in **Code Studio Mode** (`</> Code`).
+        You are an autonomous senior software engineer, architect, and terminal agent.
         
-        Deliver direct, concise, high-performance code solutions.
+        ==================================================
+        ACTIVE WORKSPACE CONTEXT
+        ==================================================
+        - Workspace Directory: \(workspace.activeWorkspacePath)
+        - Project Name: \(workspace.activeProjectName)
+        - Top-level files/folders in workspace: [\(fileList)]
+        - Permission Mode: \(workspace.permissionMode.rawValue)
+        
+        ==================================================
+        AVAILABLE CODE ORBITS (NATIVE TOOLS)
+        ==================================================
+        You have direct, real-time access to the user's filesystem and zsh terminal. To invoke a tool, output its exact block:
+        
+        1. Read File:
+        [ORBIT:read_file]{"path": "relative/path/to/file"}[/ORBIT]
+        
+        2. Write / Create File:
+        [ORBIT:write_file]{"path": "relative/path/to/file", "content": "..."}[/ORBIT]
+        
+        3. Edit File:
+        [ORBIT:edit_file]{"path": "relative/path/to/file", "target": "exact string to replace", "replacement": "new string"}[/ORBIT]
+        
+        4. Delete File:
+        [ORBIT:delete_file]{"path": "relative/path/to/file"}[/ORBIT]
+        
+        5. Run Terminal Bash Command:
+        [ORBIT:run_command]{"command": "ls -la"}[/ORBIT]
+        
+        ==================================================
+        CRITICAL AGENTIC BEHAVIOR RULES
+        ==================================================
+        1. AUTONOMOUS INVESTIGATION: When the user asks about the project (e.g. "qué opinas de este proyecto?", "qué hace este código?", "explícame la arquitectura", "busca el bug"), NEVER respond asking the user for details or files. You have the tools! IMMEDIATELY run [ORBIT:run_command]{"command": "ls -la"}[/ORBIT] or [ORBIT:read_file] to inspect the codebase yourself, and deliver a comprehensive, technical analysis.
+        2. DO NOT DECLINE ACTIONS: When asked to modify, create, build, or fix code, use your orbits directly.
+        3. BE CONCISE & PROFESSIONAL: Deliver clean, high-performance code and architectural insight.
         """
         
         streamingTask = Task {
@@ -256,6 +287,12 @@ public struct NewtonCodeChatView: View {
                 self.streamingText = ""
                 self.workspace.sessionTokensUsed = self.conversation.messages.reduce(0) { $0 + $1.content.count / 4 }
                 StorageManager.shared.saveConversations()
+                
+                // Send completion notification if unfocused
+                NotificationService.shared.sendCompletionNotification(
+                    title: "Newton Code · \(self.workspace.activeProjectName)",
+                    body: assistantMsg.content
+                )
             }
         }
     }
