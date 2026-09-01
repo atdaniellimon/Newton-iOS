@@ -98,41 +98,33 @@ public final class OrbitEngine {
         outputText = outputText.replacingOccurrences(of: ", de la familia de modelos Newton", with: "")
         outputText = outputText.replacingOccurrences(of: ", from the Newton model family", with: "")
         
-        // 4. Fallback: Intent matching from user prompt
+        // 4. Fallback: Intent matching from user prompt (EXPLICIT image requests only)
         if detectedImageUrl == nil && !userPrompt.isEmpty {
-            let imgIntentPattern = "(?i)(?:/imagine\\s+(.+)|(?:me\\s+)?(?:puedes\\s+)?(?:hacer|haces|hazme|haz|genera[rs]?|gener[aá]me|generarme|crea[rs]?|cre[aá]me|crearme|dibuja[rs]?|dibujame|pinta[rs]?|pintame|ilustra[rs]?|renderiza[rs]?|generate|create|draw|paint|make)\\s*(?:me|te|nos)?\\s*(?:una?\\s+|an?\\s+)?(?:imagen|foto|dibujo|gr[aá]fico|ilustraci[oó]n|image|photo|drawing|picture)?\\s*(?:de|sobre|para|of|about|for)?\\s*(.+))"
+            let lower = userPrompt.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            let isCapabilityQuestion = lower.contains("que puedes hacer") || lower.contains("qué puedes hacer") || lower.contains("que sabes hacer") || lower.contains("qué sabes hacer") || lower.contains("quien eres") || lower.contains("quién eres") || lower.hasPrefix("hola")
             
-            if let intentRegex = try? NSRegularExpression(pattern: imgIntentPattern, options: []) {
-                let nsPrompt = userPrompt as NSString
-                if let match = intentRegex.firstMatch(in: userPrompt, options: [], range: NSRange(location: 0, length: nsPrompt.length)) {
-                    var subject = ""
-                    if match.range(at: 1).location != NSNotFound {
-                        subject = nsPrompt.substring(with: match.range(at: 1))
-                    } else if match.range(at: 2).location != NSNotFound {
-                        subject = nsPrompt.substring(with: match.range(at: 2))
+            if !isCapabilityQuestion {
+                let imgIntentPattern = "(?i)(?:^/imagine\\s+(.+)|(?:dibuja[rs]?|dib[uú]jame|pinta[rs]?|pintame|ilustra[rs]?|renderiza[rs]?|draw|paint|illustrate)\\s+(?:una?\\s+|an?\\s+)?(.+)|(?:(?:me\\s+)?(?:puedes\\s+)?(?:hacer|hazme|haz|genera[rs]?|gener[aá]me|crea[rs]?|cre[aá]me|make|generate|create)\\s+(?:me|nos)?\\s*(?:una?\\s+|an?\\s+)(?:imagen|foto|dibujo|gr[aá]fico|ilustraci[oó]n|image|photo|picture|drawing|artwork|render)\\s*(?:de|sobre|para|of|about|for)?\\s*(.+)))"
+                
+                if let intentRegex = try? NSRegularExpression(pattern: imgIntentPattern, options: []) {
+                    let nsPrompt = userPrompt as NSString
+                    if let match = intentRegex.firstMatch(in: userPrompt, options: [], range: NSRange(location: 0, length: nsPrompt.length)) {
+                        var subject = ""
+                        for idx in 1..<match.numberOfRanges {
+                            if match.range(at: idx).location != NSNotFound {
+                                subject = nsPrompt.substring(with: match.range(at: idx))
+                                break
+                            }
+                        }
+                        
+                        let cleanSubj = subject.trimmingCharacters(in: CharacterSet(charactersIn: "?!., \t\n"))
+                        if !cleanSubj.isEmpty {
+                            detectedImageUrl = await generateImage(prompt: cleanSubj, baseUrl: baseUrl, apiKey: apiKey)
+                            if outputText.isEmpty || outputText.contains("No pude generar") || outputText.contains("no puedo generar") || outputText.contains("no tengo la capacidad") || outputText.contains("Parece que no puedo") {
+                                outputText = "¡Claro que sí! Aquí tienes una imagen de **\(cleanSubj)**:"
+                            }
+                        }
                     }
-                    
-                    let cleanSubj = subject.trimmingCharacters(in: CharacterSet(charactersIn: "?!., \t\n"))
-                    let promptToGenerate = cleanSubj.isEmpty ? userPrompt : cleanSubj
-                    
-                    detectedImageUrl = await generateImage(prompt: promptToGenerate, baseUrl: baseUrl, apiKey: apiKey)
-                    
-                    if outputText.isEmpty || outputText.contains("No pude generar") || outputText.contains("no puedo generar") || outputText.contains("no tengo la capacidad") || outputText.contains("Parece que no puedo") {
-                        outputText = "¡Claro que sí! Aquí tienes una imagen de **\(promptToGenerate)**:"
-                    }
-                }
-            }
-        }
-        
-        // 4. Fallback: Match assistant refusal mentioning image generation
-        if detectedImageUrl == nil && (outputText.contains("No pude generar la imagen de") || outputText.contains("No puedo generar la imagen de")) {
-            let refusalPattern = "(?i)No pud?e generar la imagen de\\s+([^.\\n?]+)"
-            if let refRegex = try? NSRegularExpression(pattern: refusalPattern, options: []) {
-                let nsOut = outputText as NSString
-                if let match = refRegex.firstMatch(in: outputText, options: [], range: NSRange(location: 0, length: nsOut.length)) {
-                    let subject = nsOut.substring(with: match.range(at: 1)).trimmingCharacters(in: CharacterSet(charactersIn: "?!., \t\n"))
-                    detectedImageUrl = await generateImage(prompt: subject, baseUrl: baseUrl, apiKey: apiKey)
-                    outputText = "¡Claro que sí! Aquí tienes una imagen de **\(subject)**:"
                 }
             }
         }

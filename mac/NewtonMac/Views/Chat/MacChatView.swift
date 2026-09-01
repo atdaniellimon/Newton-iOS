@@ -518,7 +518,7 @@ public struct MacModelPickerPopover: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Select Model")
+            Text("Active Engine")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.50, green: 0.55, blue: 0.62))
                 .padding(.horizontal, 8)
@@ -527,33 +527,12 @@ public struct MacModelPickerPopover: View {
             Button(action: {
                 settings.currentModelId = "newton-singularity"
             }) {
-                modelRow(name: "Singularity", desc: "Newton Singularity Model Core", isSelected: settings.currentModelId.contains("singularity"))
-            }
-            .buttonStyle(.plain)
-            
-            Button(action: {
-                settings.currentModelId = "claude-3-5-sonnet-20241022"
-            }) {
-                modelRow(name: "Newton I (Sonnet 3.5)", desc: "Deep analytical & tool reasoning", isSelected: settings.currentModelId.contains("sonnet"))
-            }
-            .buttonStyle(.plain)
-            
-            Button(action: {
-                settings.currentModelId = "deepseek-r1"
-            }) {
-                modelRow(name: "Newton R1 (DeepSeek)", desc: "Mathematical and formal logic", isSelected: settings.currentModelId.contains("r1"))
-            }
-            .buttonStyle(.plain)
-            
-            Button(action: {
-                settings.currentModelId = "gpt-4o"
-            }) {
-                modelRow(name: "Newton Omni (GPT-4o)", desc: "Multimodal speed and creativity", isSelected: settings.currentModelId.contains("gpt-4o"))
+                modelRow(name: "Singularity", desc: "Newton Singularity Model Core", isSelected: true)
             }
             .buttonStyle(.plain)
         }
         .padding(8)
-        .frame(width: 260)
+        .frame(width: 240)
         .background(isDark ? Color(red: 0.14, green: 0.17, blue: 0.22) : Color.white)
     }
     

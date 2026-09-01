@@ -69,14 +69,15 @@ public struct MacConversationListView: View {
     @ViewBuilder
     private var topNavigationPill: some View {
         HStack(spacing: 6) {
-            // Sidebar / List Button
+            // Newton Code </> Button
             Button(action: {}) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 13, weight: .medium))
+                Text("</>")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundColor(isDark ? Color(red: 0.75, green: 0.80, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.48))
                     .frame(width: 34, height: 32)
             }
             .buttonStyle(.plain)
+            .help("Newton Code & Programming Engine")
             
             // Active Chat Tab (Dark Navy / Sand Capsule)
             Button(action: {}) {

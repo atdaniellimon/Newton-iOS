@@ -207,11 +207,149 @@ public struct MacFormattedAssistantContent: View {
     
     private var isDark: Bool { colorScheme == .dark }
     
+    private var cleanContent: String {
+        var text = content
+        let orbitPattern = "\\[ORBIT:[\\w\\-_]+\\][\\s\\S]*?(?:\\[/ORBIT\\]|$)"
+        if let regex = try? NSRegularExpression(pattern: orbitPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        let jsonPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```"
+        if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private var blocks: [MacContentBlock] {
+        parseContentBlocks(cleanContent)
+    }
+    
     public var body: some View {
-        Text(content)
-            .font(.system(size: 14, weight: .regular, design: .serif))
-            .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.98) : Color(red: 0.08, green: 0.11, blue: 0.16))
-            .lineSpacing(4)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(blocks) { block in
+                if block.isCode, let code = block.code {
+                    MacCodeBlockView(code: code, language: block.language ?? "")
+                } else if let txt = block.text {
+                    Text(LocalizedStringKey(txt))
+                        .font(.system(size: 14, weight: .regular, design: .serif))
+                        .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.98) : Color(red: 0.08, green: 0.11, blue: 0.16))
+                        .lineSpacing(4)
+                }
+            }
+        }
+    }
+    
+    private func parseContentBlocks(_ raw: String) -> [MacContentBlock] {
+        var resultBlocks: [MacContentBlock] = []
+        let pattern = "```([a-zA-Z0-9_-]*)\\n([\\s\\S]*?)```"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return [.text(raw)]
+        }
+        
+        let nsString = raw as NSString
+        let matches = regex.matches(in: raw, range: NSRange(location: 0, length: nsString.length))
+        
+        var currentIndex = 0
+        for match in matches {
+            let matchRange = match.range
+            if matchRange.location > currentIndex {
+                let textPart = nsString.substring(with: NSRange(location: currentIndex, length: matchRange.location - currentIndex))
+                if !textPart.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    resultBlocks.append(.text(textPart))
+                }
+            }
+            
+            let lang = match.numberOfRanges > 1 && match.range(at: 1).location != NSNotFound ? nsString.substring(with: match.range(at: 1)) : ""
+            let code = match.numberOfRanges > 2 && match.range(at: 2).location != NSNotFound ? nsString.substring(with: match.range(at: 2)) : ""
+            resultBlocks.append(.code(language: lang, code: code))
+            
+            currentIndex = matchRange.location + matchRange.length
+        }
+        
+        if currentIndex < nsString.length {
+            let remainder = nsString.substring(from: currentIndex)
+            if !remainder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                resultBlocks.append(.text(remainder))
+            }
+        }
+        
+        return resultBlocks.isEmpty ? [.text(raw)] : resultBlocks
+    }
+}
+
+public struct MacContentBlock: Identifiable {
+    public let id = UUID()
+    public let text: String?
+    public let language: String?
+    public let code: String?
+    public let isCode: Bool
+    
+    public static func text(_ str: String) -> MacContentBlock {
+        MacContentBlock(text: str, language: nil, code: nil, isCode: false)
+    }
+    
+    public static func code(language: String, code: String) -> MacContentBlock {
+        MacContentBlock(text: nil, language: language, code: code, isCode: true)
+    }
+}
+
+public struct MacCodeBlockView: View {
+    public let code: String
+    public let language: String
+    @State private var copied: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var isDark: Bool { colorScheme == .dark }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Text(language.isEmpty ? "code" : language.lowercased())
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.82) : Color(red: 0.45, green: 0.50, blue: 0.58))
+                
+                Spacer()
+                
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        copied = false
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        Text(copied ? "Copied" : "Copy")
+                    }
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundColor(copied ? NewtonTheme.forestGreen : (isDark ? Color(red: 0.70, green: 0.75, blue: 0.82) : Color(red: 0.45, green: 0.50, blue: 0.58)))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isDark ? Color(red: 0.12, green: 0.14, blue: 0.18) : Color(red: 0.93, green: 0.94, blue: 0.96))
+            
+            Divider()
+            
+            // Code Text
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(code)
+                    .font(.system(size: 12.5, design: .monospaced))
+                    .foregroundColor(isDark ? Color(red: 0.90, green: 0.93, blue: 0.98) : Color(red: 0.10, green: 0.13, blue: 0.18))
+                    .padding(12)
+                    .textSelection(.enabled)
+            }
+        }
+        .background(isDark ? Color(red: 0.09, green: 0.11, blue: 0.14) : Color(red: 0.98, green: 0.98, blue: 0.99))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(isDark ? Color(red: 0.20, green: 0.24, blue: 0.30) : Color(red: 0.88, green: 0.90, blue: 0.93), lineWidth: 0.8)
+        )
+        .padding(.vertical, 4)
     }
 }
 
