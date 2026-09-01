@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  Faithfully recreates the web desktop floating card input bar.
+//  1:1 Faithful replication of the Newton Web input bar interface.
 //
 
 import SwiftUI
@@ -14,11 +14,18 @@ public struct MacMessageInputBar: View {
     public var isStreaming: Bool
     public var onSend: () -> Void
     public var onStop: () -> Void
-    public var onAttachFile: (() -> Void)? = nil
+    public var onAttachFile: () -> Void
     
     @State private var isWebSearchEnabled: Bool = false
+    @FocusState private var isFocused: Bool
     
-    public init(text: Binding<String>, isStreaming: Bool, onSend: @escaping () -> Void, onStop: @escaping () -> Void, onAttachFile: (() -> Void)? = nil) {
+    public init(
+        text: Binding<String>,
+        isStreaming: Bool,
+        onSend: @escaping () -> Void,
+        onStop: @escaping () -> Void,
+        onAttachFile: @escaping () -> Void
+    ) {
         self._text = text
         self.isStreaming = isStreaming
         self.onSend = onSend
@@ -26,145 +33,116 @@ public struct MacMessageInputBar: View {
         self.onAttachFile = onAttachFile
     }
     
+    private var canSend: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
     public var body: some View {
         VStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 10) {
-                // Multiline text input
-                MacTextEditorRepresentable(text: $text, onCommit: onSend)
-                    .frame(minHeight: 36, maxHeight: 120)
-                    .background(Color.clear)
-                
-                // Bottom Toolbar inside the input card
-                HStack(spacing: 14) {
-                    // Paperclip
-                    if let onAttachFile = onAttachFile {
-                        Button(action: onAttachFile) {
-                            Image(systemName: "paperclip")
-                                .font(.system(size: 15))
-                                .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Attach file or image")
+            // Floating Input Container
+            VStack(spacing: 0) {
+                // Text input area
+                ZStack(alignment: .topLeading) {
+                    if text.isEmpty {
+                        Text("Ask Newton anything...")
+                            .font(.system(size: 13.5))
+                            .foregroundColor(Color(red: 0.60, green: 0.65, blue: 0.72))
+                            .padding(.horizontal, 14)
+                            .padding(.top, 12)
+                            .allowsHitTesting(false)
                     }
                     
-                    // Web Search Toggle
+                    TextEditor(text: $text)
+                        .font(.system(size: 13.5))
+                        .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+                        .background(Color.clear)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                        .frame(minHeight: 40, maxHeight: 120)
+                        .focused($isFocused)
+                }
+                
+                // Bottom Toolbar (Attachments, Search, Send)
+                HStack(spacing: 12) {
+                    // Paperclip Attachment Button
+                    Button(action: onAttachFile) {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Attach PDF, Code or Documents")
+                    
+                    // Web Search Toggle Button
                     Button(action: {
                         isWebSearchEnabled.toggle()
                         if isWebSearchEnabled && !text.contains("[ORBIT:web_search]") {
-                            Haptics.light()
+                            text = "[ORBIT:web_search]{\"query\": \"\"}[/ORBIT] " + text
                         }
                     }) {
                         Image(systemName: "globe")
-                            .font(.system(size: 15))
-                            .foregroundColor(isWebSearchEnabled ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.45, green: 0.50, blue: 0.58))
+                            .font(.system(size: 14))
+                            .foregroundColor(isWebSearchEnabled ? NewtonTheme.sand : Color(red: 0.45, green: 0.50, blue: 0.58))
                     }
                     .buttonStyle(.plain)
-                    .help("Web Search Toggle")
+                    .help("Enable Real-Time Web Search Orbit")
                     
                     Spacer()
                     
-                    // Send / Stop Arrow Button
+                    // Send / Stop Button
                     if isStreaming {
                         Button(action: onStop) {
                             ZStack {
                                 Circle()
-                                    .fill(Color(red: 0.88, green: 0.35, blue: 0.30))
+                                    .fill(Color(red: 0.06, green: 0.09, blue: 0.16))
                                     .frame(width: 28, height: 28)
-                                Image(systemName: "stop.fill")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.white)
+                                
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.white)
+                                    .frame(width: 10, height: 10)
                             }
                         }
                         .buttonStyle(.plain)
                     } else {
-                        Button(action: onSend) {
+                        Button(action: {
+                            if canSend {
+                                onSend()
+                                isWebSearchEnabled = false
+                            }
+                        }) {
                             ZStack {
                                 Circle()
-                                    .fill(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(red: 0.70, green: 0.74, blue: 0.80) : Color(red: 0.06, green: 0.09, blue: 0.16))
+                                    .fill(canSend ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.80, green: 0.83, blue: 0.88))
                                     .frame(width: 28, height: 28)
+                                
                                 Image(systemName: "arrow.up")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(canSend ? Color.white : Color(red: 0.55, green: 0.60, blue: 0.68))
                             }
                         }
                         .buttonStyle(.plain)
-                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(!canSend)
+                        .keyboardShortcut(.return, modifiers: [])
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
+                .padding(.top, 4)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
+                    .stroke(isFocused ? Color(red: 0.70, green: 0.75, blue: 0.82) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.04), radius: 12, x: 0, y: 4)
+            .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 3)
+            .padding(.horizontal, 48)
             
-            // Bottom Disclaimer
+            // Bottom Disclaimer Text matching Web Screenshot
             Text("Newton AI may produce creative or technical output. Verify important data.")
-                .font(.system(size: 11))
-                .foregroundColor(Color(red: 0.58, green: 0.64, blue: 0.72))
-                .padding(.bottom, 6)
-        }
-        .padding(.horizontal, 40)
-        .frame(maxWidth: 800)
-    }
-}
-
-public struct MacTextEditorRepresentable: NSViewRepresentable {
-    @Binding var text: String
-    var onCommit: () -> Void
-    
-    public func makeNSView(context: Context) -> NSTextView {
-        let textView = NSTextView()
-        textView.delegate = context.coordinator
-        textView.isRichText = false
-        textView.allowsUndo = true
-        textView.drawsBackground = false
-        textView.font = NSFont.systemFont(ofSize: 14)
-        textView.textColor = NSColor(red: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
-        
-        // Placeholder text support
-        if text.isEmpty {
-            textView.string = ""
-        }
-        return textView
-    }
-    
-    public func updateNSView(_ nsView: NSTextView, context: Context) {
-        if nsView.string != text {
-            nsView.string = text
-        }
-    }
-    
-    public func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    public class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: MacTextEditorRepresentable
-        
-        init(_ parent: MacTextEditorRepresentable) {
-            self.parent = parent
-        }
-        
-        public func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
-            self.parent.text = textView.string
-        }
-        
-        public func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                if let event = NSApp.currentEvent, event.modifierFlags.contains(.shift) {
-                    return false // Shift+Enter allows newline
-                } else {
-                    parent.onCommit()
-                    return true
-                }
-            }
-            return false
+                .font(.system(size: 10.5))
+                .foregroundColor(Color(red: 0.58, green: 0.63, blue: 0.70))
+                .padding(.bottom, 4)
         }
     }
 }

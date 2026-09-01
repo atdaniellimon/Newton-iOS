@@ -3,11 +3,12 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  Faithfully matches the web desktop interface design.
+//  1:1 Faithful replication of the Newton Web desktop interface with high performance.
 //
 
 import SwiftUI
 import AppKit
+import PDFKit
 
 public struct MacChatView: View {
     @Binding public var conversation: Conversation
@@ -18,6 +19,8 @@ public struct MacChatView: View {
     @State private var isStreaming: Bool = false
     @State private var streamTask: Task<Void, Never>? = nil
     @State private var showModelSheet: Bool = false
+    @State private var attachedFileName: String? = nil
+    @State private var attachedFileData: Data? = nil
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
@@ -25,240 +28,24 @@ public struct MacChatView: View {
     
     public var body: some View {
         ZStack {
-            // Background Kinetic 3D Wireframe Mesh
+            // Background Kinetic 3D Wireframe Mesh (Hardware Accelerated)
             MacHero3DCanvasView(isThinking: isStreaming)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Top Header Bar with Model Pill & Ghost Mode
-                HStack {
-                    Button(action: {
-                        showModelSheet.toggle()
-                    }) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95) : Color(red: 0.65, green: 0.70, blue: 0.75))
-                                .frame(width: 8, height: 8)
-                            
-                            Text(conversation.isGhost ? "Ghost Session (No Memory)" : modelDisplayName)
-                                .font(.system(size: 12.5, weight: .medium))
-                                .foregroundColor(Color(red: 0.15, green: 0.18, blue: 0.22))
-                            
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.9))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95).opacity(0.6) : Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
-                        )
-                        .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    // Ghost Mode Quick Toggle / Burn Button
-                    Button(action: {
-                        if conversation.isGhost {
-                            conversation.messages.removeAll()
-                            storage.deleteConversation(id: conversation.id)
-                        } else {
-                            let ghost = storage.createGhostConversation()
-                            conversation = ghost
-                        }
-                    }) {
-                        HStack(spacing: 5) {
-                            Image(systemName: conversation.isGhost ? "ghost.fill" : "ghost")
-                                .font(.system(size: 11))
-                            Text(conversation.isGhost ? "Vanish" : "Ghost Mode")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(conversation.isGhost ? Color(red: 0.92, green: 0.35, blue: 0.30) : Color(red: 0.45, green: 0.50, blue: 0.58))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.8))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 0.8)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .help(conversation.isGhost ? "Incinerate ghost session messages instantly" : "Start ephemeral Ghost session (no history saved)")
-                    
-                    Spacer()
-                    
-                    // Export Options
-                    Menu {
-                        Button("Export to Editorial PDF") {
-                            if let url = ConversationExportManager.shared.generateCustomDocumentPDF(title: conversation.title, content: conversation.messages.map { "\($0.role == .user ? "User" : "Newton"): \($0.content)" }.joined(separator: "\n\n")) {
-                                NSWorkspace.shared.activateFileViewerSelecting([url])
-                            }
-                        }
-                        Button("Export to Markdown") {
-                            if let url = ConversationExportManager.shared.exportToMarkdown(conversation: conversation) {
-                                NSWorkspace.shared.activateFileViewerSelecting([url])
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
-                            .frame(width: 28, height: 28)
-                            .background(Color.white.opacity(0.8))
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 0.8)
-                            )
-                    }
-                    .menuStyle(.borderlessButton)
-                    .frame(width: 32)
-                }
-                .padding(.horizontal, 28)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                // Top Header Bar: Model Selector Pill
+                topHeaderBar
                 
-                // Content: Empty State Hero OR Conversation ScrollView
+                // Main Content: Hero Welcome OR Messages ScrollView
                 if conversation.messages.isEmpty {
-                    Spacer()
-                    
-                    VStack(spacing: 24) {
-                        // Hand-Drawn Newton Lightbulb Logo
-                        Image("NewtonLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 72, height: 72)
-                        
-                        // Hero Serif Title
-                        Text("What will you discover today?")
-                            .font(.system(size: 28, weight: .regular, design: .serif))
-                            .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
-                        
-                        // 2x2 Suggestion Cards Grid
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                            SuggestionCard(
-                                icon: "lightbulb",
-                                title: "Explain a Concept",
-                                subtitle: "Quantum computing basics",
-                                prompt: "Explain quantum computing basics with a simple real-world analogy."
-                            ) { selectedPrompt in
-                                inputText = selectedPrompt
-                                sendMessage()
-                            }
-                            
-                            SuggestionCard(
-                                icon: "terminal",
-                                title: "Code & Debug",
-                                subtitle: "Python web scraper script",
-                                prompt: "Write an efficient Python script for web scraping with async request handling."
-                            ) { selectedPrompt in
-                                inputText = selectedPrompt
-                                sendMessage()
-                            }
-                            
-                            SuggestionCard(
-                                icon: "doc.text",
-                                title: "Write & Draft",
-                                subtitle: "Technical architecture spec",
-                                prompt: "Draft a clean technical specification document for a cloud microservices architecture."
-                            ) { selectedPrompt in
-                                inputText = selectedPrompt
-                                sendMessage()
-                            }
-                            
-                            SuggestionCard(
-                                icon: "sparkles",
-                                title: "Analyze & Compare",
-                                subtitle: "Claude 3.5 vs DeepSeek R1",
-                                prompt: "What are the key architectural differences between Claude 3.5 Sonnet and DeepSeek R1?"
-                            ) { selectedPrompt in
-                                inputText = selectedPrompt
-                                sendMessage()
-                            }
-                        }
-                        .frame(maxWidth: 620)
-                    }
-                    
-                    Spacer()
+                    heroWelcomeScreen
                 } else {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(spacing: 16) {
-                                ForEach(conversation.messages) { message in
-                                    MacMessageBubbleView(message: message, onRetry: {
-                                        retryMessage(message)
-                                    })
-                                    .id(message.id)
-                                }
-                            }
-                            Color.clear
-                                .frame(height: 1)
-                                .id("mac_bottom_anchor")
-                        }
-                        .overlay(
-                            VStack {
-                                Spacer()
-                                HStack {
-                                    Spacer()
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                            proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
-                                        }
-                                    }) {
-                                        Image(systemName: "chevron.down")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .foregroundColor(NewtonTheme.sand)
-                                            .frame(width: 32, height: 32)
-                                            .background(NewtonTheme.card.opacity(0.95))
-                                            .clipShape(Circle())
-                                            .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(NewtonTheme.border, lineWidth: 0.8)
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.trailing, 24)
-                                    .padding(.bottom, 12)
-                                }
-                            }
-                        )
-                        .onChange(of: conversation.messages.count) { _ in
-                            withAnimation {
-                                proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
-                            }
-                        }
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
-                            }
-                        }
-                    }
+                    messagesScrollView
                 }
                 
-                // Floating Bottom Input Bar Card OR Terminated Banner
+                // Bottom Input Area OR Terminated Banner
                 if isTerminated {
-                    HStack(spacing: 8) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 13))
-                            .foregroundColor(NewtonTheme.coralRed)
-                        Text("Session ended by Newton.")
-                            .font(.system(size: 13, weight: .semibold, design: .serif))
-                            .foregroundColor(NewtonTheme.textSecondary)
-                    }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 24)
-                    .background(NewtonTheme.card)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(NewtonTheme.coralRed.opacity(0.4), lineWidth: 1)
-                    )
-                    .padding(.bottom, 14)
+                    terminatedBanner
                 } else {
                     MacMessageInputBar(
                         text: $inputText,
@@ -267,6 +54,7 @@ public struct MacChatView: View {
                         onStop: stopStreaming,
                         onAttachFile: openFilePicker
                     )
+                    .padding(.bottom, 8)
                 }
             }
         }
@@ -283,27 +71,330 @@ public struct MacChatView: View {
     
     private var modelDisplayName: String {
         if settings.currentModelId.contains("sonnet") {
-            return "Newton I (Claude 3.5 Sonnet)"
+            return "Newton I"
         } else if settings.currentModelId.contains("r1") {
-            return "Newton R1 (DeepSeek)"
+            return "Newton R1"
         } else if settings.currentModelId.contains("gpt-4o") {
-            return "Newton Omni (GPT-4o)"
+            return "Newton Omni"
         }
         return "Newton I"
     }
     
+    @ViewBuilder
+    private var topHeaderBar: some View {
+        HStack {
+            // Model Pill matching Web screenshot
+            Button(action: {
+                showModelSheet.toggle()
+            }) {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95) : Color(red: 0.65, green: 0.70, blue: 0.76))
+                        .frame(width: 7, height: 7)
+                    
+                    Text(conversation.isGhost ? "Ghost Session" : modelDisplayName)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(red: 0.12, green: 0.15, blue: 0.20))
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.white)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
+                )
+                .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
+            }
+            .buttonStyle(.plain)
+            
+            if conversation.isGhost {
+                Button(action: {
+                    conversation.messages.removeAll()
+                    storage.deleteConversation(id: conversation.id)
+                }) {
+                    Text("Vanish")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(red: 0.92, green: 0.35, blue: 0.30))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.white)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color(red: 0.92, green: 0.35, blue: 0.30).opacity(0.4), lineWidth: 0.8)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 14)
+        .padding(.bottom, 6)
+    }
+    
+    @ViewBuilder
+    private var heroWelcomeScreen: some View {
+        Spacer()
+        
+        VStack(spacing: 20) {
+            // Hand-Drawn Newton Lightbulb Logo with "Newton" text below
+            VStack(spacing: 6) {
+                if let img = NSImage(named: "NewtonLogo") ?? NSImage(contentsOfFile: Bundle.main.bundlePath + "/Contents/Resources/NewtonLogo.png") {
+                    Image(nsImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 58, height: 58)
+                } else {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 42, weight: .light))
+                        .foregroundColor(Color(red: 0.10, green: 0.13, blue: 0.18))
+                }
+                
+                Text("Newton")
+                    .font(.system(size: 15, weight: .bold, design: .serif))
+                    .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+            }
+            
+            // Hero Serif Headline matching screenshot
+            Text("What will you discover today?")
+                .font(.system(size: 26, weight: .regular, design: .serif))
+                .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+                .padding(.bottom, 8)
+            
+            // 2x2 Suggestion Cards Grid matching screenshot 1:1
+            VStack(spacing: 12) {
+                HStack(spacing: 14) {
+                    suggestionCard(
+                        icon: "lightbulb",
+                        title: "Explain a Concept",
+                        subtitle: "Quantum computing basics",
+                        prompt: "Explain quantum computing basics with an intuitive real-world analogy."
+                    )
+                    
+                    suggestionCard(
+                        icon: "terminal",
+                        title: "Code & Debug",
+                        subtitle: "Python web scraper script",
+                        prompt: "Write a high-performance Python script for web scraping with async request handling."
+                    )
+                }
+                
+                HStack(spacing: 14) {
+                    suggestionCard(
+                        icon: "doc.text",
+                        title: "Write & Draft",
+                        subtitle: "Technical architecture spec",
+                        prompt: "Draft a comprehensive technical architecture specification document for a cloud platform."
+                    )
+                    
+                    suggestionCard(
+                        icon: "sparkles",
+                        title: "Analyze & Compare",
+                        subtitle: "Claude 3.5 vs DeepSeek R1",
+                        prompt: "What are the core technical and architectural differences between Claude 3.5 Sonnet and DeepSeek R1?"
+                    )
+                }
+            }
+            .frame(maxWidth: 580)
+        }
+        .padding(.horizontal, 40)
+        
+        Spacer()
+    }
+    
+    @ViewBuilder
+    private func suggestionCard(icon: String, title: String, subtitle: String, prompt: String) -> some View {
+        Button(action: {
+            inputText = prompt
+            sendMessage()
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundColor(Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .frame(width: 24)
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+                    
+                    Text(subtitle)
+                        .font(.system(size: 11.5))
+                        .foregroundColor(Color(red: 0.50, green: 0.55, blue: 0.62))
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.white.opacity(0.95))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.02), radius: 4, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private var messagesScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(conversation.messages) { message in
+                        MacMessageBubbleView(message: message, onRetry: {
+                            retryMessage(message)
+                        })
+                        .id(message.id)
+                    }
+                    
+                    Color.clear
+                        .frame(height: 1)
+                        .id("mac_bottom_anchor")
+                }
+                .padding(.horizontal, 48)
+                .padding(.vertical, 20)
+            }
+            .overlay(
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
+                            }
+                        }) {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(NewtonTheme.sand)
+                                .frame(width: 32, height: 32)
+                                .background(Color.white.opacity(0.95))
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 32)
+                        .padding(.bottom, 12)
+                    }
+                }
+            )
+            .onChange(of: conversation.messages.count) { _ in
+                withAnimation {
+                    proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
+                }
+            }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    proxy.scrollTo("mac_bottom_anchor", anchor: .bottom)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var terminatedBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 13))
+                .foregroundColor(NewtonTheme.coralRed)
+            Text("Session ended by Newton.")
+                .font(.system(size: 13, weight: .semibold, design: .serif))
+                .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 24)
+        .background(Color.white)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(NewtonTheme.coralRed.opacity(0.4), lineWidth: 1)
+        )
+        .padding(.bottom, 14)
+    }
+    
+    private func openFilePicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.item, .content, .data, .text, .plainText, .pdf, .sourceCode, .image]
+        
+        if panel.runModal() == .OK, let selectedUrl = panel.url {
+            attachedFileName = selectedUrl.lastPathComponent
+            if let data = try? Data(contentsOf: selectedUrl) {
+                attachedFileData = data
+            }
+        }
+    }
+    
+    private func retryMessage(_ msg: Message) {
+        if let idx = conversation.messages.firstIndex(where: { $0.id == msg.id }) {
+            let previousPrompt = conversation.messages.prefix(upTo: idx).last(where: { $0.role == .user })?.content ?? ""
+            conversation.messages = Array(conversation.messages.prefix(upTo: idx))
+            inputText = previousPrompt
+            sendMessage()
+        }
+    }
+    
     private func sendMessage() {
-        let userPrompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !userPrompt.isEmpty else { return }
+        let rawInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var displayPrompt = rawInput
+        var backendPayloadPrompt = rawInput
+        
+        let hasFile = attachedFileData != nil
+        let fileName = attachedFileName ?? "Document"
+        
+        if hasFile {
+            if displayPrompt.isEmpty {
+                displayPrompt = "📎 \(fileName)"
+            } else {
+                displayPrompt = "\(displayPrompt)\n\n📎 \(fileName)"
+            }
+            
+            if let fileData = attachedFileData {
+                if let textContent = String(data: fileData, encoding: .utf8) {
+                    backendPayloadPrompt += "\n\n[File Attached: \(fileName)]:\n```\n\(textContent)\n```"
+                } else if let pdfDoc = PDFDocument(data: fileData) {
+                    var extractedPdf = ""
+                    for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
+                        if let page = pdfDoc.page(at: pageIdx), let str = page.string {
+                            extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
+                        }
+                    }
+                    if !extractedPdf.isEmpty {
+                        backendPayloadPrompt += "\n\n[Extracted Text from Attached PDF: \(fileName)]:\n```\n\(extractedPdf)\n```"
+                    }
+                }
+            }
+        }
+        
+        guard !displayPrompt.isEmpty || attachedFileData != nil else { return }
         
         let isFirstMessage = conversation.messages.isEmpty
         inputText = ""
+        attachedFileName = nil
+        attachedFileData = nil
         
-        let userMessage = Message(role: .user, content: userPrompt)
+        let userMessage = Message(role: .user, content: displayPrompt)
         conversation.messages.append(userMessage)
         
         if isFirstMessage {
-            conversation.title = String(userPrompt.split(separator: " ").prefix(4).joined(separator: " "))
+            conversation.title = String(rawInput.isEmpty ? fileName : rawInput.split(separator: " ").prefix(4).joined(separator: " "))
         }
         
         let assistantMessageId = UUID().uuidString
@@ -312,6 +403,11 @@ public struct MacChatView: View {
         storage.updateConversation(conversation)
         
         isStreaming = true
+        
+        var messagesToSend = Array(conversation.messages.dropLast())
+        if let lastIdx = messagesToSend.indices.last, messagesToSend[lastIdx].role == .user {
+            messagesToSend[lastIdx].content = backendPayloadPrompt
+        }
         
         streamTask = Task {
             var fullResponse = ""
@@ -328,7 +424,7 @@ public struct MacChatView: View {
             
             do {
                 let stream = LLMService.shared.streamCompletion(
-                    messages: conversation.messages.dropLast(),
+                    messages: messagesToSend,
                     provider: provider,
                     modelId: modelId,
                     baseUrl: baseUrl,
@@ -339,197 +435,138 @@ public struct MacChatView: View {
                 )
                 
                 for try await token in stream {
-                    guard !Task.isCancelled else { break }
+                    if Task.isCancelled { break }
                     
-                    if token.contains("<think>") {
+                    var cleanToken = token
+                    
+                    if cleanToken.contains("<think>") {
                         isInsideThinkingTag = true
+                        cleanToken = cleanToken.replacingOccurrences(of: "<think>", with: "")
                     }
                     
                     if isInsideThinkingTag {
-                        currentThinking += token.replacingOccurrences(of: "<think>", with: "")
-                        if token.contains("</think>") {
+                        if cleanToken.contains("</think>") {
+                            let parts = cleanToken.components(separatedBy: "</think>")
+                            currentThinking += parts.first ?? ""
                             isInsideThinkingTag = false
-                            currentThinking = currentThinking.replacingOccurrences(of: "</think>", with: "")
+                            if parts.count > 1 {
+                                fullResponse += parts[1]
+                            }
+                        } else {
+                            currentThinking += cleanToken
                         }
                     } else {
-                        fullResponse += token
+                        fullResponse += cleanToken
                     }
                     
-                    await MainActor.run {
-                        self.updateStreamingToken(assistantMessageId: assistantMessageId, text: fullResponse, thinking: currentThinking)
+                    if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                        conversation.messages[idx].content = fullResponse
+                        conversation.messages[idx].thinkingContent = currentThinking.isEmpty ? nil : currentThinking
                     }
                 }
                 
-                let (finalContent, orbitResults, detectedImgUrl) = await OrbitEngine.shared.processOrbitsInText(
+                // Process Orbits
+                let orbitResults = await OrbitEngine.shared.processOrbitsInText(
                     fullResponse,
-                    userPrompt: userPrompt,
+                    userPrompt: displayPrompt,
                     baseUrl: baseUrl,
                     apiKey: apiKey
                 )
                 
-                await MainActor.run {
-                    self.finalizeStreaming(
-                        assistantMessageId: assistantMessageId,
-                        content: finalContent,
-                        imgUrl: detectedImgUrl,
-                        orbits: orbitResults
-                    )
+                if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                    conversation.messages[idx].content = orbitResults.processedText
+                    conversation.messages[idx].orbitResults = orbitResults.results
+                    conversation.messages[idx].imageUrl = orbitResults.imageUrl
+                    conversation.messages[idx].isStreaming = false
+                    storage.updateConversation(conversation)
                 }
             } catch {
-                await MainActor.run {
-                    self.failStreaming(assistantMessageId: assistantMessageId, errorText: error.localizedDescription)
+                if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
+                    conversation.messages[idx].content = "⚠️ Error: \(error.localizedDescription)"
+                    conversation.messages[idx].isStreaming = false
+                    storage.updateConversation(conversation)
                 }
             }
+            
+            isStreaming = false
         }
-    }
-    
-    @MainActor
-    private func updateStreamingToken(assistantMessageId: String, text: String, thinking: String) {
-        if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-            conversation.messages[index].content = text
-            conversation.messages[index].thinkingContent = thinking.isEmpty ? nil : thinking
-        }
-    }
-    
-    @MainActor
-    private func finalizeStreaming(assistantMessageId: String, content: String, imgUrl: String?, orbits: [OrbitExecutionResult]) {
-        if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-            conversation.messages[index].content = content
-            conversation.messages[index].imageUrl = imgUrl
-            conversation.messages[index].orbitResults = orbits
-            conversation.messages[index].isStreaming = false
-        }
-        storage.updateConversation(conversation)
-        isStreaming = false
-    }
-    
-    @MainActor
-    private func failStreaming(assistantMessageId: String, errorText: String) {
-        if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-            conversation.messages[index].content = "Error: \(errorText)"
-            conversation.messages[index].isStreaming = false
-        }
-        isStreaming = false
     }
     
     private func stopStreaming() {
         streamTask?.cancel()
         streamTask = nil
         isStreaming = false
-    }
-    
-    private func retryMessage(_ message: Message) {
-        if let idx = conversation.messages.firstIndex(where: { $0.id == message.id }), idx > 0 {
-            let previousUser = conversation.messages[idx - 1]
-            if previousUser.role == .user {
-                inputText = previousUser.content
-                sendMessage()
-            }
-        }
-    }
-    
-    private func openFilePicker() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        if panel.runModal() == .OK, let url = panel.url {
-            if let content = try? String(contentsOf: url, encoding: .utf8) {
-                inputText += "\n\n```\(url.lastPathComponent)\n\(content)\n```"
-            }
-        }
-    }
-}
-
-public struct SuggestionCard: View {
-    public let icon: String
-    public let title: String
-    public let subtitle: String
-    public let prompt: String
-    public let onSelect: (String) -> Void
-    
-    @State private var isHovered: Bool = false
-    
-    public var body: some View {
-        Button(action: {
-            onSelect(prompt)
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 15))
-                    .foregroundColor(Color(red: 0.25, green: 0.30, blue: 0.38))
-                    .frame(width: 24)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
-                    
-                    Text(subtitle)
-                        .font(.system(size: 11.5))
-                        .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isHovered ? Color(red: 0.70, green: 0.75, blue: 0.82) : Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(isHovered ? 0.06 : 0.02), radius: 6, x: 0, y: 2)
-            .scaleEffect(isHovered ? 1.01 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: isHovered)
-        }
-        .buttonStyle(.plain)
-        .onHover { hover in
-            isHovered = hover
+        if let lastIdx = conversation.messages.indices.last {
+            conversation.messages[lastIdx].isStreaming = false
+            storage.updateConversation(conversation)
         }
     }
 }
 
 public struct MacModelPickerPopover: View {
-    @StateObject private var settings = SettingsManager.shared
+    @ObservedObject var settings = SettingsManager.shared
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Select Model Engine")
-                .font(.system(size: 13, weight: .bold))
-                .padding(.bottom, 2)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Select Model")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(Color(red: 0.50, green: 0.55, blue: 0.62))
+                .padding(.horizontal, 8)
+                .padding(.top, 6)
             
-            ForEach(DefaultModelCatalog.models(for: settings.currentProvider)) { model in
-                Button(action: {
-                    settings.currentModelId = model.id
-                }) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.name)
-                                .font(.system(size: 12.5, weight: model.id == settings.currentModelId ? .semibold : .regular))
-                                .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
-                            
-                            Text(model.description)
-                                .font(.system(size: 10.5))
-                                .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
-                        }
-                        Spacer()
-                        if model.id == settings.currentModelId {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(model.id == settings.currentModelId ? Color(red: 0.92, green: 0.95, blue: 0.98) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
+            Button(action: {
+                settings.currentModelId = "claude-3-5-sonnet-20241022"
+            }) {
+                modelRow(name: "Newton I (Sonnet 3.5)", desc: "Deep analytical & tool reasoning", isSelected: settings.currentModelId.contains("sonnet"))
+            }
+            .buttonStyle(.plain)
+            
+            Button(action: {
+                settings.currentModelId = "deepseek-r1"
+            }) {
+                modelRow(name: "Newton R1 (DeepSeek)", desc: "Mathematical and formal logic", isSelected: settings.currentModelId.contains("r1"))
+            }
+            .buttonStyle(.plain)
+            
+            Button(action: {
+                settings.currentModelId = "gpt-4o"
+            }) {
+                modelRow(name: "Newton Omni (GPT-4o)", desc: "Multimodal speed and creativity", isSelected: settings.currentModelId.contains("gpt-4o"))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(8)
+        .frame(width: 260)
+    }
+    
+    @ViewBuilder
+    private func modelRow(name: String, desc: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(isSelected ? NewtonTheme.sand : Color(red: 0.75, green: 0.78, blue: 0.84))
+                .frame(width: 7, height: 7)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(Color(red: 0.10, green: 0.13, blue: 0.18))
+                
+                Text(desc)
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+            }
+            
+            Spacer()
+            
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(NewtonTheme.sand)
             }
         }
-        .padding(14)
-        .frame(width: 280)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(isSelected ? Color(red: 0.95, green: 0.96, blue: 0.98) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

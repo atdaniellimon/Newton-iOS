@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  Matches the web desktop floating sidebar card.
+//  1:1 Faithful replication of the Newton Web sidebar interface.
 //
 
 import SwiftUI
@@ -14,6 +14,7 @@ public struct MacConversationListView: View {
     @Binding public var showSettingsSheet: Bool
     @StateObject private var storage = StorageManager.shared
     @State private var searchText: String = ""
+    @State private var hoveredConversationId: String? = nil
     
     public init(selectedConversation: Binding<Conversation?>, showSettingsSheet: Binding<Bool>) {
         self._selectedConversation = selectedConversation
@@ -33,76 +34,75 @@ public struct MacConversationListView: View {
     
     public var body: some View {
         VStack(spacing: 12) {
+            // Top Navigation Segmented Pill
             topNavigationPill
+            
+            // Search Bar Capsule
             searchBar
+            
+            // New Conversation Dark Pill Button
             newChatButton
+            
+            // Conversations List
             conversationList
         }
-        .frame(width: 240)
+        .frame(width: 260)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(red: 0.89, green: 0.91, blue: 0.94), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
-        .padding(.leading, 12)
-        .padding(.vertical, 12)
+        .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 3)
+        .padding(.leading, 16)
+        .padding(.vertical, 16)
     }
     
     @ViewBuilder
     private var topNavigationPill: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            // Sidebar / List Button
             Button(action: {}) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(red: 0.25, green: 0.30, blue: 0.38))
-                    .frame(width: 32, height: 32)
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .frame(width: 34, height: 32)
             }
             .buttonStyle(.plain)
             
+            // Active Chat Tab (Dark Navy Capsule)
             Button(action: {}) {
                 ZStack {
                     Capsule()
                         .fill(Color(red: 0.06, green: 0.09, blue: 0.16))
-                        .frame(width: 44, height: 32)
+                        .frame(width: 52, height: 32)
+                    
                     Image(systemName: "bubble.left.fill")
-                        .font(.system(size: 13))
+                        .font(.system(size: 12.5))
                         .foregroundColor(.white)
                 }
             }
             .buttonStyle(.plain)
             
-            Button(action: {
-                let ghost = storage.createGhostConversation()
-                selectedConversation = ghost
-            }) {
-                Image(systemName: "ghost")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.plain)
-            .help("Start ephemeral Ghost Session (no history saved)")
-            
+            // Settings Gear Button
             Button(action: {
                 showSettingsSheet = true
             }) {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(red: 0.25, green: 0.30, blue: 0.38))
-                    .frame(width: 32, height: 32)
+                    .font(.system(size: 13.5, weight: .medium))
+                    .foregroundColor(Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .frame(width: 34, height: 32)
             }
             .buttonStyle(.plain)
-            .help("Settings & API Keys")
+            .help("Settings & Engine Preferences")
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(Color(red: 0.95, green: 0.96, blue: 0.98))
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
+                .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
         )
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
@@ -111,32 +111,44 @@ public struct MacConversationListView: View {
     
     @ViewBuilder
     private var searchBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
+                .font(.system(size: 11.5))
                 .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
             
             TextField("Search chats...", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
+            
+            if !searchText.isEmpty {
+                Button(action: { searchText = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(red: 0.65, green: 0.70, blue: 0.76))
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(red: 0.98, green: 0.98, blue: 0.99))
+        .clipShape(Capsule())
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
+            Capsule()
+                .stroke(Color(red: 0.90, green: 0.92, blue: 0.95), lineWidth: 0.8)
         )
         .padding(.horizontal, 14)
     }
     
     @ViewBuilder
     private var newChatButton: some View {
-        Button(action: createNewChat) {
+        Button(action: {
+            let newConvo = storage.createConversation()
+            selectedConversation = newConvo
+        }) {
             HStack(spacing: 8) {
                 Image(systemName: "bubble.left")
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, weight: .semibold))
                 
                 Text("New conversation")
                     .font(.system(size: 12.5, weight: .semibold))
@@ -145,75 +157,88 @@ public struct MacConversationListView: View {
             }
             .foregroundColor(.white)
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, 10)
             .background(Color(red: 0.06, green: 0.09, blue: 0.16))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 14)
+        .padding(.top, 2)
     }
     
     @ViewBuilder
     private var conversationList: some View {
         ScrollView {
             LazyVStack(spacing: 4) {
-                ForEach(filteredConversations) { conv in
-                    MacConversationRowView(
-                        conversation: conv,
-                        isSelected: conv.id == selectedConversation?.id,
-                        onSelect: {
-                            selectedConversation = conv
-                        },
-                        onDelete: {
-                            storage.deleteConversation(id: conv.id)
-                            if selectedConversation?.id == conv.id {
+                ForEach(filteredConversations) { convo in
+                    conversationRow(convo)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        }
+    }
+    
+    @ViewBuilder
+    private func conversationRow(_ convo: Conversation) -> some View {
+        let isSelected = selectedConversation?.id == convo.id
+        let isHovered = hoveredConversationId == convo.id
+        
+        Button(action: {
+            selectedConversation = convo
+        }) {
+            HStack(spacing: 8) {
+                if convo.isGhost {
+                    Image(systemName: "ghost.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                } else if convo.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(NewtonTheme.sand)
+                }
+                
+                Text(convo.title.isEmpty ? "New Conversation" : convo.title)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                
+                Spacer()
+                
+                if isHovered || isSelected {
+                    Menu {
+                        Button(convo.isPinned ? "Unpin" : "Pin to Top") {
+                            storage.togglePin(id: convo.id)
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            storage.deleteConversation(id: convo.id)
+                            if selectedConversation?.id == convo.id {
                                 selectedConversation = storage.conversations.first
                             }
                         }
-                    )
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+                            .frame(width: 20, height: 20)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 20)
                 }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-        }
-    }
-    
-    private func createNewChat() {
-        let newConv = storage.createConversation()
-        selectedConversation = newConv
-    }
-}
-
-public struct MacConversationRowView: View {
-    public let conversation: Conversation
-    public let isSelected: Bool
-    public let onSelect: () -> Void
-    public let onDelete: () -> Void
-    
-    public var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 6) {
-                if conversation.isGhost {
-                    Image(systemName: "ghost.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
-                }
-                
-                Text(conversation.title.isEmpty ? "New Conversation" : conversation.title)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.25, green: 0.30, blue: 0.38))
-                    .lineLimit(1)
-                
-                Spacer()
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color(red: 0.92, green: 0.95, blue: 0.98) : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? Color(red: 0.94, green: 0.96, blue: 0.98) : (isHovered ? Color(red: 0.97, green: 0.98, blue: 0.99) : Color.clear))
+            )
         }
         .buttonStyle(.plain)
-        .contextMenu {
-            Button("Delete", role: .destructive, action: onDelete)
+        .onHover { hovering in
+            hoveredConversationId = hovering ? convo.id : nil
         }
     }
 }

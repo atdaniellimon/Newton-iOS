@@ -76,6 +76,12 @@ if [ -f "mac/NewtonMac/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" ]; t
     rm -rf build/icon.iconset
 fi
 
+# 3.1 Copy Newton Hand-Drawn Logo and compile Assets
+if [ -f "mac/NewtonMac/Assets.xcassets/NewtonLogo.imageset/newton_logo.png" ]; then
+    cp -f "mac/NewtonMac/Assets.xcassets/NewtonLogo.imageset/newton_logo.png" "$RESOURCES_DIR/NewtonLogo.png"
+fi
+actool mac/NewtonMac/Assets.xcassets --compile "$RESOURCES_DIR" --platform macosx --minimum-deployment-target 12.0 --app-icon AppIcon --output-partial-info-plist /tmp/partial.plist >/dev/null 2>&1 || true
+
 # 4. Ad-hoc codesign
 codesign --force --deep --sign - "$APP_DIR"
 
