@@ -27,6 +27,14 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Newton uses your location for real-time location and weather Orbits.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Newton accesses reminders to organize your tasks.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Newton accesses calendar to manage your schedule.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Newton requires microphone access for voice conversations.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

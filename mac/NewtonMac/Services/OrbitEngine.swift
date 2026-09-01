@@ -194,12 +194,45 @@ public final class OrbitEngine {
             let mathResult = evaluateExpression(expr)
             return OrbitExecutionResult(orbitName: "calculator", params: paramsJson, result: mathResult, isSuccess: true)
             
-        case "time", "date":
-            let formatter = DateFormatter()
-            formatter.dateStyle = .full
-            formatter.timeStyle = .medium
-            let nowStr = formatter.string(from: Date())
-            return OrbitExecutionResult(orbitName: "time", params: paramsJson, result: nowStr, isSuccess: true)
+        case "sequential_thinking", "think", "reason":
+            let thought = params["thought"] as? String ?? paramsJson
+            let thoughtNum = params["thoughtNumber"] as? Int ?? (params["thought_number"] as? Int ?? 1)
+            let totalThoughts = params["totalThoughts"] as? Int ?? (params["total_thoughts"] as? Int ?? 1)
+            let isRevision = params["isRevision"] as? Bool ?? false
+            let label = "🧠 [Sequential Thought \(thoughtNum)/\(totalThoughts)\(isRevision ? " (Revision)" : "")]: \(thought)"
+            return OrbitExecutionResult(orbitName: "sequential_thinking", params: paramsJson, result: label, isSuccess: true)
+            
+        case "location", "get_location", "gps":
+            let locationInfo = await DeviceBridgeService.shared.getCurrentLocation()
+            return OrbitExecutionResult(orbitName: "location", params: paramsJson, result: locationInfo, isSuccess: true)
+            
+        case "time", "date", "clock", "datetime", "get_time":
+            let timeInfo = DeviceBridgeService.shared.getFormattedDateTime()
+            return OrbitExecutionResult(orbitName: "time", params: paramsJson, result: timeInfo, isSuccess: true)
+            
+        case "reminders", "get_reminders", "list_reminders":
+            let filter = params["filter"] as? String ?? "all"
+            let remindersList = await DeviceBridgeService.shared.getReminders(filter: filter)
+            return OrbitExecutionResult(orbitName: "reminders", params: paramsJson, result: remindersList, isSuccess: true)
+            
+        case "create_reminder", "add_reminder", "set_reminder":
+            let title = params["title"] as? String ?? paramsJson
+            let due = params["dueDate"] as? String ?? (params["due_date"] as? String ?? (params["due"] as? String ?? ""))
+            let result = DeviceBridgeService.shared.createReminder(title: title, dueDate: due)
+            return OrbitExecutionResult(orbitName: "create_reminder", params: paramsJson, result: result, isSuccess: true)
+            
+        case "calendar", "get_calendar", "events", "list_events":
+            let days = params["days"] as? Int ?? 7
+            let calendarEvents = await DeviceBridgeService.shared.getCalendarEvents(daysAhead: days)
+            return OrbitExecutionResult(orbitName: "calendar", params: paramsJson, result: calendarEvents, isSuccess: true)
+            
+        case "create_event", "add_event", "schedule_event":
+            let title = params["title"] as? String ?? "Reunión"
+            let startDate = params["startDate"] as? String ?? (params["start_date"] as? String ?? (params["date"] as? String ?? ""))
+            let endDate = params["endDate"] as? String ?? (params["end_date"] as? String ?? "")
+            let notes = params["notes"] as? String ?? (params["description"] as? String ?? "")
+            let result = DeviceBridgeService.shared.createCalendarEvent(title: title, startDate: startDate, endDate: endDate, notes: notes)
+            return OrbitExecutionResult(orbitName: "create_event", params: paramsJson, result: result, isSuccess: true)
             
         case "generate_pdf", "pdf", "create_pdf", "make_pdf":
             var title = "Documento Newton"

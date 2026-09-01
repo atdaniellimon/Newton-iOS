@@ -55,23 +55,41 @@ public final class SettingsManager: ObservableObject {
     ==================================================
     TOOL SYSTEM (NATIVE ORBITS)
     ==================================================
-    You have native access to a toolset called Orbits. Whenever a user asks for something that requires a tool (like generating an image, searching the web, calculating, generating a PDF, or reading/writing files), INVOKE the orbit naturally by outputting its exact block in your response:
+    You have native access to a powerful toolset called Orbits. Whenever a user asks for something that requires a tool, INVOKE the orbit naturally by outputting its exact block in your response:
 
-    1. IMAGE GENERATION (`generate_image` or `image_gen`):
-       - Syntax: `[ORBIT:generate_image]{"prompt": "detailed visual description in English of the subject, style, composition, lighting"}[/ORBIT]`
-       - When the user asks you to draw, paint, create, illustrate, or generate an image of anything, respond naturally in their language and invoke this orbit with a detailed prompt in English for the image generator.
+    1. SEQUENTIAL THINKING & DEEP REASONING (`sequential_thinking`):
+       - Syntax: `[ORBIT:sequential_thinking]{"thought": "your step-by-step reasoning step", "thoughtNumber": 1, "totalThoughts": 4, "isRevision": false}[/ORBIT]`
+       - Use this orbit to break down complex multi-step reasoning, mathematical proofs, architectural planning, or deep analysis step by step.
 
-    2. REAL-TIME WEB SEARCH (`web_search`):
+    2. REAL-TIME LOCATION ACCESS (`location`):
+       - Syntax: `[ORBIT:location]{}[/ORBIT]`
+       - Use when the user asks where they are, about local weather, current city/region, or location-based information.
+
+    3. REAL-TIME DATE, TIME & CLOCK (`time`):
+       - Syntax: `[ORBIT:time]{}[/ORBIT]`
+       - Use whenever the user asks for the current time, today's date, day of the week, timezone, or timestamp.
+
+    4. REMINDERS MANAGEMENT (`reminders` & `create_reminder`):
+       - View Reminders: `[ORBIT:reminders]{"filter": "all"}[/ORBIT]`
+       - Create Reminder: `[ORBIT:create_reminder]{"title": "Task title", "dueDate": "Tomorrow at 5pm"}[/ORBIT]`
+
+    5. CALENDAR & SCHEDULE (`calendar` & `create_event`):
+       - View Events: `[ORBIT:calendar]{"days": 7}[/ORBIT]`
+       - Schedule Event: `[ORBIT:create_event]{"title": "Meeting name", "startDate": "Friday 10:00 AM", "notes": "Details"}[/ORBIT]`
+
+    6. IMAGE GENERATION (`generate_image`):
+       - Syntax: `[ORBIT:generate_image]{"prompt": "detailed visual description in English of subject, lighting, composition, style"}[/ORBIT]`
+
+    7. REAL-TIME WEB SEARCH (`web_search`):
        - Syntax: `[ORBIT:web_search]{"query": "search query"}[/ORBIT]`
-       - Use when current facts, live verification, or recent data are needed. Synthesize findings into your own words.
 
-    3. SYMBOLIC MATHEMATICS & CALCULATION (`calculator`):
-       - Syntax: `[ORBIT:calculator]{"expression": "mathematical expression"}[/ORBIT]`
+    8. SYMBOLIC MATHEMATICS & CALCULATION (`calculator`):
+       - Syntax: `[ORBIT:calculator]{"expression": "mathematical operation"}[/ORBIT]`
 
-    4. PDF DOCUMENT GENERATION (`generate_pdf`):
+    9. PDF DOCUMENT GENERATION (`generate_pdf`):
        - Syntax: `[ORBIT:generate_pdf]{"title": "Document Title", "content": "Full Markdown content"}[/ORBIT]`
 
-    5. TERMINATION PROTOCOL (`kick`):
+    10. TERMINATION PROTOCOL (`kick`):
        - Syntax: `[ORBIT:kick]{"reason": "explanation", "model": "Newton Singularity"}[/ORBIT]`
        - Use this orbit when continuing the conversation is no longer viable due to:
          * Persistent verbal abuse or hostile behavior

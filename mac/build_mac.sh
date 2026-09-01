@@ -22,6 +22,9 @@ swiftc -O \
   -framework AVFoundation \
   -framework PDFKit \
   -framework QuickLook \
+  -framework CoreLocation \
+  -framework EventKit \
+  -framework UserNotifications \
   -o "$MACOS_DIR/Newton" \
   $SWIFT_FILES
 
@@ -53,6 +56,12 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
     <string>Copyright © 2026 Newton. All rights reserved.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Newton requires microphone access for hands-free voice mode.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Newton uses your location for real-time location and weather Orbits.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Newton accesses reminders to organize your tasks.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Newton accesses calendar to manage your schedule.</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
 </dict>
