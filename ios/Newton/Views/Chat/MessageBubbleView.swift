@@ -450,8 +450,23 @@ public struct GeneratedImageCardView: View {
 public struct FormattedAssistantContent: View {
     public let content: String
     
+    private var cleanContent: String {
+        var text = content
+        // Strip any full or partially streaming [ORBIT:name]...[/ORBIT] tags
+        let orbitPattern = "\\[ORBIT:[\\w\\-_]+\\][\\s\\S]*?(?:\\[/ORBIT\\]|$)"
+        if let regex = try? NSRegularExpression(pattern: orbitPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        // Strip json tool calls
+        let jsonPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```"
+        if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
     private var blocks: [ContentBlock] {
-        parseContentBlocks(content)
+        parseContentBlocks(cleanContent)
     }
     
     public var body: some View {

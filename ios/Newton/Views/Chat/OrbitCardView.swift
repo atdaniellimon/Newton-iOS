@@ -84,6 +84,11 @@ public struct PDFDocumentCardView: View {
            let title = json["title"] as? String, !title.isEmpty {
             return title
         }
+        if let titleRegex = try? NSRegularExpression(pattern: "\"title\"\\s*:\\s*\"([^\"]+)\""),
+           let match = titleRegex.firstMatch(in: result.params, range: NSRange(location: 0, length: (result.params as NSString).length)),
+           match.numberOfRanges > 1 {
+            return (result.params as NSString).substring(with: match.range(at: 1))
+        }
         if let pdfUrl = pdfUrl {
             return pdfUrl.deletingPathExtension().lastPathComponent
         }
