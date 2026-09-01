@@ -19,8 +19,8 @@ public final class OrbitEngine {
         var results: [OrbitExecutionResult] = []
         var detectedImageUrl: String? = nil
         
-        // 1. Process explicit [ORBIT:name]{...}
-        let pattern = "\\[ORBIT:(\\w+)\\]\\s*(\\{[\\s\\S]*?\\})(?:\\s*\\[/ORBIT\\])?"
+        // 1. Process explicit [ORBIT:name]...[/ORBIT]
+        let pattern = "\\[ORBIT:(\\w+)\\]([\\s\\S]*?)(?:\\[/ORBIT\\]|$)"
         if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
             let nsString = text as NSString
             let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
@@ -29,7 +29,7 @@ public final class OrbitEngine {
                 guard match.numberOfRanges >= 3 else { continue }
                 let fullMatch = nsString.substring(with: match.range(at: 0))
                 let orbitName = nsString.substring(with: match.range(at: 1))
-                let paramsJson = nsString.substring(with: match.range(at: 2))
+                let paramsJson = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 let result = await executeOrbit(name: orbitName, paramsJson: paramsJson, baseUrl: baseUrl, apiKey: apiKey)
                 results.append(result)
@@ -38,12 +38,13 @@ public final class OrbitEngine {
                     detectedImageUrl = result.result
                 }
                 
-                let replacement = (orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" || orbitName.lowercased() == "generate_image") ? "" : "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
+                let isCardOrbit = ["image_gen", "imagine", "generate_image", "generate_pdf", "pdf", "create_pdf", "make_pdf"].contains(orbitName.lowercased())
+                let replacement = isCardOrbit ? "" : "\n\n> **Orbit (\(orbitName))**: \(result.result)\n\n"
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: replacement)
             }
         }
         
-        // 2. Process JSON tool calls ```json { "name": "generate_image", "parameters": { "prompt": "..." } } ```
+        // 2. Process JSON tool calls ```json { "name": "...", "parameters": { ... } } ```
         let jsonToolPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"parameters\"\\s*:\\s*(\\{[\\s\\S]*?\\})\\s*\\}\\s*```"
         if let regex = try? NSRegularExpression(pattern: jsonToolPattern, options: [.caseInsensitive]) {
             let nsString = outputText as NSString
@@ -219,12 +220,35 @@ public final class OrbitEngine {
             return OrbitExecutionResult(orbitName: "time", params: paramsJson, result: nowStr, isSuccess: true)
             
         case "generate_pdf", "pdf", "create_pdf", "make_pdf":
-            let title = params["title"] as? String ?? "Documento Newton"
-            let content = params["content"] as? String ?? paramsJson
-            if let pdfUrl = ConversationExportManager.shared.generateCustomDocumentPDF(title: title, content: content) {
-                return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "📄 Documento PDF generado: **\(title).pdf**\nListo para ver y compartir.", isSuccess: true)
+            var title = "Documento Newton"
+            var content = paramsJson
+            
+            // 1. Try standard JSON dictionary
+            if let data = paramsJson.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let t = json["title"] as? String, !t.isEmpty { title = t }
+                if let c = json["content"] as? String, !c.isEmpty { content = c }
             } else {
-                return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "Error al compilar el PDF.", isSuccess: false)
+                // 2. Regex fallback for JSON with unescaped math / newlines
+                if let titleRegex = try? NSRegularExpression(pattern: "\"title\"\\s*:\\s*\"([^\"]+)\""),
+                   let match = titleRegex.firstMatch(in: paramsJson, range: NSRange(location: 0, length: (paramsJson as NSString).length)),
+                   match.numberOfRanges > 1 {
+                    title = (paramsJson as NSString).substring(with: match.range(at: 1))
+                }
+                
+                if let contentRegex = try? NSRegularExpression(pattern: "\"content\"\\s*:\\s*\"([\\s\\S]*?)\"\\s*\\}?$"),
+                   let match = contentRegex.firstMatch(in: paramsJson, range: NSRange(location: 0, length: (paramsJson as NSString).length)),
+                   match.numberOfRanges > 1 {
+                    content = (paramsJson as NSString).substring(with: match.range(at: 1))
+                        .replacingOccurrences(of: "\\n", with: "\n")
+                        .replacingOccurrences(of: "\\\"", with: "\"")
+                }
+            }
+            
+            if let pdfUrl = ConversationExportManager.shared.generateCustomDocumentPDF(title: title, content: content) {
+                return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: pdfUrl.path, isSuccess: true)
+            } else {
+                return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "Error al generar el PDF.", isSuccess: false)
             }
             
         default:
