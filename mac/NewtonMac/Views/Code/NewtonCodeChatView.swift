@@ -1,0 +1,253 @@
+//
+//  NewtonCodeChatView.swift
+//  NewtonMac
+//
+//  Created for Newton Code on macOS.
+//  Interactive programming session view with tool chips, bash execution cards, and permission handling.
+//
+
+import SwiftUI
+import AppKit
+
+public struct NewtonCodeChatView: View {
+    @ObservedObject public var conversation: Conversation
+    @ObservedObject private var workspace = NewtonCodeWorkspaceManager.shared
+    @ObservedObject private var settings = SettingsManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    
+    @State private var inputText: String = ""
+    @State private var isStreaming: Bool = false
+    @State private var streamingText: String = ""
+    @State private var streamingTask: Task<Void, Never>? = nil
+    
+    private var isDark: Bool { colorScheme == .dark }
+    
+    public init(conversation: Conversation) {
+        self.conversation = conversation
+    }
+    
+    public var body: some View {
+        VStack(spacing: 0) {
+            // Top Workspace Header
+            topProjectHeader
+            
+            // Messages Scroll View
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        ForEach(conversation.messages) { message in
+                            codeMessageBubble(message)
+                        }
+                        
+                        if isStreaming {
+                            streamingAssistantBubble
+                        }
+                        
+                        Color.clear
+                            .frame(height: 8)
+                            .id("bottom-anchor")
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 16)
+                }
+                .onChange(of: conversation.messages.count) { _ in
+                    withAnimation {
+                        proxy.scrollTo("bottom-anchor", anchor: .bottom)
+                    }
+                }
+                .onChange(of: streamingText) { _ in
+                    proxy.scrollTo("bottom-anchor", anchor: .bottom)
+                }
+            }
+            
+            // Bottom Coding Input Bar
+            NewtonCodeInputBar(
+                text: $inputText,
+                isStreaming: isStreaming,
+                onSend: sendMessage,
+                onStop: stopStreaming
+            )
+        }
+        .background(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : Color(red: 0.97, green: 0.98, blue: 0.99))
+    }
+    
+    @ViewBuilder
+    private var topProjectHeader: some View {
+        HStack(spacing: 8) {
+            Text(conversation.title.isEmpty ? "Coding Task" : conversation.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.99) : Color(red: 0.08, green: 0.11, blue: 0.16))
+            
+            Text(workspace.activeProjectName)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : Color(red: 0.45, green: 0.50, blue: 0.58))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            
+            Spacer()
+            
+            // Terminal action buttons
+            Button(action: {}) {
+                Image(systemName: "terminal")
+                    .font(.system(size: 11.5))
+                    .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+            }
+            .buttonStyle(.plain)
+            .help("Open Terminal")
+            
+            Button(action: {}) {
+                Image(systemName: "sidebar.right")
+                    .font(.system(size: 11.5))
+                    .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+            }
+            .buttonStyle(.plain)
+            .help("Toggle Inspector")
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .overlay(
+            Rectangle()
+                .fill(isDark ? Color(red: 0.18, green: 0.22, blue: 0.28) : Color(red: 0.88, green: 0.90, blue: 0.94))
+                .frame(height: 1),
+            alignment: .bottom
+        )
+    }
+    
+    @ViewBuilder
+    private func codeMessageBubble(_ message: Message) -> some View {
+        if message.role == "user" {
+            HStack {
+                Spacer()
+                Text(message.content)
+                    .font(.system(size: 13.5))
+                    .foregroundColor(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : .white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(isDark ? NewtonTheme.sand : Color(red: 0.10, green: 0.14, blue: 0.22))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                // Collapsible tool chips if any tools ran
+                if !message.orbitResults.isEmpty {
+                    ForEach(message.orbitResults) { orbit in
+                        if orbit.orbitName == "read_file" {
+                            CodeToolChipView(title: "Read \(orbit.params)", details: orbit.result)
+                        } else if orbit.orbitName == "run_command" {
+                            CodeBashExecutionCardView(command: orbit.params, onRun: {
+                                Task { await workspace.runBashCommand(command: orbit.params) }
+                            })
+                            if !orbit.result.isEmpty {
+                                CodeToolChipView(title: "Command Output", details: orbit.result)
+                            }
+                        } else if orbit.orbitName == "edit_file" || orbit.orbitName == "write_file" {
+                            CodeToolChipView(title: "Modified \(orbit.params)", details: orbit.result)
+                        }
+                    }
+                }
+                
+                // Formatted Assistant Text & Code Blocks
+                MacFormattedAssistantContent(content: message.content)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    
+    @ViewBuilder
+    private var streamingAssistantBubble: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ThinkingOrbView(isReasoning: true)
+                    .frame(width: 18, height: 18)
+                Text("Newton Singularity is writing code & analyzing workspace...")
+                    .font(.system(size: 11.5, weight: .medium, design: .serif))
+                    .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+            }
+            .padding(.vertical, 2)
+            
+            if !streamingText.isEmpty {
+                MacFormattedAssistantContent(content: streamingText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private func sendMessage() {
+        let textToSend = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !textToSend.isEmpty else { return }
+        
+        if conversation.title.isEmpty || conversation.title == "New Conversation" {
+            conversation.title = String(textToSend.prefix(32))
+        }
+        
+        let userMsg = Message(role: "user", content: textToSend)
+        conversation.messages.append(userMsg)
+        inputText = ""
+        
+        isStreaming = true
+        streamingText = ""
+        
+        let systemPrompt = """
+        You are Newton Singularity Code Engine, specialized for software engineering, deep architecture analysis, file manipulation, and terminal execution.
+        Current active workspace: \(workspace.activeWorkspacePath)
+        Permission Mode: \(workspace.permissionMode.rawValue)
+        
+        Available Code Orbits:
+        - [ORBIT:read_file]{"path": "relative/path/to/file"}[/ORBIT]
+        - [ORBIT:write_file]{"path": "relative/path/to/file", "content": "..."}[/ORBIT]
+        - [ORBIT:edit_file]{"path": "relative/path/to/file", "target": "old", "replacement": "new"}[/ORBIT]
+        - [ORBIT:delete_file]{"path": "relative/path/to/file"}[/ORBIT]
+        - [ORBIT:run_command]{"command": "bash command"}[/ORBIT]
+        
+        Deliver direct, concise, high-performance code solutions.
+        """
+        
+        streamingTask = Task {
+            var fullStreamed = ""
+            do {
+                for try await chunk in APIService.shared.streamChat(messages: conversation.messages, systemPrompt: systemPrompt) {
+                    if Task.isCancelled { break }
+                    fullStreamed += chunk
+                    await MainActor.run {
+                        self.streamingText = fullStreamed
+                    }
+                }
+            } catch {
+                if fullStreamed.isEmpty {
+                    fullStreamed = "Connection error: \(error.localizedDescription)"
+                }
+            }
+            
+            // Process Code Orbits
+            let processed = await OrbitEngine.shared.processOrbitsInText(fullStreamed, userPrompt: textToSend)
+            
+            await MainActor.run {
+                let assistantMsg = Message(
+                    role: "assistant",
+                    content: processed.processedText.isEmpty ? fullStreamed : processed.processedText,
+                    orbitResults: processed.results
+                )
+                self.conversation.messages.append(assistantMsg)
+                self.isStreaming = false
+                self.streamingText = ""
+                StorageManager.shared.saveConversations()
+            }
+        }
+    }
+    
+    private func stopStreaming() {
+        streamingTask?.cancel()
+        streamingTask = nil
+        isStreaming = false
+        if !streamingText.isEmpty {
+            let partial = Message(role: "assistant", content: streamingText)
+            conversation.messages.append(partial)
+            streamingText = ""
+            StorageManager.shared.saveConversations()
+        }
+    }
+}

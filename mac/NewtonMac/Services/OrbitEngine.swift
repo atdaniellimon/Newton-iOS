@@ -275,6 +275,37 @@ public final class OrbitEngine {
                 return OrbitExecutionResult(orbitName: "generate_pdf", params: paramsJson, result: "Error al generar el PDF.", isSuccess: false)
             }
             
+        case "read_file", "view_file":
+            let path = params["path"] as? String ?? paramsJson.trimmingCharacters(in: .whitespacesAndNewlines)
+            let (content, error) = NewtonCodeWorkspaceManager.shared.readFile(relativePath: path)
+            if let error = error {
+                return OrbitExecutionResult(orbitName: "read_file", params: path, result: "Error: \(error)", isSuccess: false)
+            }
+            return OrbitExecutionResult(orbitName: "read_file", params: path, result: content, isSuccess: true)
+            
+        case "write_file", "create_file":
+            let path = params["path"] as? String ?? ""
+            let content = params["content"] as? String ?? ""
+            let (success, error) = NewtonCodeWorkspaceManager.shared.writeFile(relativePath: path, content: content)
+            return OrbitExecutionResult(orbitName: "write_file", params: path, result: success ? "File saved successfully" : (error ?? "Failed"), isSuccess: success)
+            
+        case "edit_file", "replace_file_content":
+            let path = params["path"] as? String ?? ""
+            let target = params["target"] as? String ?? ""
+            let replacement = params["replacement"] as? String ?? ""
+            let (success, error) = NewtonCodeWorkspaceManager.shared.editFile(relativePath: path, target: target, replacement: replacement)
+            return OrbitExecutionResult(orbitName: "edit_file", params: path, result: success ? "File edited successfully" : (error ?? "Failed"), isSuccess: success)
+            
+        case "delete_file", "remove_file":
+            let path = params["path"] as? String ?? paramsJson.trimmingCharacters(in: .whitespacesAndNewlines)
+            let (success, error) = NewtonCodeWorkspaceManager.shared.deleteFile(relativePath: path)
+            return OrbitExecutionResult(orbitName: "delete_file", params: path, result: success ? "File deleted" : (error ?? "Failed"), isSuccess: success)
+            
+        case "run_command", "bash", "terminal":
+            let cmd = params["command"] as? String ?? paramsJson.trimmingCharacters(in: .whitespacesAndNewlines)
+            let (output, exitCode) = await NewtonCodeWorkspaceManager.shared.runBashCommand(command: cmd)
+            return OrbitExecutionResult(orbitName: "run_command", params: cmd, result: output, isSuccess: exitCode == 0)
+            
         case "kick", "terminate":
             var reason = "Operational boundary violations or systematic refusal."
             if let data = paramsJson.data(using: .utf8),
