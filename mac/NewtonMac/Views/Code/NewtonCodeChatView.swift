@@ -10,7 +10,7 @@ import SwiftUI
 import AppKit
 
 public struct NewtonCodeChatView: View {
-    @ObservedObject public var conversation: Conversation
+    @Binding public var conversation: Conversation
     @ObservedObject private var workspace = NewtonCodeWorkspaceManager.shared
     @ObservedObject private var settings = SettingsManager.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -22,8 +22,8 @@ public struct NewtonCodeChatView: View {
     
     private var isDark: Bool { colorScheme == .dark }
     
-    public init(conversation: Conversation) {
-        self.conversation = conversation
+    public init(conversation: Binding<Conversation>) {
+        self._conversation = conversation
     }
     
     public var body: some View {
@@ -118,7 +118,7 @@ public struct NewtonCodeChatView: View {
     
     @ViewBuilder
     private func codeMessageBubble(_ message: Message) -> some View {
-        if message.role == "user" {
+        if message.role == .user {
             HStack {
                 Spacer()
                 Text(message.content)
@@ -139,7 +139,7 @@ public struct NewtonCodeChatView: View {
                             CodeToolChipView(title: "Read \(orbit.params)", details: orbit.result)
                         } else if orbit.orbitName == "run_command" {
                             CodeBashExecutionCardView(command: orbit.params, onRun: {
-                                Task { await workspace.runBashCommand(command: orbit.params) }
+                                Task { _ = await workspace.runBashCommand(command: orbit.params) }
                             })
                             if !orbit.result.isEmpty {
                                 CodeToolChipView(title: "Command Output", details: orbit.result)
@@ -161,8 +161,7 @@ public struct NewtonCodeChatView: View {
     private var streamingAssistantBubble: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                ThinkingOrbView(isReasoning: true)
-                    .frame(width: 18, height: 18)
+                ThinkingOrbView(size: 18)
                 Text("Newton Singularity is writing code & analyzing workspace...")
                     .font(.system(size: 11.5, weight: .medium, design: .serif))
                     .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
@@ -184,7 +183,7 @@ public struct NewtonCodeChatView: View {
             conversation.title = String(textToSend.prefix(32))
         }
         
-        let userMsg = Message(role: "user", content: textToSend)
+        let userMsg = Message(role: .user, content: textToSend)
         conversation.messages.append(userMsg)
         inputText = ""
         
@@ -209,7 +208,15 @@ public struct NewtonCodeChatView: View {
         streamingTask = Task {
             var fullStreamed = ""
             do {
-                for try await chunk in APIService.shared.streamChat(messages: conversation.messages, systemPrompt: systemPrompt) {
+                let stream = LLMService.shared.streamCompletion(
+                    messages: conversation.messages,
+                    provider: conversation.provider,
+                    modelId: conversation.modelId,
+                    baseUrl: settings.customBaseUrl,
+                    apiKey: settings.customApiKey,
+                    systemPrompt: systemPrompt
+                )
+                for try await chunk in stream {
                     if Task.isCancelled { break }
                     fullStreamed += chunk
                     await MainActor.run {
@@ -227,7 +234,7 @@ public struct NewtonCodeChatView: View {
             
             await MainActor.run {
                 let assistantMsg = Message(
-                    role: "assistant",
+                    role: .assistant,
                     content: processed.processedText.isEmpty ? fullStreamed : processed.processedText,
                     orbitResults: processed.results
                 )
@@ -244,7 +251,7 @@ public struct NewtonCodeChatView: View {
         streamingTask = nil
         isStreaming = false
         if !streamingText.isEmpty {
-            let partial = Message(role: "assistant", content: streamingText)
+            let partial = Message(role: .assistant, content: streamingText)
             conversation.messages.append(partial)
             streamingText = ""
             StorageManager.shared.saveConversations()

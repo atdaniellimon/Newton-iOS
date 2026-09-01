@@ -184,7 +184,7 @@ public struct MacConversationListView: View {
             // Action Buttons: + New & Customize
             HStack(spacing: 8) {
                 Button(action: {
-                    let newConvo = storage.createConversation()
+                    var newConvo = storage.createConversation()
                     newConvo.title = "Task in \(workspace.activeProjectName)"
                     selectedConversation = newConvo
                 }) {
@@ -240,7 +240,7 @@ public struct MacConversationListView: View {
                                 Button(action: {
                                     workspace.activeWorkspacePath = proj.path
                                     workspace.activeProjectName = proj.name
-                                    let newConvo = storage.createConversation()
+                                    var newConvo = storage.createConversation()
                                     newConvo.title = "Task in \(proj.name)"
                                     selectedConversation = newConvo
                                 }) {

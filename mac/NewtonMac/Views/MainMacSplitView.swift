@@ -32,18 +32,17 @@ public struct MainMacSplitView: View {
             // Main Canvas Area
             if selectedSidebarTab == .code {
                 if let selected = bindingForSelectedConversation(), !selected.wrappedValue.messages.isEmpty {
-                    NewtonCodeChatView(conversation: selected.wrappedValue)
+                    NewtonCodeChatView(conversation: selected)
                 } else {
                     NewtonCodeDashboardView(
                         inputPrompt: $dashboardPrompt,
                         onStartTask: { prompt in
-                            let newConvo = storage.createConversation()
+                            var newConvo = storage.createConversation()
                             newConvo.title = String(prompt.prefix(28))
-                            selectedConversation = newConvo
-                            
-                            // Send initial task
-                            let userMsg = Message(role: "user", content: prompt)
+                            let userMsg = Message(role: .user, content: prompt)
                             newConvo.messages.append(userMsg)
+                            storage.updateConversation(newConvo)
+                            selectedConversation = newConvo
                         }
                     )
                 }
