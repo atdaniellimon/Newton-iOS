@@ -14,12 +14,13 @@ public final class LiveActivityManager: ObservableObject {
     public static let shared = LiveActivityManager()
     
     #if canImport(ActivityKit)
-    private var currentActivity: Activity<NewtonActivityAttributes>?
+    private var _activityObj: Any? = nil
     #endif
     
     private init() {}
     
     public func startActivity(type: String, query: String, initialStatus: String = "Reasoning...") {
+        guard #available(iOS 16.2, *) else { return }
         #if canImport(ActivityKit)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
@@ -39,7 +40,7 @@ public final class LiveActivityManager: ObservableObject {
                 content: .init(state: initialState, staleDate: nil),
                 pushType: nil
             )
-            self.currentActivity = activity
+            self._activityObj = activity
         } catch {
             print("Failed to start Live Activity: \(error)")
         }
@@ -47,8 +48,9 @@ public final class LiveActivityManager: ObservableObject {
     }
     
     public func updateActivity(status: String, progress: Double, isComplete: Bool = false, preview: String? = nil) {
+        guard #available(iOS 16.2, *) else { return }
         #if canImport(ActivityKit)
-        guard let activity = currentActivity else { return }
+        guard let activity = _activityObj as? Activity<NewtonActivityAttributes> else { return }
         
         let updatedState = NewtonActivityAttributes.ContentState(
             title: activity.attributes.activityType == "image_gen" ? "Generating Artwork" : "Newton Singularity",
@@ -63,18 +65,19 @@ public final class LiveActivityManager: ObservableObject {
             if isComplete {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 await activity.end(.init(state: updatedState, staleDate: nil), dismissalPolicy: .immediate)
-                self.currentActivity = nil
+                self._activityObj = nil
             }
         }
         #endif
     }
     
     public func endCurrentActivity() {
+        guard #available(iOS 16.2, *) else { return }
         #if canImport(ActivityKit)
-        guard let activity = currentActivity else { return }
+        guard let activity = _activityObj as? Activity<NewtonActivityAttributes> else { return }
         Task {
             await activity.end(nil, dismissalPolicy: .immediate)
-            self.currentActivity = nil
+            self._activityObj = nil
         }
         #endif
     }

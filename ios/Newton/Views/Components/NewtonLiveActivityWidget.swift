@@ -10,8 +10,13 @@ import SwiftUI
 import WidgetKit
 import ActivityKit
 
+@available(iOS 16.2, *)
 public struct NewtonLiveActivityWidgetView: View {
     let context: ActivityViewContext<NewtonActivityAttributes>
+    
+    public init(context: ActivityViewContext<NewtonActivityAttributes>) {
+        self.context = context
+    }
     
     public var body: some View {
         // Lock Screen Banner UI
