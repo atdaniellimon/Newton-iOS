@@ -21,7 +21,6 @@ public struct MacHero3DCanvasView: NSViewRepresentable {
         let scnView = SCNView(frame: .zero)
         scnView.backgroundColor = NSColor.clear
         scnView.antialiasingMode = .multisampling4X
-        scnView.isOpaque = false
         scnView.preferredFramesPerSecond = 60
         scnView.autoenablesDefaultLighting = false
         scnView.allowsCameraControl = false
