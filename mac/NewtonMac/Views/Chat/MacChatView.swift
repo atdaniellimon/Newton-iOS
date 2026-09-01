@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  1:1 Faithful replication of the Newton Web desktop interface with high performance.
+//  1:1 Faithful replication of the Newton Web desktop interface with full Light & Dark mode.
 //
 
 import SwiftUI
@@ -14,6 +14,7 @@ public struct MacChatView: View {
     @Binding public var conversation: Conversation
     @StateObject private var storage = StorageManager.shared
     @StateObject private var settings = SettingsManager.shared
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var inputText: String = ""
     @State private var isStreaming: Bool = false
@@ -26,9 +27,11 @@ public struct MacChatView: View {
         self._conversation = conversation
     }
     
+    private var isDark: Bool { colorScheme == .dark }
+    
     public var body: some View {
         ZStack {
-            // Background Kinetic 3D Wireframe Mesh (Hardware Accelerated)
+            // Background Kinetic 3D Wave Grid (120Hz Canvas matching iOS)
             MacHero3DCanvasView(isThinking: isStreaming)
                 .ignoresSafeArea()
             
@@ -89,26 +92,26 @@ public struct MacChatView: View {
             }) {
                 HStack(spacing: 7) {
                     Circle()
-                        .fill(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95) : Color(red: 0.65, green: 0.70, blue: 0.76))
+                        .fill(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95) : (isDark ? NewtonTheme.sand : Color(red: 0.65, green: 0.70, blue: 0.76)))
                         .frame(width: 7, height: 7)
                     
                     Text(conversation.isGhost ? "Ghost Session" : modelDisplayName)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(red: 0.12, green: 0.15, blue: 0.20))
+                        .foregroundColor(isDark ? Color(red: 0.92, green: 0.94, blue: 0.98) : Color(red: 0.12, green: 0.15, blue: 0.20))
                     
                     Image(systemName: "chevron.down")
                         .font(.system(size: 8.5, weight: .semibold))
-                        .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+                        .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.55, green: 0.60, blue: 0.68))
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.white)
+                .background(isDark ? Color(red: 0.14, green: 0.17, blue: 0.22) : Color.white)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
+                        .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
                 )
-                .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
+                .shadow(color: Color.black.opacity(isDark ? 0.20 : 0.02), radius: 3, x: 0, y: 1)
             }
             .buttonStyle(.plain)
             
@@ -122,7 +125,7 @@ public struct MacChatView: View {
                         .foregroundColor(Color(red: 0.92, green: 0.35, blue: 0.30))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.white)
+                        .background(isDark ? Color(red: 0.14, green: 0.17, blue: 0.22) : Color.white)
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
@@ -149,23 +152,25 @@ public struct MacChatView: View {
                 if let img = NSImage(named: "NewtonLogo") ?? NSImage(contentsOfFile: Bundle.main.bundlePath + "/Contents/Resources/NewtonLogo.png") {
                     Image(nsImage: img)
                         .resizable()
+                        .renderingMode(isDark ? .template : .original)
                         .scaledToFit()
+                        .foregroundColor(isDark ? NewtonTheme.sand : nil)
                         .frame(width: 58, height: 58)
                 } else {
                     Image(systemName: "lightbulb")
                         .font(.system(size: 42, weight: .light))
-                        .foregroundColor(Color(red: 0.10, green: 0.13, blue: 0.18))
+                        .foregroundColor(isDark ? NewtonTheme.sand : Color(red: 0.10, green: 0.13, blue: 0.18))
                 }
                 
                 Text("Newton")
                     .font(.system(size: 15, weight: .bold, design: .serif))
-                    .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+                    .foregroundColor(isDark ? Color(red: 0.92, green: 0.94, blue: 0.98) : Color(red: 0.08, green: 0.11, blue: 0.16))
             }
             
             // Hero Serif Headline matching screenshot
             Text("What will you discover today?")
                 .font(.system(size: 26, weight: .regular, design: .serif))
-                .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+                .foregroundColor(isDark ? Color(red: 0.92, green: 0.94, blue: 0.98) : Color(red: 0.08, green: 0.11, blue: 0.16))
                 .padding(.bottom, 8)
             
             // 2x2 Suggestion Cards Grid matching screenshot 1:1
@@ -218,30 +223,30 @@ public struct MacChatView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 15))
-                    .foregroundColor(Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .foregroundColor(isDark ? NewtonTheme.sand : Color(red: 0.35, green: 0.40, blue: 0.48))
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color(red: 0.08, green: 0.11, blue: 0.16))
+                        .foregroundColor(isDark ? Color(red: 0.92, green: 0.94, blue: 0.98) : Color(red: 0.08, green: 0.11, blue: 0.16))
                     
                     Text(subtitle)
                         .font(.system(size: 11.5))
-                        .foregroundColor(Color(red: 0.50, green: 0.55, blue: 0.62))
+                        .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.50, green: 0.55, blue: 0.62))
                 }
                 
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.white.opacity(0.95))
+            .background(isDark ? Color(red: 0.14, green: 0.17, blue: 0.22) : Color.white.opacity(0.95))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 1)
+                    .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.02), radius: 4, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(isDark ? 0.20 : 0.02), radius: 4, x: 0, y: 1)
         }
         .buttonStyle(.plain)
     }
@@ -279,12 +284,12 @@ public struct MacChatView: View {
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(NewtonTheme.sand)
                                 .frame(width: 32, height: 32)
-                                .background(Color.white.opacity(0.95))
+                                .background(isDark ? Color(red: 0.16, green: 0.20, blue: 0.26) : Color.white.opacity(0.95))
                                 .clipShape(Circle())
                                 .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
                                 .overlay(
                                     Circle()
-                                        .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
+                                        .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -314,11 +319,11 @@ public struct MacChatView: View {
                 .foregroundColor(NewtonTheme.coralRed)
             Text("Session ended by Newton.")
                 .font(.system(size: 13, weight: .semibold, design: .serif))
-                .foregroundColor(Color(red: 0.45, green: 0.50, blue: 0.58))
+                .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.82) : Color(red: 0.45, green: 0.50, blue: 0.58))
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 24)
-        .background(Color.white)
+        .background(isDark ? Color(red: 0.14, green: 0.17, blue: 0.22) : Color.white)
         .clipShape(Capsule())
         .overlay(
             Capsule()
@@ -505,12 +510,15 @@ public struct MacChatView: View {
 
 public struct MacModelPickerPopover: View {
     @ObservedObject var settings = SettingsManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var isDark: Bool { colorScheme == .dark }
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Select Model")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(Color(red: 0.50, green: 0.55, blue: 0.62))
+                .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.50, green: 0.55, blue: 0.62))
                 .padding(.horizontal, 8)
                 .padding(.top, 6)
             
@@ -537,23 +545,24 @@ public struct MacModelPickerPopover: View {
         }
         .padding(8)
         .frame(width: 260)
+        .background(isDark ? Color(red: 0.14, green: 0.17, blue: 0.22) : Color.white)
     }
     
     @ViewBuilder
     private func modelRow(name: String, desc: String, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(isSelected ? NewtonTheme.sand : Color(red: 0.75, green: 0.78, blue: 0.84))
+                .fill(isSelected ? NewtonTheme.sand : (isDark ? Color(red: 0.30, green: 0.35, blue: 0.42) : Color(red: 0.75, green: 0.78, blue: 0.84)))
                 .frame(width: 7, height: 7)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(Color(red: 0.10, green: 0.13, blue: 0.18))
+                    .foregroundColor(isDark ? Color(red: 0.92, green: 0.94, blue: 0.98) : Color(red: 0.10, green: 0.13, blue: 0.18))
                 
                 Text(desc)
                     .font(.system(size: 10))
-                    .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+                    .foregroundColor(isDark ? Color(red: 0.60, green: 0.65, blue: 0.72) : Color(red: 0.55, green: 0.60, blue: 0.68))
             }
             
             Spacer()
@@ -566,7 +575,7 @@ public struct MacModelPickerPopover: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(isSelected ? Color(red: 0.95, green: 0.96, blue: 0.98) : Color.clear)
+        .background(isSelected ? (isDark ? Color(red: 0.20, green: 0.25, blue: 0.32) : Color(red: 0.95, green: 0.96, blue: 0.98)) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

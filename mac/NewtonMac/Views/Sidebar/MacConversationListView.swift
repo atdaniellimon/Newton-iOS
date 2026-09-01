@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  1:1 Faithful replication of the Newton Web sidebar interface.
+//  1:1 Faithful replication of the Newton Web sidebar with full Light & Dark mode adaptation.
 //
 
 import SwiftUI
@@ -13,6 +13,9 @@ public struct MacConversationListView: View {
     @Binding public var selectedConversation: Conversation?
     @Binding public var showSettingsSheet: Bool
     @StateObject private var storage = StorageManager.shared
+    @StateObject private var settings = SettingsManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    
     @State private var searchText: String = ""
     @State private var hoveredConversationId: String? = nil
     
@@ -20,6 +23,8 @@ public struct MacConversationListView: View {
         self._selectedConversation = selectedConversation
         self._showSettingsSheet = showSettingsSheet
     }
+    
+    private var isDark: Bool { colorScheme == .dark }
     
     private var filteredConversations: [Conversation] {
         if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -47,13 +52,13 @@ public struct MacConversationListView: View {
             conversationList
         }
         .frame(width: 260)
-        .background(Color.white)
+        .background(isDark ? Color(red: 0.12, green: 0.15, blue: 0.19) : Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color(red: 0.89, green: 0.91, blue: 0.94), lineWidth: 1)
+                .stroke(isDark ? Color(red: 0.20, green: 0.24, blue: 0.30) : Color(red: 0.89, green: 0.91, blue: 0.94), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 3)
+        .shadow(color: Color.black.opacity(isDark ? 0.25 : 0.04), radius: 10, x: 0, y: 3)
         .padding(.leading, 16)
         .padding(.vertical, 16)
     }
@@ -65,21 +70,21 @@ public struct MacConversationListView: View {
             Button(action: {}) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .foregroundColor(isDark ? Color(red: 0.75, green: 0.80, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.48))
                     .frame(width: 34, height: 32)
             }
             .buttonStyle(.plain)
             
-            // Active Chat Tab (Dark Navy Capsule)
+            // Active Chat Tab (Dark Navy / Sand Capsule)
             Button(action: {}) {
                 ZStack {
                     Capsule()
-                        .fill(Color(red: 0.06, green: 0.09, blue: 0.16))
+                        .fill(isDark ? NewtonTheme.sand : Color(red: 0.06, green: 0.09, blue: 0.16))
                         .frame(width: 52, height: 32)
                     
                     Image(systemName: "bubble.left.fill")
                         .font(.system(size: 12.5))
-                        .foregroundColor(.white)
+                        .foregroundColor(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : .white)
                 }
             }
             .buttonStyle(.plain)
@@ -90,7 +95,7 @@ public struct MacConversationListView: View {
             }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 13.5, weight: .medium))
-                    .foregroundColor(Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .foregroundColor(isDark ? Color(red: 0.75, green: 0.80, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.48))
                     .frame(width: 34, height: 32)
             }
             .buttonStyle(.plain)
@@ -98,11 +103,11 @@ public struct MacConversationListView: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(Color(red: 0.95, green: 0.96, blue: 0.98))
+        .background(isDark ? Color(red: 0.16, green: 0.20, blue: 0.26) : Color(red: 0.95, green: 0.96, blue: 0.98))
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
+                .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.88, green: 0.90, blue: 0.94), lineWidth: 0.8)
         )
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
@@ -114,11 +119,12 @@ public struct MacConversationListView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11.5))
-                .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+                .foregroundColor(isDark ? Color(red: 0.55, green: 0.60, blue: 0.68) : Color(red: 0.55, green: 0.60, blue: 0.68))
             
             TextField("Search chats...", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
+                .foregroundColor(isDark ? .white : Color(red: 0.08, green: 0.11, blue: 0.16))
             
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
@@ -131,11 +137,11 @@ public struct MacConversationListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(red: 0.98, green: 0.98, blue: 0.99))
+        .background(isDark ? Color(red: 0.16, green: 0.20, blue: 0.26) : Color(red: 0.98, green: 0.98, blue: 0.99))
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(Color(red: 0.90, green: 0.92, blue: 0.95), lineWidth: 0.8)
+                .stroke(isDark ? Color(red: 0.24, green: 0.28, blue: 0.36) : Color(red: 0.90, green: 0.92, blue: 0.95), lineWidth: 0.8)
         )
         .padding(.horizontal, 14)
     }
@@ -155,12 +161,12 @@ public struct MacConversationListView: View {
                 
                 Spacer()
             }
-            .foregroundColor(.white)
+            .foregroundColor(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : .white)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color(red: 0.06, green: 0.09, blue: 0.16))
+            .background(isDark ? NewtonTheme.sand : Color(red: 0.06, green: 0.09, blue: 0.16))
             .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+            .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 14)
@@ -201,7 +207,7 @@ public struct MacConversationListView: View {
                 
                 Text(convo.title.isEmpty ? "New Conversation" : convo.title)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.35, green: 0.40, blue: 0.48))
+                    .foregroundColor(isSelected ? (isDark ? NewtonTheme.sand : Color(red: 0.06, green: 0.09, blue: 0.16)) : (isDark ? Color(red: 0.78, green: 0.82, blue: 0.88) : Color(red: 0.35, green: 0.40, blue: 0.48)))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 
@@ -222,7 +228,7 @@ public struct MacConversationListView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.55, green: 0.60, blue: 0.68))
+                            .foregroundColor(isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : Color(red: 0.55, green: 0.60, blue: 0.68))
                             .frame(width: 20, height: 20)
                     }
                     .menuStyle(.borderlessButton)
@@ -233,7 +239,7 @@ public struct MacConversationListView: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? Color(red: 0.94, green: 0.96, blue: 0.98) : (isHovered ? Color(red: 0.97, green: 0.98, blue: 0.99) : Color.clear))
+                    .fill(isSelected ? (isDark ? Color(red: 0.18, green: 0.22, blue: 0.28) : Color(red: 0.94, green: 0.96, blue: 0.98)) : (isHovered ? (isDark ? Color(red: 0.15, green: 0.18, blue: 0.24) : Color(red: 0.97, green: 0.98, blue: 0.99)) : Color.clear))
             )
         }
         .buttonStyle(.plain)

@@ -3,7 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  Matches the web desktop layout.
+//  Matches the web desktop layout with full Light & Dark mode adaptation.
 //
 
 import SwiftUI
@@ -11,8 +11,10 @@ import AppKit
 
 public struct MainMacSplitView: View {
     @StateObject private var storage = StorageManager.shared
+    @StateObject private var settings = SettingsManager.shared
     @State private var selectedConversation: Conversation? = nil
     @State private var showSettingsSheet: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
     
     public var body: some View {
         HStack(spacing: 0) {
@@ -32,10 +34,11 @@ public struct MainMacSplitView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.white)
+                .background(colorScheme == .dark ? Color(red: 0.08, green: 0.10, blue: 0.13) : Color(red: 0.98, green: 0.98, blue: 0.99))
             }
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 0.99))
+        .background(colorScheme == .dark ? Color(red: 0.08, green: 0.10, blue: 0.13) : Color(red: 0.98, green: 0.98, blue: 0.99))
+        .preferredColorScheme(settings.appTheme.colorScheme)
         .onAppear {
             if selectedConversation == nil {
                 selectedConversation = storage.conversations.first ?? storage.createConversation()

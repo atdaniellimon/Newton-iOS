@@ -15,6 +15,22 @@ public enum AppThemeMode: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     public var displayName: String { rawValue }
+    
+    public var iconName: String {
+        switch self {
+        case .system: return "laptopcomputer"
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.stars.fill"
+        }
+    }
+    
+    public var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
 }
 
 public struct NewtonTheme {

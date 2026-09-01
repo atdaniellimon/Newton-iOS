@@ -3,91 +3,105 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
-//  High-performance hardware-accelerated 3D wireframe mesh with 0% CPU overhead.
+//  120Hz GPU-accelerated 3D Undulating Kinetic Wave Grid matching iOS & Web canvas.
 //
 
 import SwiftUI
-import SceneKit
 import AppKit
 
-public struct MacHero3DCanvasView: NSViewRepresentable {
+public struct MacHero3DCanvasView: View {
     public var isThinking: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
     
     public init(isThinking: Bool = false) {
         self.isThinking = isThinking
     }
     
-    public func makeNSView(context: Context) -> SCNView {
-        let scnView = SCNView(frame: .zero)
-        scnView.backgroundColor = NSColor.clear
-        scnView.antialiasingMode = .multisampling4X
-        scnView.preferredFramesPerSecond = 60
-        scnView.autoenablesDefaultLighting = false
-        scnView.allowsCameraControl = false
-        
-        let scene = SCNScene()
-        scene.background.contents = NSColor.clear
-        
-        // Create 3D Gravitational Topographic Grid
-        let plane = SCNPlane(width: 80, height: 80)
-        plane.widthSegmentCount = 40
-        plane.heightSegmentCount = 40
-        
-        let material = SCNMaterial()
-        material.fillMode = .lines
-        material.diffuse.contents = NSColor(red: 0.40, green: 0.46, blue: 0.54, alpha: 0.12)
-        material.isDoubleSided = true
-        plane.materials = [material]
-        
-        let meshNode = SCNNode(geometry: plane)
-        meshNode.name = "meshNode"
-        meshNode.eulerAngles = SCNVector3(x: -CGFloat.pi / 2.7, y: 0, z: 0)
-        meshNode.position = SCNVector3(x: 0, y: -6, z: -12)
-        
-        // Gentle undulating wave animation
-        let waveUp = SCNAction.moveBy(x: 0, y: 1.2, z: 0, duration: 6.0)
-        waveUp.timingMode = .easeInEaseOut
-        let waveDown = SCNAction.moveBy(x: 0, y: -1.2, z: 0, duration: 6.0)
-        waveDown.timingMode = .easeInEaseOut
-        let sequence = SCNAction.sequence([waveUp, waveDown])
-        meshNode.runAction(SCNAction.repeatForever(sequence), forKey: "waveAction")
-        
-        scene.rootNode.addChildNode(meshNode)
-        
-        // Camera with perspective
-        let camera = SCNCamera()
-        camera.zFar = 200
-        camera.fieldOfView = 55
-        let cameraNode = SCNNode()
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(x: 0, y: 8, z: 22)
-        cameraNode.eulerAngles = SCNVector3(x: -CGFloat.pi / 9, y: 0, z: 0)
-        scene.rootNode.addChildNode(cameraNode)
-        
-        // Soft Ambient Light
-        let ambient = SCNLight()
-        ambient.type = .ambient
-        ambient.color = NSColor(white: 0.9, alpha: 1.0)
-        let ambientNode = SCNNode()
-        ambientNode.light = ambient
-        scene.rootNode.addChildNode(ambientNode)
-        
-        scnView.scene = scene
-        return scnView
-    }
-    
-    public func updateNSView(_ nsView: SCNView, context: Context) {
-        guard let meshNode = nsView.scene?.rootNode.childNode(withName: "meshNode", recursively: true) else { return }
-        
-        // Adjust animation speed smoothly when streaming without rebuilding scene
-        if isThinking {
-            meshNode.removeAction(forKey: "waveAction")
-            let waveUp = SCNAction.moveBy(x: 0, y: 1.5, z: 0, duration: 2.2)
-            waveUp.timingMode = .easeInEaseOut
-            let waveDown = SCNAction.moveBy(x: 0, y: -1.5, z: 0, duration: 2.2)
-            waveDown.timingMode = .easeInEaseOut
-            let sequence = SCNAction.sequence([waveUp, waveDown])
-            meshNode.runAction(SCNAction.repeatForever(sequence), forKey: "waveAction")
+    public var body: some View {
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            let isDark = colorScheme == .dark
+            let speedMultiplier = isThinking ? 1.8 : 0.85
+            
+            Canvas { context, size in
+                let w = size.width
+                let h = size.height
+                let cx = w / 2.0
+                let cy = h * 0.60
+                
+                let rows = 36
+                let cols = 34
+                let gridSpacing: CGFloat = 32.0
+                let cameraHeight: CGFloat = 200.0
+                let fov: CGFloat = 400.0
+                
+                var gridPoints: [[CGPoint]] = Array(repeating: Array(repeating: .zero, count: cols), count: rows)
+                
+                for r in 0..<rows {
+                    for c in 0..<cols {
+                        let xWorld = (CGFloat(c) - CGFloat(cols) / 2.0) * gridSpacing
+                        let zWorld = CGFloat(r) * gridSpacing + 25.0
+                        
+                        // Wave equation: dynamic harmonic kinetic wave motion
+                        let u = Double(xWorld) * 0.032
+                        let v = Double(zWorld) * 0.032
+                        let wave = sin(u + time * speedMultiplier) * cos(v + time * speedMultiplier) * 36.0
+                        let yWorld = wave - 10.0
+                        
+                        let depth = zWorld
+                        guard depth > 10 else { continue }
+                        let scale = fov / (fov + depth)
+                        
+                        let xProj = cx + xWorld * scale
+                        let yProj = cy + (cameraHeight - yWorld) * scale
+                        
+                        gridPoints[r][c] = CGPoint(x: xProj, y: yProj)
+                    }
+                }
+                
+                // Draw Horizontal Wave Lines
+                for r in 0..<rows {
+                    var path = Path()
+                    var started = false
+                    for c in 0..<cols {
+                        let pt = gridPoints[r][c]
+                        if pt != .zero {
+                            if !started {
+                                path.move(to: pt)
+                                started = true
+                            } else {
+                                path.addLine(to: pt)
+                            }
+                        }
+                    }
+                    
+                    let depthRatio = 1.0 - Double(r) / Double(rows)
+                    let alpha = max(0.04, depthRatio * (isDark ? 0.32 : 0.22))
+                    let lineColor = isDark ? NewtonTheme.sand : Color(red: 0.30, green: 0.36, blue: 0.44)
+                    context.stroke(path, with: .color(lineColor.opacity(alpha)), lineWidth: 0.9)
+                }
+                
+                // Draw Vertical Perspective Lines
+                for c in 0..<cols {
+                    var path = Path()
+                    var started = false
+                    for r in 0..<rows {
+                        let pt = gridPoints[r][c]
+                        if pt != .zero {
+                            if !started {
+                                path.move(to: pt)
+                                started = true
+                            } else {
+                                path.addLine(to: pt)
+                            }
+                        }
+                    }
+                    let alpha = isDark ? 0.14 : 0.10
+                    let lineColor = isDark ? NewtonTheme.forestGreen : Color(red: 0.40, green: 0.46, blue: 0.54)
+                    context.stroke(path, with: .color(lineColor.opacity(alpha)), lineWidth: 0.65)
+                }
+            }
         }
+        .allowsHitTesting(false)
     }
 }
