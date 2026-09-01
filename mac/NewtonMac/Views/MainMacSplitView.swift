@@ -3,6 +3,7 @@
 //  NewtonMac
 //
 //  Created for Newton macOS.
+//  Matches the web desktop layout.
 //
 
 import SwiftUI
@@ -11,41 +12,37 @@ import AppKit
 public struct MainMacSplitView: View {
     @StateObject private var storage = StorageManager.shared
     @State private var selectedConversation: Conversation? = nil
+    @State private var showSettingsSheet: Bool = false
     
     public var body: some View {
-        NavigationView {
-            MacConversationListView(selectedConversation: $selectedConversation)
+        HStack(spacing: 0) {
+            // Floating Sidebar Card
+            MacConversationListView(
+                selectedConversation: $selectedConversation,
+                showSettingsSheet: $showSettingsSheet
+            )
             
+            // Main Chat Canvas Area
             if let selected = bindingForSelectedConversation() {
                 MacChatView(conversation: selected)
             } else {
-                VStack(spacing: 16) {
-                    MacHero3DCanvasView()
-                        .frame(width: 260, height: 260)
-                    
-                    Text("Newton AI")
-                        .font(.system(size: 22, weight: .bold, design: .serif))
-                        .foregroundColor(NewtonTheme.textPrimary)
-                    
-                    Text("Select a conversation from the sidebar or press ⌘N to begin.")
-                        .font(.system(size: 13))
-                        .foregroundColor(NewtonTheme.textSecondary)
-                    
-                    Button("Start New Conversation") {
-                        let newConv = storage.createConversation()
-                        selectedConversation = newConv
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NewtonTheme.sand)
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(NewtonTheme.background)
+                .background(Color.white)
             }
         }
+        .background(Color(red: 0.98, green: 0.98, blue: 0.99))
         .onAppear {
             if selectedConversation == nil {
                 selectedConversation = storage.conversations.first ?? storage.createConversation()
             }
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            MacSettingsView()
         }
     }
     
