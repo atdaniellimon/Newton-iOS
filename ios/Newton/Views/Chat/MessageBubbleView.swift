@@ -377,7 +377,7 @@ public struct GeneratedImageCardView: View {
                         .font(.system(size: 12))
                         .foregroundColor(NewtonTheme.textSecondary)
                     Button("Retry") {
-                        loadImage()
+                        Task { await loadImageAsync() }
                     }
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(NewtonTheme.sand)
@@ -389,11 +389,12 @@ public struct GeneratedImageCardView: View {
         }
         .padding(.vertical, 4)
         .task(id: urlStr) {
-            loadImage()
+            await loadImageAsync()
         }
     }
     
-    private func loadImage() {
+    @MainActor
+    private func loadImageAsync() async {
         isLoading = true
         loadFailed = false
         
@@ -406,35 +407,32 @@ public struct GeneratedImageCardView: View {
         
         // 2. Remote URL handling with URLSession
         guard let url = URL(string: urlStr) else {
-            isLoading = false
-            loadFailed = true
+            self.isLoading = false
+            self.loadFailed = true
             return
         }
         
-        Task {
-            do {
-                var request = URLRequest(url: url)
-                request.timeoutInterval = 30
-                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
-                let (data, response) = try await URLSession.shared.data(for: request)
-                if let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-                   let img = UIImage(data: data) {
-                    await MainActor.run {
-                        self.uiImage = img
-                        self.isLoading = false
-                    }
-                } else {
-                    await MainActor.run {
-                        self.isLoading = false
-                        self.loadFailed = true
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.isLoading = false
-                    self.loadFailed = true
-                }
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 20
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard !Task.isCancelled else { return }
+            if let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
+               let img = UIImage(data: data) {
+                self.uiImage = img
+                self.isLoading = false
+            } else {
+                self.isLoading = false
+                self.loadFailed = true
             }
+        } catch is CancellationError {
+            // Ignore cancellation on view redraw
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            self.isLoading = false
+            self.loadFailed = true
         }
     }
 }

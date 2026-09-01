@@ -119,15 +119,15 @@ public final class OrbitEngine {
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // 1. Try calling the provider's /v1/images/generations if baseUrl is provided
-        if !baseUrl.isEmpty {
+        // 1. Try calling the provider's /v1/images/generations with a fast 4s timeout
+        if !baseUrl.isEmpty && !baseUrl.contains("localhost") && !baseUrl.contains("127.0.0.1") {
             let cleanBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
             
             if let endpointUrl = URL(string: endpointStr) {
                 var request = URLRequest(url: endpointUrl)
                 request.httpMethod = "POST"
-                request.timeoutInterval = 25
+                request.timeoutInterval = 4
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 if !apiKey.isEmpty {
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -136,7 +136,7 @@ public final class OrbitEngine {
                 let payload: [String: Any] = [
                     "prompt": cleanPrompt,
                     "n": 1,
-                    "size": "1024x1024",
+                    "size": "768x768",
                     "response_format": "b64_json"
                 ]
                 
@@ -151,9 +151,8 @@ public final class OrbitEngine {
                             if let b64 = first["b64_json"] as? String, !b64.isEmpty {
                                 return "data:image/png;base64,\(b64)"
                             }
-                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
-                                // Download remote URL directly into base64 to ensure instant rendering
-                                if let (dlData, _) = try? await URLSession.shared.data(from: URL(string: imgUrl)!),
+                            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty, let urlObj = URL(string: imgUrl) {
+                                if let (dlData, _) = try? await URLSession.shared.data(from: urlObj),
                                    let _ = UIImage(data: dlData) {
                                     return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
                                 }
@@ -165,24 +164,23 @@ public final class OrbitEngine {
             }
         }
         
-        // 2. High-Quality Direct Download Fallback
-        if let encoded = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)?
+        // 2. High-Performance Turbo Image Generator
+        let encodedPrompt = cleanPrompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)?
             .replacingOccurrences(of: " ", with: "%20")
-            .replacingOccurrences(of: "?", with: "") {
+            .replacingOccurrences(of: "?", with: "") ?? "artwork"
+        
+        let turboUrlStr = "https://image.pollinations.ai/prompt/\(encodedPrompt)?width=768&height=768&nologo=true&model=turbo"
+        if let turboUrl = URL(string: turboUrlStr) {
+            var dlRequest = URLRequest(url: turboUrl)
+            dlRequest.timeoutInterval = 15
+            dlRequest.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
             
-            let directUrlStr = "https://image.pollinations.ai/prompt/\(encoded)?width=768&height=768&nologo=true"
-            if let directUrl = URL(string: directUrlStr) {
-                var dlRequest = URLRequest(url: directUrl)
-                dlRequest.timeoutInterval = 20
-                dlRequest.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
-                
-                if let (dlData, dlResp) = try? await URLSession.shared.data(for: dlRequest),
-                   let http = dlResp as? HTTPURLResponse, (200...299).contains(http.statusCode),
-                   let _ = UIImage(data: dlData) {
-                    return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
-                }
-                return directUrlStr
+            if let (dlData, dlResp) = try? await URLSession.shared.data(for: dlRequest),
+               let http = dlResp as? HTTPURLResponse, (200...299).contains(http.statusCode),
+               let _ = UIImage(data: dlData) {
+                return "data:image/jpeg;base64,\(dlData.base64EncodedString())"
             }
+            return turboUrlStr
         }
         
         return ""
