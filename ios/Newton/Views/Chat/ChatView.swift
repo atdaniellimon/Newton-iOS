@@ -59,6 +59,32 @@ public struct ChatView: View {
                 .opacity(0.88)
             
             VStack(spacing: 0) {
+                // Ghost Mode Banner
+                if conversation.isGhost {
+                    HStack(spacing: 8) {
+                        Image(systemName: "ghost.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                        Text("Ghost Mode • Messages vanish when session ends")
+                            .font(.system(size: 11.5, weight: .medium, design: .serif))
+                            .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                        Spacer()
+                        Button("Vanish") {
+                            Haptics.success()
+                            conversation.messages.removeAll()
+                            storage.deleteConversation(id: conversation.id)
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(NewtonTheme.coralRed)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color(red: 0.75, green: 0.55, blue: 0.95).opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                }
+                
                 // Messages Scroll View
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -165,6 +191,22 @@ public struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
+                // Ghost Mode Toggle
+                Button {
+                    Haptics.medium()
+                    if conversation.isGhost {
+                        conversation.isGhost = false
+                        storage.saveConversations()
+                    } else {
+                        let ghost = storage.createGhostConversation()
+                        conversation = ghost
+                    }
+                } label: {
+                    Image(systemName: conversation.isGhost ? "ghost.fill" : "ghost")
+                        .font(.system(size: 17))
+                        .foregroundColor(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95) : NewtonTheme.textSecondary)
+                }
+                
                 // Live Voice Call Button
                 Button {
                     Haptics.medium()

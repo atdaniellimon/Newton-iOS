@@ -30,17 +30,17 @@ public struct MacChatView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Top Header Bar with Model Pill
+                // Top Header Bar with Model Pill & Ghost Mode
                 HStack {
                     Button(action: {
                         showModelSheet.toggle()
                     }) {
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(Color(red: 0.65, green: 0.70, blue: 0.75))
+                                .fill(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95) : Color(red: 0.65, green: 0.70, blue: 0.75))
                                 .frame(width: 8, height: 8)
                             
-                            Text(modelDisplayName)
+                            Text(conversation.isGhost ? "Ghost Session (No Memory)" : modelDisplayName)
                                 .font(.system(size: 12.5, weight: .medium))
                                 .foregroundColor(Color(red: 0.15, green: 0.18, blue: 0.22))
                             
@@ -54,11 +54,40 @@ public struct MacChatView: View {
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
+                                .stroke(conversation.isGhost ? Color(red: 0.75, green: 0.55, blue: 0.95).opacity(0.6) : Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 1)
                         )
                         .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
                     }
                     .buttonStyle(.plain)
+                    
+                    // Ghost Mode Quick Toggle / Burn Button
+                    Button(action: {
+                        if conversation.isGhost {
+                            conversation.messages.removeAll()
+                            storage.deleteConversation(id: conversation.id)
+                        } else {
+                            let ghost = storage.createGhostConversation()
+                            conversation = ghost
+                        }
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: conversation.isGhost ? "ghost.fill" : "ghost")
+                                .font(.system(size: 11))
+                            Text(conversation.isGhost ? "Vanish" : "Ghost Mode")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(conversation.isGhost ? Color(red: 0.92, green: 0.35, blue: 0.30) : Color(red: 0.45, green: 0.50, blue: 0.58))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.8))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color(red: 0.88, green: 0.91, blue: 0.94), lineWidth: 0.8)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help(conversation.isGhost ? "Incinerate ghost session messages instantly" : "Start ephemeral Ghost session (no history saved)")
                     
                     Spacer()
                     

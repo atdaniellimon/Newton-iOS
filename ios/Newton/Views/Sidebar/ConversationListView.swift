@@ -62,9 +62,14 @@ public struct ConversationListView: View {
                 VStack(spacing: 4) {
                     SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
                     
-                    // Future sections (temporarily commented out)
-                    // SidebarItemRow(icon: "folder", title: "Projects", isSelected: false)
-                    // SidebarItemRow(icon: "chevron.left.forwardslash.chevron.right", title: "Code", isSelected: false)
+                    Button {
+                        Haptics.medium()
+                        let ghost = storage.createGhostConversation()
+                        selectedConversationId = ghost.id
+                        onSelectConversation?(ghost.id)
+                    } label: {
+                        SidebarItemRow(icon: "ghost", title: "Ghost Session", isSelected: false)
+                    }
                     
                     Button {
                         Haptics.light()
@@ -99,6 +104,12 @@ public struct ConversationListView: View {
                                     Image(systemName: "pin.fill")
                                         .font(.system(size: 11))
                                         .foregroundColor(NewtonTheme.sand)
+                                }
+                                
+                                if convo.isGhost {
+                                    Image(systemName: "ghost.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
                                 }
                                 
                                 Text(convo.title)

@@ -74,6 +74,18 @@ public struct MacConversationListView: View {
             .buttonStyle(.plain)
             
             Button(action: {
+                let ghost = storage.createGhostConversation()
+                selectedConversation = ghost
+            }) {
+                Image(systemName: "ghost")
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .help("Start ephemeral Ghost Session (no history saved)")
+            
+            Button(action: {
                 showSettingsSheet = true
             }) {
                 Image(systemName: "gearshape")
@@ -180,7 +192,13 @@ public struct MacConversationRowView: View {
     
     public var body: some View {
         Button(action: onSelect) {
-            HStack {
+            HStack(spacing: 6) {
+                if conversation.isGhost {
+                    Image(systemName: "ghost.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                }
+                
                 Text(conversation.title.isEmpty ? "New Conversation" : conversation.title)
                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.25, green: 0.30, blue: 0.38))

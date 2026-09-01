@@ -1,9 +1,9 @@
 //
 //  StorageManager.swift
-//  Newton
+//  NewtonMac
 //
-//  Created for Newton iOS.
-//  Local JSON & iCloud Ubiquitous Key-Value synchronization.
+//  Created for Newton macOS.
+//  Local JSON & iCloud Ubiquitous Key-Value synchronization with Ephemeral Ghost Mode support.
 //
 
 import Foundation
@@ -17,8 +17,12 @@ public final class StorageManager: ObservableObject {
     private let iCloudKey = "newton_cloud_conversations_v1"
     
     private var fileURL: URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return docs.appendingPathComponent(conversationsFileName)
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let newtonDir = appSupport.appendingPathComponent("NewtonMac", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: newtonDir.path) {
+            try? FileManager.default.createDirectory(at: newtonDir, withIntermediateDirectories: true)
+        }
+        return newtonDir.appendingPathComponent(conversationsFileName)
     }
     
     private init() {
@@ -56,9 +60,28 @@ public final class StorageManager: ObservableObject {
         return createConversation(provider: provider, modelId: modelId, title: title)
     }
     
+    public func createGhostConversation(title: String = "Ghost Session 👻") -> Conversation {
+        let provider = SettingsManager.shared.currentProvider
+        let modelId = SettingsManager.shared.currentModelId
+        let ghostConvo = Conversation(
+            title: title,
+            provider: provider,
+            modelId: modelId,
+            messages: [],
+            isPinned: false,
+            isGhost: true
+        )
+        conversations.insert(ghostConvo, at: 0)
+        return ghostConvo
+    }
+    
     public func clearAllConversations() {
         conversations.removeAll()
         saveConversations()
+    }
+    
+    public func purgeGhostConversations() {
+        conversations.removeAll(where: { $0.isGhost })
     }
     
     public func updateConversation(_ convo: Conversation) {
@@ -67,7 +90,9 @@ public final class StorageManager: ObservableObject {
             updated.updatedAt = Date()
             conversations[index] = updated
             sortConversations()
-            saveConversations()
+            if !convo.isGhost {
+                saveConversations()
+            }
         }
     }
     
@@ -75,7 +100,9 @@ public final class StorageManager: ObservableObject {
         if let index = conversations.firstIndex(where: { $0.id == id }) {
             conversations[index].isPinned.toggle()
             sortConversations()
-            saveConversations()
+            if !conversations[index].isGhost {
+                saveConversations()
+            }
         }
     }
     
@@ -100,7 +127,8 @@ public final class StorageManager: ObservableObject {
     
     public func saveConversations() {
         do {
-            let data = try JSONEncoder().encode(conversations)
+            let persistentConvos = conversations.filter { !$0.isGhost }
+            let data = try JSONEncoder().encode(persistentConvos)
             // 1. Save to Local File
             try data.write(to: fileURL, options: [.atomicWrite])
             
@@ -116,46 +144,25 @@ public final class StorageManager: ObservableObject {
         if let cloudData = NSUbiquitousKeyValueStore.default.data(forKey: iCloudKey),
            let cloudConvos = try? JSONDecoder().decode([Conversation].self, from: cloudData),
            !cloudConvos.isEmpty {
-            self.conversations = cloudConvos
+            let ghosts = self.conversations.filter { $0.isGhost }
+            self.conversations = ghosts + cloudConvos
             sortConversations()
         }
     }
     
     private func loadConversations() {
-        // 1. Try loading from iCloud first
-        if let cloudData = NSUbiquitousKeyValueStore.default.data(forKey: iCloudKey),
-           let cloudConvos = try? JSONDecoder().decode([Conversation].self, from: cloudData),
-           !cloudConvos.isEmpty {
-            self.conversations = cloudConvos
-            sortConversations()
-            return
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let loaded = try JSONDecoder().decode([Conversation].self, from: data)
+                self.conversations = loaded
+                sortConversations()
+                return
+            } catch {
+                print("Error loading local conversations: \(error)")
+            }
         }
         
-        // 2. Try loading from Local File
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            let welcome = Conversation(
-                title: "Welcome to Newton",
-                provider: .openrouter,
-                modelId: "anthropic/claude-3.5-sonnet",
-                messages: [
-                    Message(
-                        role: .assistant,
-                        content: "Welcome to Newton. An elegant, private AI interface designed for deep reasoning, creative writing, and high-performance coding."
-                    )
-                ]
-            )
-            self.conversations = [welcome]
-            saveConversations()
-            return
-        }
-        
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let loaded = try JSONDecoder().decode([Conversation].self, from: data)
-            self.conversations = loaded
-            sortConversations()
-        } catch {
-            print("Error loading conversations: \(error)")
-        }
+        loadFromCloud()
     }
 }

@@ -14,6 +14,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
     public var modelId: String
     public var messages: [Message]
     public var isPinned: Bool
+    public var isGhost: Bool
     public let createdAt: Date
     public var updatedAt: Date
     
@@ -24,6 +25,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         modelId: String = "anthropic/claude-3.5-sonnet",
         messages: [Message] = [],
         isPinned: Bool = false,
+        isGhost: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -33,6 +35,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         self.modelId = modelId
         self.messages = messages
         self.isPinned = isPinned
+        self.isGhost = isGhost
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -44,6 +47,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
                lhs.modelId == rhs.modelId &&
                lhs.messages == rhs.messages &&
                lhs.isPinned == rhs.isPinned &&
+               lhs.isGhost == rhs.isGhost &&
                lhs.updatedAt == rhs.updatedAt
     }
 }
