@@ -85,9 +85,9 @@ public struct NewtonCodeDashboardView: View {
                         
                         // 8 Metrics Grid
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
-                            metricBox(title: "Sessions", value: "\(workspace.totalSessionsCount)")
-                            metricBox(title: "Messages", value: "\(workspace.totalMessagesCount)")
-                            metricBox(title: "Total tokens", value: "4.4B")
+                            metricBox(title: "Sessions", value: "\(workspace.realTotalSessionsCount)")
+                            metricBox(title: "Messages", value: "\(workspace.realTotalMessagesCount)")
+                            metricBox(title: "Total tokens", value: workspace.realTotalTokensFormatted)
                             metricBox(title: "Active days", value: "\(workspace.activeDaysCount)")
                             metricBox(title: "Current streak", value: "\(workspace.currentStreak)d")
                             metricBox(title: "Longest streak", value: "\(workspace.longestStreak)d")

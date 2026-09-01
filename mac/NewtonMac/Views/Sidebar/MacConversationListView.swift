@@ -82,26 +82,22 @@ public struct MacConversationListView: View {
     @ViewBuilder
     private var topHeaderRow: some View {
         HStack(spacing: 8) {
-            // Space reserved for native macOS window controls
             Color.clear
-                .frame(width: 66, height: 26)
+                .frame(width: 66, height: 24)
             
-            // Native macOS Segmented Control
             Picker("", selection: $selectedSidebarTab) {
-                Image(systemName: "bubble.left")
+                Image(systemName: "message")
                     .tag(SidebarTab.chat)
-                Text("</>")
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .tag(SidebarTab.code)
                 Image(systemName: "gearshape")
                     .tag(SidebarTab.settings)
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .onChange(of: selectedSidebarTab) { newTab in
-                if newTab == .settings {
-                    showSettingsSheet = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        selectedSidebarTab = .chat
-                    }
+                if newTab == .code {
+                    selectedConversation = nil
                 }
             }
         }
@@ -292,6 +288,16 @@ public struct MacConversationListView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         }
                                         .buttonStyle(.plain)
+                                        .contextMenu {
+                                            Button(role: .destructive, action: {
+                                                if selectedConversation?.id == convo.id {
+                                                    selectedConversation = nil
+                                                }
+                                                storage.deleteConversation(convo)
+                                            }) {
+                                                Label("Delete Task", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
                                 .padding(.horizontal, 6)

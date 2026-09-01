@@ -140,7 +140,7 @@ public struct MacChatView: View {
             Spacer()
         }
         .padding(.horizontal, 28)
-        .padding(.top, 12)
+        .padding(.top, 4)
         .padding(.bottom, 6)
     }
     

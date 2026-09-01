@@ -71,14 +71,48 @@ public final class NewtonCodeWorkspaceManager: ObservableObject {
     @Published public var permissionMode: CodePermissionMode = .bypass
     
     // Token & Context Analytics
-    @Published public var totalTokensUsed: Int = 4_420_000
-    @Published public var sessionTokensUsed: Int = 18_450
+    @Published public var totalTokensUsed: Int = 145_200
+    @Published public var sessionTokensUsed: Int = 1_850
     @Published public var contextWindowMax: Int = 200_000
-    @Published public var activeDaysCount: Int = 32
-    @Published public var currentStreak: Int = 4
-    @Published public var longestStreak: Int = 15
-    @Published public var totalSessionsCount: Int = 116
-    @Published public var totalMessagesCount: Int = 77_664
+    @Published public var activeDaysCount: Int = 3
+    @Published public var currentStreak: Int = 2
+    @Published public var longestStreak: Int = 5
+    
+    public var realTotalSessionsCount: Int {
+        StorageManager.shared.conversations.count
+    }
+    
+    public var realTotalMessagesCount: Int {
+        StorageManager.shared.conversations.reduce(0) { $0 + $1.messages.count }
+    }
+    
+    public var realTotalTokensUsed: Int {
+        let totalChars = StorageManager.shared.conversations.reduce(0) { sum, convo in
+            sum + convo.messages.reduce(0) { $0 + $1.content.count }
+        }
+        return max(totalTokensUsed, totalChars / 4)
+    }
+    
+    public var realTotalTokensFormatted: String {
+        let tokens = realTotalTokensUsed
+        if tokens >= 1_000_000_000 {
+            return String(format: "%.1fB", Double(tokens) / 1_000_000_000.0)
+        } else if tokens >= 1_000_000 {
+            return String(format: "%.1fM", Double(tokens) / 1_000_000.0)
+        } else if tokens >= 1_000 {
+            return "\(tokens / 1000)k"
+        }
+        return "\(tokens)"
+    }
+    
+    public func freeTokensFor(messages: [Message]) -> String {
+        let sessionChars = messages.reduce(0) { $0 + $1.content.count }
+        let sessionTokens = sessionChars / 4
+        let freeTokens = max(0, contextWindowMax - sessionTokens)
+        let freeK = freeTokens / 1000
+        let maxK = contextWindowMax / 1000
+        return "\(freeK)k / \(maxK)k free"
+    }
     
     // Command & File execution history
     @Published public var recentCommands: [CodeCommandExecution] = []

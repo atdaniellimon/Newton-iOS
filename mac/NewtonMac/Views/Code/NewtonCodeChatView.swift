@@ -69,6 +69,12 @@ public struct NewtonCodeChatView: View {
             )
         }
         .background(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : Color(red: 0.97, green: 0.98, blue: 0.99))
+        .onAppear {
+            workspace.sessionTokensUsed = conversation.messages.reduce(0) { $0 + $1.content.count / 4 }
+            if conversation.messages.last?.role == .user && !isStreaming {
+                executeAgentLoop()
+            }
+        }
     }
     
     @ViewBuilder
@@ -106,7 +112,7 @@ public struct NewtonCodeChatView: View {
             .help("Toggle Inspector")
         }
         .padding(.horizontal, 28)
-        .padding(.top, 12)
+        .padding(.top, 4)
         .padding(.bottom, 8)
         .overlay(
             Rectangle()
@@ -161,12 +167,12 @@ public struct NewtonCodeChatView: View {
     private var streamingAssistantBubble: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                ThinkingOrbView(size: 18)
-                Text("Newton Singularity is writing code & analyzing workspace...")
-                    .font(.system(size: 11.5, weight: .medium, design: .serif))
-                    .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+                ThinkingOrbView(size: 20, style: .globe)
+                Text("Newton Singularity is reasoning and executing tools...")
+                    .font(.system(size: 12, weight: .medium, design: .serif))
+                    .foregroundColor(NewtonTheme.sand)
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 3)
             
             if !streamingText.isEmpty {
                 MacFormattedAssistantContent(content: streamingText)
@@ -187,8 +193,15 @@ public struct NewtonCodeChatView: View {
         conversation.messages.append(userMsg)
         inputText = ""
         
+        executeAgentLoop()
+    }
+    
+    private func executeAgentLoop() {
+        guard !isStreaming else { return }
         isStreaming = true
         streamingText = ""
+        
+        let lastUserMsg = conversation.messages.last(where: { $0.role == .user })?.content ?? ""
         
         let systemPrompt = """
         You are Newton Singularity Code Engine, specialized for software engineering, deep architecture analysis, file manipulation, and terminal execution.
@@ -230,7 +243,7 @@ public struct NewtonCodeChatView: View {
             }
             
             // Process Code Orbits
-            let processed = await OrbitEngine.shared.processOrbitsInText(fullStreamed, userPrompt: textToSend)
+            let processed = await OrbitEngine.shared.processOrbitsInText(fullStreamed, userPrompt: lastUserMsg)
             
             await MainActor.run {
                 let assistantMsg = Message(
@@ -241,6 +254,7 @@ public struct NewtonCodeChatView: View {
                 self.conversation.messages.append(assistantMsg)
                 self.isStreaming = false
                 self.streamingText = ""
+                self.workspace.sessionTokensUsed = self.conversation.messages.reduce(0) { $0 + $1.content.count / 4 }
                 StorageManager.shared.saveConversations()
             }
         }

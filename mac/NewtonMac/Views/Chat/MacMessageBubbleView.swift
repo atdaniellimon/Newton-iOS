@@ -217,6 +217,12 @@ public struct MacFormattedAssistantContent: View {
         if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {
             text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
         }
+        let mdImgPattern = "!\\[.*?\\]\\(.*?\\)"
+        if let regex = try? NSRegularExpression(pattern: mdImgPattern, options: []) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        text = text.replacingOccurrences(of: "Generated Image", with: "")
+        text = text.replacingOccurrences(of: "Imagen generada", with: "")
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     

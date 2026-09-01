@@ -98,6 +98,14 @@ public final class OrbitEngine {
         outputText = outputText.replacingOccurrences(of: ", de la familia de modelos Newton", with: "")
         outputText = outputText.replacingOccurrences(of: ", from the Newton model family", with: "")
         
+        // Strip markdown image syntax and repetitive Generated Image labels from text
+        if let mdImgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\(.*?\\)", options: []) {
+            outputText = mdImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        if let genImgRegex = try? NSRegularExpression(pattern: "(?im)^\\s*(?:Generated Image|Imagen generada)\\s*$", options: []) {
+            outputText = genImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        
         // 4. Fallback: Intent matching from user prompt (EXPLICIT image requests only)
         if detectedImageUrl == nil && !userPrompt.isEmpty {
             let lower = userPrompt.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
