@@ -277,14 +277,13 @@ public struct FullScreenImageViewer: View {
     }
     
     private func loadImageData() {
-        if imageString.hasPrefix("data:image/"),
-           let commaIndex = imageString.firstIndex(of: ","),
-           let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
-           let img = UIImage(data: data) {
+        if let img = imageString.decodeBase64ToUIImage() {
             self.loadedUIImage = img
         } else if let url = URL(string: imageString) {
             Task {
-                if let (data, _) = try? await URLSession.shared.data(from: url),
+                var request = URLRequest(url: url)
+                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+                if let (data, _) = try? await URLSession.shared.data(for: request),
                    let img = UIImage(data: data) {
                     await MainActor.run {
                         self.loadedUIImage = img
@@ -328,13 +327,12 @@ public struct UserAttachedImageView: View {
             }
         }
         .task(id: imageString) {
-            if imageString.hasPrefix("data:image/"),
-               let commaIndex = imageString.firstIndex(of: ","),
-               let data = Data(base64Encoded: String(imageString[imageString.index(after: commaIndex)...])),
-               let img = UIImage(data: data) {
+            if let img = imageString.decodeBase64ToUIImage() {
                 self.uiImage = img
             } else if let url = URL(string: imageString) {
-                if let (data, _) = try? await URLSession.shared.data(from: url),
+                var request = URLRequest(url: url)
+                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+                if let (data, _) = try? await URLSession.shared.data(for: request),
                    let img = UIImage(data: data) {
                     await MainActor.run { self.uiImage = img }
                 }
@@ -399,15 +397,11 @@ public struct GeneratedImageCardView: View {
         isLoading = true
         loadFailed = false
         
-        // 1. Base64 handling
-        if urlStr.hasPrefix("data:image/"),
-           let commaIndex = urlStr.firstIndex(of: ",") {
-            let base64 = String(urlStr[urlStr.index(after: commaIndex)...])
-            if let data = Data(base64Encoded: base64), let img = UIImage(data: data) {
-                self.uiImage = img
-                self.isLoading = false
-                return
-            }
+        // 1. Instant robust Base64 decoding
+        if let decodedImg = urlStr.decodeBase64ToUIImage() {
+            self.uiImage = decodedImg
+            self.isLoading = false
+            return
         }
         
         // 2. Remote URL handling with URLSession
@@ -421,6 +415,7 @@ public struct GeneratedImageCardView: View {
             do {
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 30
+                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
                 let (data, response) = try await URLSession.shared.data(for: request)
                 if let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
                    let img = UIImage(data: data) {

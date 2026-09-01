@@ -122,10 +122,7 @@ public struct ArtGalleryView: View {
                                                     .fill(NewtonTheme.card)
                                                     .frame(height: 160)
                                                 
-                                                if item.imageUrl.hasPrefix("data:image/"),
-                                                   let commaIndex = item.imageUrl.firstIndex(of: ","),
-                                                   let data = Data(base64Encoded: String(item.imageUrl[item.imageUrl.index(after: commaIndex)...])),
-                                                   let uiImg = UIImage(data: data) {
+                                                if let uiImg = item.imageUrl.decodeBase64ToUIImage() {
                                                     Image(uiImage: uiImg)
                                                         .resizable()
                                                         .scaledToFill()

@@ -121,3 +121,23 @@ extension View {
             )
     }
 }
+
+extension String {
+    public func decodeBase64ToUIImage() -> UIImage? {
+        var base64 = self
+        if let commaIndex = self.firstIndex(of: ",") {
+            base64 = String(self[self.index(after: commaIndex)...])
+        }
+        let clean = base64
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        
+        if let data = Data(base64Encoded: clean, options: .ignoreUnknownCharacters),
+           let img = UIImage(data: data) {
+            return img
+        }
+        return nil
+    }
+}
