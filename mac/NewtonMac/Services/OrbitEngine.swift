@@ -234,6 +234,15 @@ public final class OrbitEngine {
             let result = DeviceBridgeService.shared.createCalendarEvent(title: title, startDate: startDate, endDate: endDate, notes: notes)
             return OrbitExecutionResult(orbitName: "create_event", params: paramsJson, result: result, isSuccess: true)
             
+        case "save_memory", "remember", "store_memory":
+            let fact = params["fact"] as? String ?? (params["memory"] as? String ?? (params["content"] as? String ?? paramsJson))
+            MemoryManager.shared.addMemory(fact)
+            return OrbitExecutionResult(orbitName: "save_memory", params: paramsJson, result: "🧠 Memoria guardada: \"\(fact)\"", isSuccess: true)
+            
+        case "get_memories", "list_memories":
+            let mems = MemoryManager.shared.formattedMemoryPrompt()
+            return OrbitExecutionResult(orbitName: "get_memories", params: paramsJson, result: mems.isEmpty ? "No hay memorias registradas." : mems, isSuccess: true)
+            
         case "generate_pdf", "pdf", "create_pdf", "make_pdf":
             var title = "Documento Newton"
             var content = paramsJson

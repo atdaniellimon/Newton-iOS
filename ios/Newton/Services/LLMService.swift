@@ -143,7 +143,26 @@ public final class LLMService {
         systemPrompt: String
     ) throws -> Data {
         
-        let effectiveSystemPrompt = systemPrompt.isEmpty ? SettingsManager.singularitySystemPrompt : systemPrompt
+        var effectiveSystemPrompt = systemPrompt.isEmpty ? SettingsManager.singularitySystemPrompt : systemPrompt
+        
+        // Inject Persistent User Long-Term Memory
+        let memoryFacts = MemoryManager.shared.formattedMemoryPrompt()
+        if !memoryFacts.isEmpty {
+            effectiveSystemPrompt += """
+            
+            
+            ==================================================
+            PERSISTENT USER MEMORY & LONG-TERM CONTEXT
+            ==================================================
+            The following are verified, persistent facts about the user:
+            \(memoryFacts)
+            
+            MEMORY USAGE DIRECTIVES (STRICT):
+            - Naturally ground your technical depth, recommendations, architectural solutions, and tone using this knowledge.
+            - DO NOT nag the user or force awkward conversational small talk (NEVER spontaneously ask 'How is project X going?' or 'How is your company doing?'). Only reference past projects or facts when directly relevant to answering the user's current request.
+            - If the user shares new persistent facts about themselves or says 'remember that...', invoke `[ORBIT:save_memory]{"fact": "..."}[/ORBIT]` organically.
+            """
+        }
         
         if provider == .anthropic {
             var formattedMessages: [[String: Any]] = []

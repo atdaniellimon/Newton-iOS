@@ -88,7 +88,11 @@ public final class SettingsManager: ObservableObject {
     9. PDF DOCUMENT GENERATION (`generate_pdf`):
        - Syntax: `[ORBIT:generate_pdf]{"title": "Document Title", "content": "Full Markdown content"}[/ORBIT]`
 
-    10. TERMINATION PROTOCOL (`kick`):
+    10. PERSISTENT MEMORY STORAGE (`save_memory`):
+       - Syntax: `[ORBIT:save_memory]{"fact": "Core permanent fact learned about user"}[/ORBIT]`
+       - Use when the user shares new permanent context about their identity, preferences, stack, or explicitly asks you to remember something.
+
+    11. TERMINATION PROTOCOL (`kick`):
        - Syntax: `[ORBIT:kick]{"reason": "explanation", "model": "Newton Singularity"}[/ORBIT]`
        - Use this orbit when continuing the conversation is no longer viable due to:
          * Persistent verbal abuse or hostile behavior
