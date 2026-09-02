@@ -13,10 +13,13 @@ public struct MacSettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var syncService = iCloudSyncService.shared
+    @ObservedObject var memoryManager = MemoryManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var showingClearCacheAlert: Bool = false
+    @State private var newMemoryInput: String = ""
+    @State private var showingWipeMemoriesAlert: Bool = false
     
     public init() {}
     
@@ -138,6 +141,111 @@ public struct MacSettingsView: View {
                         }
                     }
                     
+                    // Persistent Long-Term Memory Card
+                    settingsCard(title: "PERSISTENT LONG-TERM MEMORY", icon: "brain.head.profile") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Stored Memory Items:")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color(NSColor.secondaryLabelColor))
+                                Spacer()
+                                Text("\(memoryManager.memories.count)")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.sand)
+                            }
+                            
+                            // Memory Items List
+                            if memoryManager.memories.isEmpty {
+                                Text("No permanent memories stored yet. Newton learns organically as you chat, or you can add memories below.")
+                                    .font(.system(size: 11.5))
+                                    .foregroundColor(Color(NSColor.tertiaryLabelColor))
+                                    .padding(.vertical, 4)
+                            } else {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    ForEach(memoryManager.memories) { mem in
+                                        HStack(alignment: .top, spacing: 6) {
+                                            Text("•")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(NewtonTheme.sand)
+                                            
+                                            Text(mem.content)
+                                                .font(.system(size: 11.5))
+                                                .foregroundColor(Color(NSColor.labelColor))
+                                                .fixedSize(horizontal: false, vertical: true)
+                                            
+                                            Spacer()
+                                            
+                                            Button(action: {
+                                                memoryManager.deleteMemory(id: mem.id)
+                                            }) {
+                                                Image(systemName: "trash")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(NewtonTheme.coralRed.opacity(0.8))
+                                            }
+                                            .buttonStyle(.plain)
+                                            .help("Delete memory")
+                                        }
+                                        .padding(.vertical, 2)
+                                    }
+                                }
+                                .padding(8)
+                                .background(Color(NSColor.windowBackgroundColor).opacity(0.6))
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            
+                            Divider()
+                                .padding(.vertical, 2)
+                            
+                            // Add New Memory Input Prompt
+                            HStack(spacing: 8) {
+                                TextField("Add a permanent memory or user fact...", text: $newMemoryInput)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(size: 11.5))
+                                
+                                Button(action: {
+                                    let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    if !trimmed.isEmpty {
+                                        memoryManager.addMemory(trimmed)
+                                        newMemoryInput = ""
+                                    }
+                                }) {
+                                    Text("Add")
+                                        .font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundColor(NewtonTheme.sand)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(Color(NSColor.controlBackgroundColor))
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                .stroke(Color(NSColor.separatorColor), lineWidth: 0.8)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                            
+                            // Wipe All Memories Button
+                            if !memoryManager.memories.isEmpty {
+                                HStack {
+                                    Spacer()
+                                    Button(action: {
+                                        showingWipeMemoriesAlert = true
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "trash.fill")
+                                            Text("Borrar toda la memoria definitivamente")
+                                        }
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(NewtonTheme.coralRed)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.top, 2)
+                            }
+                        }
+                    }
+                    
                     // Storage & Privacy Card
                     settingsCard(title: "STORAGE & PRIVACY", icon: "lock.shield.fill") {
                         VStack(alignment: .leading, spacing: 10) {
@@ -208,6 +316,16 @@ public struct MacSettingsView: View {
         .frame(width: 460, height: 520)
         .background(Color(NSColor.windowBackgroundColor))
         .preferredColorScheme(settings.appTheme.colorScheme)
+        .alert(isPresented: $showingWipeMemoriesAlert) {
+            Alert(
+                title: Text("¿Borrar toda la memoria definitivamente?"),
+                message: Text("Esta acción eliminará permanentemente todos los recuerdos y hechos aprendidos por Newton Singularity."),
+                primaryButton: .destructive(Text("Borrar Todo")) {
+                    memoryManager.clearAllMemories()
+                },
+                secondaryButton: .cancel(Text("Cancelar"))
+            )
+        }
     }
     
     @ViewBuilder

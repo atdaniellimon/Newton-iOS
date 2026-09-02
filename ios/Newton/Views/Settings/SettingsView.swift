@@ -12,11 +12,14 @@ public struct SettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var syncService = iCloudSyncService.shared
+    @ObservedObject var memoryManager = MemoryManager.shared
     @Environment(\.dismiss) private var dismiss
     
     @State private var showingClearCacheAlert: Bool = false
     @State private var cacheClearedMessage: String? = nil
     @State private var exportUrl: URL? = nil
+    @State private var newMemoryInput: String = ""
+    @State private var showingWipeMemoriesAlert: Bool = false
     
     public init() {}
     
@@ -108,6 +111,82 @@ public struct SettingsView: View {
                             .foregroundColor(NewtonTheme.sand)
                         }
                         .disabled(syncService.isSyncing)
+                    }
+                    .listRowBackground(NewtonTheme.card)
+                    
+                    // Persistent Long-Term Memory Section
+                    Section(header: Text("MEMORIA PERSISTENTE (LONG-TERM MEMORY)").foregroundColor(NewtonTheme.textSecondary)) {
+                        HStack {
+                            Label("Recuerdos Registrados", systemImage: "brain.head.profile")
+                                .foregroundColor(NewtonTheme.textPrimary)
+                            Spacer()
+                            Text("\(memoryManager.memories.count)")
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .foregroundColor(NewtonTheme.sand)
+                        }
+                        
+                        if memoryManager.memories.isEmpty {
+                            Text("No hay recuerdos registrados aún. Newton aprende y guarda datos sobre ti de forma orgánica conforme conversas, o puedes añadirlos abajo.")
+                                .font(.system(size: 12))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                                .padding(.vertical, 2)
+                        } else {
+                            ForEach(memoryManager.memories) { mem in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("•")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(NewtonTheme.sand)
+                                    
+                                    Text(mem.content)
+                                        .font(.system(size: 12.5))
+                                        .foregroundColor(NewtonTheme.textPrimary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    
+                                    Spacer()
+                                    
+                                    Button {
+                                        memoryManager.deleteMemory(id: mem.id)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(NewtonTheme.coralRed.opacity(0.8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                        
+                        HStack {
+                            TextField("Añadir recuerdo o contexto permanente...", text: $newMemoryInput)
+                                .font(.system(size: 13))
+                            
+                            Button {
+                                let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmed.isEmpty {
+                                    memoryManager.addMemory(trimmed)
+                                    newMemoryInput = ""
+                                }
+                            } label: {
+                                Text("Guardar")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(NewtonTheme.sand)
+                            }
+                            .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        .padding(.vertical, 2)
+                        
+                        if !memoryManager.memories.isEmpty {
+                            Button(role: .destructive) {
+                                showingWipeMemoriesAlert = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "trash.fill")
+                                    Text("Borrar toda la memoria definitivamente")
+                                }
+                                .foregroundColor(NewtonTheme.coralRed)
+                            }
+                        }
                     }
                     .listRowBackground(NewtonTheme.card)
                     
@@ -205,6 +284,15 @@ public struct SettingsView: View {
                 }
             } message: {
                 Text("This will purge temporary image and PDF caches without deleting your conversations.")
+            }
+            .alert("¿Borrar toda la memoria definitivamente?", isPresented: $showingWipeMemoriesAlert) {
+                Button("Cancelar", role: .cancel) {}
+                Button("Borrar Todo", role: .destructive) {
+                    memoryManager.clearAllMemories()
+                    Haptics.notification(.warning)
+                }
+            } message: {
+                Text("Esta acción eliminará permanentemente todos los recuerdos y hechos aprendidos por Newton Singularity.")
             }
         }
     }
