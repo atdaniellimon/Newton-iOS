@@ -78,6 +78,57 @@ public final class MemoryManager: ObservableObject {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
+    public func synthesizeMemories(instruction: String) async -> String {
+        let currentPrompt = formattedMemoryPrompt()
+        let prompt = """
+        You are the Memory Synthesizer for Newton Singularity.
+        Current memories:
+        \(currentPrompt.isEmpty ? "(No memories recorded yet)" : currentPrompt)
+        
+        User Instruction for updating/modifying memory:
+        \(instruction)
+        
+        Task:
+        Return the updated list of permanent user facts as clean bullet points starting with '•'.
+        Remove outdated facts mentioned by the user, modify existing ones, or add new facts as requested.
+        Output ONLY the bullet points, with no introductory text, no conversational filler, and no pleasantries.
+        """
+        
+        let settings = SettingsManager.shared
+        let messages = [Message(role: .user, content: prompt)]
+        
+        do {
+            let stream = LLMService.shared.streamCompletion(
+                messages: messages,
+                provider: settings.currentProvider,
+                modelId: settings.currentModelId,
+                baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
+                apiKey: settings.currentApiKey,
+                systemPrompt: "You are a precise, cold, factual memory management tool. Output bullet points only."
+            )
+            var response = ""
+            for try await token in stream {
+                response += token
+            }
+            
+            let lines = response.components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { $0.hasPrefix("•") || $0.hasPrefix("-") || $0.hasPrefix("*") }
+                .map { $0.replacingOccurrences(of: "^[•\\-*]\\s*", with: "", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            
+            if !lines.isEmpty {
+                await MainActor.run {
+                    self.memories = lines.map { MemoryItem(content: $0) }
+                }
+                return "Memoria actualizada y sintetizada (\(lines.count) recuerdos)."
+            }
+        } catch {
+            return "Error al sintetizar memoria: \(error.localizedDescription)"
+        }
+        return "No se realizaron cambios."
+    }
+    
     private func saveMemories() {
         if let data = try? JSONEncoder().encode(memories) {
             UserDefaults.standard.set(data, forKey: userDefaultsKey)

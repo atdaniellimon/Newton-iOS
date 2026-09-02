@@ -20,6 +20,8 @@ public struct SettingsView: View {
     @State private var exportUrl: URL? = nil
     @State private var newMemoryInput: String = ""
     @State private var showingWipeMemoriesAlert: Bool = false
+    @State private var isSynthesizingMemory: Bool = false
+    @State private var synthesisStatusText: String? = nil
     
     public init() {}
     
@@ -60,7 +62,7 @@ public struct SettingsView: View {
                     .listRowBackground(NewtonTheme.card)
                     
                     // Chat & Interaction Section
-                    Section(header: Text("INTERACTION").foregroundColor(NewtonTheme.textSecondary)) {
+                    Section(header: Text("INTERACTION & VOICE").foregroundColor(NewtonTheme.textSecondary)) {
                         Toggle(isOn: $settings.hapticFeedbackEnabled) {
                             HStack {
                                 Image(systemName: "iphone.radiowaves.left.and.right")
@@ -76,6 +78,21 @@ public struct SettingsView: View {
                                 Text("Auto-Scroll During Generation")
                             }
                         }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Label("Velocidad de Voz", systemImage: "waveform")
+                                    .foregroundColor(NewtonTheme.textPrimary)
+                                Spacer()
+                                Text(String(format: "%.2fx", settings.speechRate * 2.0))
+                                    .font(.system(size: 12.5, weight: .bold, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.sand)
+                            }
+                            
+                            Slider(value: $settings.speechRate, in: 0.35...0.75, step: 0.05)
+                                .tint(NewtonTheme.sand)
+                        }
+                        .padding(.vertical, 2)
                     }
                     .listRowBackground(NewtonTheme.card)
                     
@@ -157,22 +174,61 @@ public struct SettingsView: View {
                             }
                         }
                         
-                        HStack {
-                            TextField("Añadir recuerdo o contexto permanente...", text: $newMemoryInput)
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Instrucción o recuerdo para Newton...", text: $newMemoryInput)
                                 .font(.system(size: 13))
                             
-                            Button {
-                                let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmed.isEmpty {
-                                    memoryManager.addMemory(trimmed)
-                                    newMemoryInput = ""
+                            HStack(spacing: 12) {
+                                Button {
+                                    let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    if !trimmed.isEmpty {
+                                        memoryManager.addMemory(trimmed)
+                                        newMemoryInput = ""
+                                        Haptics.success()
+                                    }
+                                } label: {
+                                    Text("Añadir")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(NewtonTheme.sand)
                                 }
-                            } label: {
-                                Text("Guardar")
+                                .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSynthesizingMemory)
+                                
+                                Spacer()
+                                
+                                Button {
+                                    let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    guard !trimmed.isEmpty else { return }
+                                    isSynthesizingMemory = true
+                                    newMemoryInput = ""
+                                    Haptics.medium()
+                                    Task {
+                                        let result = await memoryManager.synthesizeMemories(instruction: trimmed)
+                                        await MainActor.run {
+                                            isSynthesizingMemory = false
+                                            synthesisStatusText = result
+                                            Haptics.success()
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        if isSynthesizingMemory {
+                                            ProgressView().controlSize(.small)
+                                        } else {
+                                            Image(systemName: "sparkles")
+                                        }
+                                        Text("Sintetizar con IA")
+                                    }
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(NewtonTheme.sand)
+                                }
+                                .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSynthesizingMemory)
                             }
-                            .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            
+                            if let status = synthesisStatusText {
+                                Text(status)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(NewtonTheme.forestGreen)
+                            }
                         }
                         .padding(.vertical, 2)
                         
@@ -220,26 +276,6 @@ public struct SettingsView: View {
                             }
                             .foregroundColor(NewtonTheme.coralRed)
                         }
-                    }
-                    .listRowBackground(NewtonTheme.card)
-                    
-                    // Privacy & Security
-                    Section(header: Text("PRIVACY & ARCHITECTURE").foregroundColor(NewtonTheme.textSecondary)) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "lock.shield.fill")
-                                    .foregroundColor(NewtonTheme.forestGreen)
-                                Text("Zero-Knowledge Local Storage")
-                                    .font(.system(size: 13.5, weight: .semibold))
-                                    .foregroundColor(NewtonTheme.textPrimary)
-                            }
-                            
-                            Text("All conversations, documents, and generated images remain securely on your device. Nothing is shared with third-party tracking or advertising services.")
-                                .font(.system(size: 11.5))
-                                .foregroundColor(NewtonTheme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.vertical, 4)
                     }
                     .listRowBackground(NewtonTheme.card)
                     

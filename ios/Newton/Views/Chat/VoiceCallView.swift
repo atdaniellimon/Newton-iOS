@@ -195,17 +195,23 @@ public struct VoiceCallView: View {
     
     private func startCall() {
         Haptics.success()
+        speechService.onSpeechFinished = {
+            DispatchQueue.main.async {
+                if !self.isMuted && !self.isProcessingResponse {
+                    self.startUserListening()
+                }
+            }
+        }
+        
         speechService.requestSpeechAuthorization { authorized in
             if authorized {
                 callStatus = "Active (Connected)"
                 // Welcome greeting if new conversation
                 if conversation.messages.isEmpty {
-                    let greeting = "Hola, soy Newton. ¿De qué te gustaría que hablemos hoy?"
+                    let greeting = "Hola. Soy Newton Singularity. ¿Qué analizamos hoy?"
                     lastSpokenResponse = greeting
+                    callStatus = "Newton Speaking..."
                     speechService.speak(text: greeting)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
-                        startUserListening()
-                    }
                 } else {
                     startUserListening()
                 }
@@ -228,8 +234,8 @@ public struct VoiceCallView: View {
     
     private func resetSilenceTimer() {
         silenceTimer?.invalidate()
-        // Wait 1.6 seconds of silence before sending the utterance to Newton
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: false) { _ in
+        // Wait 1.4 seconds of silence before sending the utterance to Newton
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.4, repeats: false) { _ in
             if !userSpeechBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 sendUserSpeechToNewton()
             }
@@ -247,17 +253,14 @@ public struct VoiceCallView: View {
         // Append user message to conversation model
         let userMessage = Message(role: .user, content: userPrompt)
         conversation.messages.append(userMessage)
+        let messagesToSend = conversation.messages
         
         Task {
             var fullResponse = ""
-            let dummyAssistant = Message(role: .assistant, content: "", isStreaming: true)
-            await MainActor.run {
-                conversation.messages.append(dummyAssistant)
-            }
             
             do {
                 let stream = LLMService.shared.streamCompletion(
-                    messages: conversation.messages,
+                    messages: messagesToSend,
                     provider: settings.currentProvider,
                     modelId: settings.currentModelId,
                     baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
@@ -277,10 +280,8 @@ public struct VoiceCallView: View {
                 )
                 
                 await MainActor.run {
-                    if let lastIdx = conversation.messages.indices.last {
-                        conversation.messages[lastIdx].content = finalContent
-                        conversation.messages[lastIdx].isStreaming = false
-                    }
+                    let assistantMessage = Message(role: .assistant, content: finalContent, isStreaming: false)
+                    conversation.messages.append(assistantMessage)
                     StorageManager.shared.updateConversation(conversation)
                     
                     self.isProcessingResponse = false
@@ -289,11 +290,6 @@ public struct VoiceCallView: View {
                     
                     // Speak back response
                     self.speechService.speak(text: finalContent)
-                    
-                    // Auto-resume listening when done speaking
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(finalContent.count) * 0.06 + 1.0) {
-                        self.startUserListening()
-                    }
                 }
                 
             } catch {

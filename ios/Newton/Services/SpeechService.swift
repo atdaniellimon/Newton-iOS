@@ -82,7 +82,7 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         }
         
         let utterance = AVSpeechUtterance(string: cleanText)
-        utterance.rate = 0.50
+        utterance.rate = Float(SettingsManager.shared.speechRate)
         utterance.pitchMultiplier = 1.0
         utterance.volume = 1.0
         utterance.preUtteranceDelay = 0.05
@@ -166,6 +166,8 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         self.currentlySpeakingMessageId = nil
     }
     
+    public var onSpeechFinished: (() -> Void)? = nil
+    
     public func toggleSpeech(for messageId: String, text: String) {
         if isSpeaking && currentlySpeakingMessageId == messageId {
             stopSpeaking()
@@ -179,6 +181,7 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         DispatchQueue.main.async {
             self.isSpeaking = false
             self.currentlySpeakingMessageId = nil
+            self.onSpeechFinished?()
         }
     }
     
@@ -186,15 +189,22 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         DispatchQueue.main.async {
             self.isSpeaking = false
             self.currentlySpeakingMessageId = nil
+            self.onSpeechFinished?()
         }
     }
     
     // MARK: - Speech-to-Text (STT) & Microphone Metering
     
     public func requestSpeechAuthorization(completion: @escaping (Bool) -> Void) {
-        SFSpeechRecognizer.requestAuthorization { status in
-            DispatchQueue.main.async {
-                completion(status == .authorized)
+        AVAudioSession.sharedInstance().requestRecordPermission { micGranted in
+            guard micGranted else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            SFSpeechRecognizer.requestAuthorization { status in
+                DispatchQueue.main.async {
+                    completion(status == .authorized)
+                }
             }
         }
     }
@@ -217,6 +227,7 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         recognitionRequest.shouldReportPartialResults = true
         
         let inputNode = audioEngine.inputNode
+        inputNode.removeTap(onBus: 0)
         
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
@@ -235,6 +246,7 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         }
         
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        guard recordingFormat.sampleRate > 0 else { return }
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
             

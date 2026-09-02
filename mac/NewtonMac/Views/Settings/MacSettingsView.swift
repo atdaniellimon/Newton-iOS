@@ -20,6 +20,8 @@ public struct MacSettingsView: View {
     @State private var showingClearCacheAlert: Bool = false
     @State private var newMemoryInput: String = ""
     @State private var showingWipeMemoriesAlert: Bool = false
+    @State private var isSynthesizingMemory: Bool = false
+    @State private var synthesisStatusText: String? = nil
     
     public init() {}
     
@@ -86,10 +88,27 @@ public struct MacSettingsView: View {
                         }
                     }
                     
-                    // Interaction Card
-                    settingsCard(title: "INTERACTION", icon: "bubble.left.and.bubble.right.fill") {
-                        VStack(alignment: .leading, spacing: 8) {
+                    // Interaction & Voice Card
+                    settingsCard(title: "INTERACTION & VOICE", icon: "waveform") {
+                        VStack(alignment: .leading, spacing: 10) {
                             Toggle("Auto-Scroll To Bottom During Streaming", isOn: $settings.autoScrollOnStream)
+                            
+                            Divider()
+                                .padding(.vertical, 2)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Speech Rate:")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color(NSColor.secondaryLabelColor))
+                                    Spacer()
+                                    Text(String(format: "%.2fx", settings.speechRate * 2.0))
+                                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                        .foregroundColor(NewtonTheme.sand)
+                                }
+                                
+                                Slider(value: $settings.speechRate, in: 0.35...0.75, step: 0.05)
+                            }
                         }
                     }
                     
@@ -197,32 +216,75 @@ public struct MacSettingsView: View {
                                 .padding(.vertical, 2)
                             
                             // Add New Memory Input Prompt
-                            HStack(spacing: 8) {
-                                TextField("Add a permanent memory or user fact...", text: $newMemoryInput)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(size: 11.5))
-                                
-                                Button(action: {
-                                    let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    if !trimmed.isEmpty {
-                                        memoryManager.addMemory(trimmed)
-                                        newMemoryInput = ""
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    TextField("Instrucción o recuerdo para Newton...", text: $newMemoryInput)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(size: 11.5))
+                                    
+                                    Button(action: {
+                                        let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        if !trimmed.isEmpty {
+                                            memoryManager.addMemory(trimmed)
+                                            newMemoryInput = ""
+                                        }
+                                    }) {
+                                        Text("Añadir")
+                                            .font(.system(size: 11.5, weight: .semibold))
+                                            .foregroundColor(NewtonTheme.sand)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color(NSColor.controlBackgroundColor))
+                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                    .stroke(Color(NSColor.separatorColor), lineWidth: 0.8)
+                                            )
                                     }
-                                }) {
-                                    Text("Add")
+                                    .buttonStyle(.plain)
+                                    .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSynthesizingMemory)
+                                    
+                                    Button(action: {
+                                        let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        guard !trimmed.isEmpty else { return }
+                                        isSynthesizingMemory = true
+                                        newMemoryInput = ""
+                                        Task {
+                                            let result = await memoryManager.synthesizeMemories(instruction: trimmed)
+                                            await MainActor.run {
+                                                isSynthesizingMemory = false
+                                                synthesisStatusText = result
+                                            }
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            if isSynthesizingMemory {
+                                                ProgressView().controlSize(.small)
+                                            } else {
+                                                Image(systemName: "sparkles")
+                                            }
+                                            Text("Sintetizar con IA")
+                                        }
                                         .font(.system(size: 11.5, weight: .semibold))
                                         .foregroundColor(NewtonTheme.sand)
-                                        .padding(.horizontal, 10)
+                                        .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
                                         .background(Color(NSColor.controlBackgroundColor))
                                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                                .stroke(Color(NSColor.separatorColor), lineWidth: 0.8)
+                                                .stroke(NewtonTheme.sand.opacity(0.4), lineWidth: 0.8)
                                         )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSynthesizingMemory)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                
+                                if let status = synthesisStatusText {
+                                    Text(status)
+                                        .font(.system(size: 10.5))
+                                        .foregroundColor(NewtonTheme.forestGreen)
+                                }
                             }
                             
                             // Wipe All Memories Button
@@ -247,7 +309,7 @@ public struct MacSettingsView: View {
                     }
                     
                     // Storage & Privacy Card
-                    settingsCard(title: "STORAGE & PRIVACY", icon: "lock.shield.fill") {
+                    settingsCard(title: "STORAGE & DATA", icon: "internaldrive.fill") {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text("Total Conversations:")
@@ -303,9 +365,6 @@ public struct MacSettingsView: View {
                         Text("Newton Singularity Core • macOS Universal")
                             .font(.system(size: 11))
                             .foregroundColor(Color(NSColor.tertiaryLabelColor))
-                        Text("Zero-Knowledge Local Storage")
-                            .font(.system(size: 10.5))
-                            .foregroundColor(NewtonTheme.forestGreen.opacity(0.8))
                     }
                     .padding(.top, 4)
                     .padding(.bottom, 8)
