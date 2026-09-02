@@ -289,7 +289,7 @@ public struct SettingsView: View {
                 Button("Cancelar", role: .cancel) {}
                 Button("Borrar Todo", role: .destructive) {
                     memoryManager.clearAllMemories()
-                    Haptics.notification(.warning)
+                    Haptics.error()
                 }
             } message: {
                 Text("Esta acción eliminará permanentemente todos los recuerdos y hechos aprendidos por Newton Singularity.")
