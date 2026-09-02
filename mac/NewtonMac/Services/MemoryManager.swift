@@ -4,6 +4,7 @@
 //
 //  Persistent Long-Term Memory Manager for Newton Singularity.
 //  Stores key user facts, stack preferences, and projects to provide natural personalized context.
+//  100% Model-Driven: populated solely by the AI model during real interactions.
 //
 
 import Foundation
@@ -38,16 +39,13 @@ public final class MemoryManager: ObservableObject {
     
     private init() {
         loadMemories()
-        if memories.isEmpty {
-            seedDefaultMemories()
-        }
     }
     
     public func addMemory(_ content: String, category: String = "general") {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         
-        // Prevent near-duplicate entries
+        // Prevent exact duplicates
         if !memories.contains(where: { $0.content.localizedCaseInsensitiveContains(trimmed) || trimmed.localizedCaseInsensitiveContains($0.content) }) {
             let newItem = MemoryItem(content: trimmed, category: category)
             memories.append(newItem)
@@ -91,24 +89,5 @@ public final class MemoryManager: ObservableObject {
            let decoded = try? JSONDecoder().decode([MemoryItem].self, from: data) {
             self.memories = decoded
         }
-    }
-    
-    private func seedDefaultMemories() {
-        let seedFacts = [
-            "Name is Daniel",
-            "Self-taught developer and entrepreneur",
-            "Based in Xalapa, Veracruz, Mexico",
-            "Works independently across multiple technical projects simultaneously",
-            "Has a private company called Daniel Limón",
-            "Has a fictional company called Moke LLC associated with some projects",
-            "Technical stack spans C, RISC-V/x86 assembly, Swift, Python, JavaScript, and HTML/CSS",
-            "Broad technical interests: systems programming, language design, AI, and product design",
-            "Approximately 22 years old, self-taught systems programmer, university student",
-            "Operates a multi-brand holding company called @Daniel Limón, with sub-brands spanning luxury interior design (ZTRN), automotive (Darwin Automobili, Moke Automotive), and tech projects",
-            "Has backgrounds in graphic design, engineering, architecture, and mechanics",
-            "Grounds decisions in philosophical or emotional truth before moving to aesthetics or implementation"
-        ]
-        
-        self.memories = seedFacts.map { MemoryItem(content: $0, category: "profile") }
     }
 }
