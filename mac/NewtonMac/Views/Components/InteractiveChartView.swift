@@ -7,8 +7,8 @@
 
 import SwiftUI
 
-public struct ChartDataPoint: Identifiable {
-    public let id = UUID()
+public struct ChartDataPoint: Identifiable, Codable {
+    public var id: String { label }
     public let label: String
     public let value: Double
     
@@ -18,39 +18,47 @@ public struct ChartDataPoint: Identifiable {
     }
 }
 
-public struct InteractiveChartView: View {
+public struct InteractiveChartPayload: Codable {
     public let title: String
     public let chartType: String
-    public let dataPoints: [ChartDataPoint]
+    public let data: [ChartDataPoint]
     
-    public init(title: String, chartType: String = "bar", dataPoints: [ChartDataPoint]) {
+    public init(title: String, chartType: String = "bar", data: [ChartDataPoint]) {
         self.title = title
         self.chartType = chartType
-        self.dataPoints = dataPoints
+        self.data = data
+    }
+}
+
+public struct InteractiveChartView: View {
+    public let data: InteractiveChartPayload
+    
+    public init(data: InteractiveChartPayload) {
+        self.data = data
     }
     
     private var maxValue: Double {
-        max(dataPoints.map { $0.value }.max() ?? 1.0, 1.0)
+        max(data.data.map { $0.value }.max() ?? 1.0, 1.0)
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(title, systemImage: "chart.bar.fill")
-                    .font(.system(size: 13.5, weight: .bold))
+                Label(data.title, systemImage: "chart.bar.fill")
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(NewtonTheme.sand)
                 Spacer()
-                Text(chartType.capitalized)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
+                Text(data.chartType.capitalized)
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
             }
             
             // Bar Columns
-            HStack(alignment: .bottom, spacing: 10) {
-                ForEach(dataPoints) { dp in
-                    VStack(spacing: 6) {
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(data.data) { dp in
+                    VStack(spacing: 5) {
                         Text(String(format: "%.0f", dp.value))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                             .foregroundColor(NewtonTheme.sand)
                         
                         RoundedRectangle(cornerRadius: 4)
@@ -61,25 +69,40 @@ public struct InteractiveChartView: View {
                                     endPoint: .bottom
                                 )
                             )
-                            .frame(height: max(CGFloat(dp.value / maxValue) * 100, 8))
+                            .frame(height: max(CGFloat(dp.value / maxValue) * 90, 6))
                         
                         Text(dp.label)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color(UIColor.secondaryLabel))
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
-            .frame(height: 140)
+            .frame(height: 130)
             .padding(.top, 4)
         }
-        .padding(14)
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(UIColor.separator).opacity(0.6), lineWidth: 0.8)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 0.8)
+        )
+    }
+    
+    public static func extractChartData(from text: String) -> InteractiveChartPayload? {
+        // Match ```chart ... ``` JSON blocks
+        let pattern = #"```chart\s*([\s\S]*?)\s*```"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+        let nsString = text as NSString
+        guard let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: nsString.length)),
+              match.numberOfRanges >= 2 else { return nil }
+        
+        let jsonStr = nsString.substring(with: match.range(at: 1))
+        guard let jsonData = jsonStr.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(InteractiveChartPayload.self, from: jsonData)
     }
 }

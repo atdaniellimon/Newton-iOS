@@ -149,6 +149,7 @@
 				E10005 /* Services */,
 				E10006 /* Utilities */,
 				E10007 /* Views */,
+				E10012 /* Intents */,
 			);
 			sourceTree = "<group>";
 		};
@@ -214,6 +215,7 @@
 				E10009 /* Chat */,
 				E10010 /* Settings */,
 				E10011 /* Sidebar */,
+				E10013 /* Workspaces */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -235,8 +237,6 @@
 				B10054 /* WebCitationCardView.swift */,
 				B10055 /* InteractiveChartView.swift */,
 				B10056 /* ShareableCardGenerator.swift */,
-				B10057 /* WorkspaceListView.swift */,
-				B10058 /* NewtonAppIntents.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -269,6 +269,22 @@
 				B10022 /* ConversationListView.swift */,
 			);
 			path = Sidebar;
+			sourceTree = "<group>";
+		};
+		E10012 /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				B10058 /* NewtonAppIntents.swift */,
+			);
+			path = Intents;
+			sourceTree = "<group>";
+		};
+		E10013 /* Workspaces */ = {
+			isa = PBXGroup;
+			children = (
+				B10057 /* WorkspaceListView.swift */,
+			);
+			path = Workspaces;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
