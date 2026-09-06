@@ -448,9 +448,8 @@ public struct MacChatView: View {
             
             // Append active workspace custom system prompt if available
             if let activeWs = WorkspaceManager.shared.activeWorkspace,
-               let customPrompt = activeWs.customSystemPrompt,
-               !customPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                systemPrompt += "\n\n[ACTIVE PROJECT WORKSPACE: \(activeWs.name)]\n\(customPrompt)"
+               !activeWs.customSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                systemPrompt += "\n\n[ACTIVE PROJECT WORKSPACE: \(activeWs.name)]\n\(activeWs.customSystemPrompt)"
             }
             
             do {
