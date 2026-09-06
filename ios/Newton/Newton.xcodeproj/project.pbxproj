@@ -50,6 +50,7 @@
 		A10041 /* iCloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10042 /* iCloudSyncService.swift */; };
 		A10042 /* DeviceBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10043 /* DeviceBridgeService.swift */; };
 		A10043 /* MemoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10044 /* MemoryManager.swift */; };
+		A10044 /* EndpointSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10045 /* EndpointSyncService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -98,6 +99,7 @@
 		B10042 /* iCloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudSyncService.swift; sourceTree = "<group>"; };
 		B10043 /* DeviceBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBridgeService.swift; sourceTree = "<group>"; };
 		B10044 /* MemoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryManager.swift; sourceTree = "<group>"; };
+		B10045 /* EndpointSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointSyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,6 +171,7 @@
 				B10042 /* iCloudSyncService.swift */,
 				B10043 /* DeviceBridgeService.swift */,
 				B10044 /* MemoryManager.swift */,
+				B10045 /* EndpointSyncService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -352,6 +355,7 @@
 				A10041 /* iCloudSyncService.swift in Sources */,
 				A10042 /* DeviceBridgeService.swift in Sources */,
 				A10043 /* MemoryManager.swift in Sources */,
+				A10044 /* EndpointSyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

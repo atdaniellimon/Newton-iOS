@@ -12,11 +12,11 @@ import SwiftUI
 public final class SettingsManager: ObservableObject {
     public static let shared = SettingsManager()
     
-    public static let hardcodedEndpoint: String = "https://aquarium-confident-wants-truth.trycloudflare.com/v1"
+    public static let hardcodedEndpoint: String = "https://supporting-butter-hydrogen-everywhere.trycloudflare.com/v1"
     
     @AppStorage("currentProvider") public var currentProviderRaw: String = AIProvider.openaiCompatible.rawValue
     @AppStorage("currentModelId") public var currentModelId: String = "newton-singularity"
-    @AppStorage("customBaseUrl") public var customBaseUrl: String = "https://aquarium-confident-wants-truth.trycloudflare.com/v1"
+    @AppStorage("customBaseUrl") public var customBaseUrl: String = "https://supporting-butter-hydrogen-everywhere.trycloudflare.com/v1"
     @AppStorage("customApiKey") public var customApiKey: String = ""
     @AppStorage("appTheme") public var appThemeRaw: String = AppThemeMode.system.rawValue
     

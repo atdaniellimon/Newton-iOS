@@ -14,6 +14,7 @@ public struct MacSettingsView: View {
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var syncService = iCloudSyncService.shared
     @ObservedObject var memoryManager = MemoryManager.shared
+    @ObservedObject var endpointSync = EndpointSyncService.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
@@ -68,6 +69,78 @@ public struct MacSettingsView: View {
             // Settings Content
             ScrollView {
                 VStack(spacing: 16) {
+                    // Server & Cloud Tunnel Status Card
+                    settingsCard(title: "SERVER & CLOUD TUNNEL", icon: "antenna.radiowaves.left.and.right") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Status:")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color(NSColor.secondaryLabelColor))
+                                Spacer()
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
+                                        .frame(width: 8, height: 8)
+                                    Text(endpointSync.isServerOnline ? "Online" : "Offline")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
+                                    if let latency = endpointSync.serverLatencyMs {
+                                        Text("(\(latency)ms)")
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(Color(NSColor.tertiaryLabelColor))
+                                    }
+                                }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Active Endpoint:")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(Color(NSColor.secondaryLabelColor))
+                                
+                                Text(endpointSync.activeEndpoint)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.sand)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .padding(6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color(NSColor.windowBackgroundColor).opacity(0.6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            }
+                            
+                            HStack {
+                                Button(action: {
+                                    Task {
+                                        await endpointSync.syncAndValidateEndpoint()
+                                    }
+                                }) {
+                                    HStack(spacing: 6) {
+                                        if endpointSync.isSyncing {
+                                            ProgressView().controlSize(.small)
+                                        } else {
+                                            Image(systemName: "arrow.triangle.2.circlepath")
+                                        }
+                                        Text("Sincronizar desde GitHub (config.json)")
+                                    }
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundColor(NewtonTheme.sand)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Color(NSColor.controlBackgroundColor))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .stroke(Color(NSColor.separatorColor), lineWidth: 0.8)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(endpointSync.isSyncing)
+                                
+                                Spacer()
+                            }
+                        }
+                    }
+                    
                     // Appearance & Theme Card
                     settingsCard(title: "APPEARANCE & THEME", icon: "paintbrush.fill") {
                         VStack(alignment: .leading, spacing: 12) {

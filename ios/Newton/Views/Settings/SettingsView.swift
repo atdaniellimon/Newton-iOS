@@ -13,6 +13,7 @@ public struct SettingsView: View {
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var syncService = iCloudSyncService.shared
     @ObservedObject var memoryManager = MemoryManager.shared
+    @ObservedObject var endpointSync = EndpointSyncService.shared
     @Environment(\.dismiss) private var dismiss
     
     @State private var showingClearCacheAlert: Bool = false
@@ -29,9 +30,63 @@ public struct SettingsView: View {
         NavigationView {
             ZStack {
                 NewtonTheme.bg
-                    .ignoresSafeArea()
+                .ignoresSafeArea()
                 
                 Form {
+                    // Server & Cloud Tunnel Section
+                    Section(header: Text("SERVER & CLOUD TUNNEL").foregroundColor(NewtonTheme.textSecondary)) {
+                        HStack {
+                            Label("Estado del Servidor", systemImage: "antenna.radiowaves.left.and.right")
+                                .foregroundColor(NewtonTheme.textPrimary)
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
+                                    .frame(width: 8, height: 8)
+                                Text(endpointSync.isServerOnline ? "Online" : "Offline")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
+                                if let latency = endpointSync.serverLatencyMs {
+                                    Text("(\(latency)ms)")
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(NewtonTheme.textSecondary)
+                                }
+                            }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Endpoint Activo:")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                            Text(endpointSync.activeEndpoint)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(NewtonTheme.sand)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .padding(.vertical, 2)
+                        
+                        Button {
+                            Haptics.medium()
+                            Task {
+                                await endpointSync.syncAndValidateEndpoint()
+                                Haptics.success()
+                            }
+                        } label: {
+                            HStack {
+                                if endpointSync.isSyncing {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                }
+                                Text("Sincronizar desde GitHub (config.json)")
+                            }
+                            .foregroundColor(NewtonTheme.sand)
+                        }
+                        .disabled(endpointSync.isSyncing)
+                    }
+                    .listRowBackground(NewtonTheme.card)
+                    
                     // Appearance Section
                     Section(header: Text("APPEARANCE").foregroundColor(NewtonTheme.textSecondary)) {
                         Picker("Theme", selection: $settings.appTheme) {
