@@ -2,10 +2,11 @@
 //  AttachmentCardView.swift
 //  Newton
 //
-//  Native, rich visual card component for file attachments.
+//  Native, rich visual card component for file attachments on macOS.
 //
 
 import SwiftUI
+import AppKit
 
 public struct AttachmentCardView: View {
     public let attachment: FileAttachment
@@ -35,7 +36,7 @@ public struct AttachmentCardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(attachment.fileName)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color(UIColor.label))
+                        .foregroundColor(.primary)
                         .lineLimit(1)
                     
                     HStack(spacing: 6) {
@@ -49,12 +50,12 @@ public struct AttachmentCardView: View {
                         
                         Text(attachment.fileSizeFormatted)
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(Color(UIColor.secondaryLabel))
+                            .foregroundColor(.secondary)
                         
                         if let lines = attachment.lineCount {
                             Text("• \(lines) lines")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(UIColor.secondaryLabel))
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
@@ -63,14 +64,14 @@ public struct AttachmentCardView: View {
                 
                 Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 14))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(.secondary.opacity(0.7))
             }
             .padding(10)
-            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .background(Color(NSColor.controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color(UIColor.separator).opacity(0.5), lineWidth: 0.8)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.8)
             )
         }
         .buttonStyle(.plain)
@@ -85,51 +86,52 @@ struct AttachmentPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(UIColor.systemGroupedBackground).ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Label(attachment.fileName, systemImage: attachment.iconName)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(NewtonTheme.sand)
-                            Spacer()
-                            Text(attachment.fileSizeFormatted)
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundColor(Color(UIColor.secondaryLabel))
-                        }
-                        .padding()
-                        .background(Color(UIColor.secondarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        
-                        if let preview = attachment.previewSnippet, !preview.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Content Preview")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(Color(UIColor.secondaryLabel))
-                                
-                                Text(preview)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .padding(12)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color(UIColor.tertiarySystemGroupedBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
+        VStack(spacing: 0) {
+            HStack {
+                Text(attachment.fileName)
+                    .font(.system(size: 15, weight: .bold))
+                Spacer()
+                Button("Done") { dismiss() }
+                    .foregroundColor(NewtonTheme.sand)
+            }
+            .padding()
+            .background(Color(NSColor.windowBackgroundColor))
+            
+            Divider()
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Label(attachment.fileName, systemImage: attachment.iconName)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(NewtonTheme.sand)
+                        Spacer()
+                        Text(attachment.fileSizeFormatted)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.secondary)
                     }
                     .padding()
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    
+                    if let preview = attachment.previewSnippet, !preview.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Content Preview")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            
+                            Text(preview)
+                                .font(.system(size: 12, design: .monospaced))
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(NSColor.controlBackgroundColor).opacity(0.7))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
                 }
-            }
-            .navigationTitle("Attachment")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(NewtonTheme.sand)
-                }
+                .padding()
             }
         }
+        .frame(minWidth: 420, minHeight: 320)
     }
 }

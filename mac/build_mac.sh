@@ -11,7 +11,7 @@ rm -rf "$APP_DIR" "build/Newton-Mac.zip" "build/Newton-Mac.dmg"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 # 1. Compile Swift sources
-find mac/NewtonMac -name "*.swift" -print0 | xargs -0 swiftc -O \
+find mac/NewtonMac -name "*.swift" -print0 | xargs -0 swiftc \
   -target x86_64-apple-macos12.0 \
   -sdk $(xcrun --show-sdk-path) \
   -framework SwiftUI \
