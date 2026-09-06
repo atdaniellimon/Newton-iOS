@@ -11,9 +11,7 @@ rm -rf "$APP_DIR" "build/Newton-Mac.zip" "build/Newton-Mac.dmg"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 # 1. Compile Swift sources
-SWIFT_FILES=$(find mac/NewtonMac -name "*.swift")
-
-swiftc -O \
+find mac/NewtonMac -name "*.swift" -print0 | xargs -0 swiftc -O \
   -target x86_64-apple-macos12.0 \
   -sdk $(xcrun --show-sdk-path) \
   -framework SwiftUI \
@@ -25,8 +23,7 @@ swiftc -O \
   -framework CoreLocation \
   -framework EventKit \
   -framework UserNotifications \
-  -o "$MACOS_DIR/Newton" \
-  $SWIFT_FILES
+  -o "$MACOS_DIR/Newton"
 
 # 2. Generate Info.plist
 cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
