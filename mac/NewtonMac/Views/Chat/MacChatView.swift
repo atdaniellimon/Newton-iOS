@@ -391,13 +391,14 @@ public struct MacChatView: View {
                 }
             }
             
+            let formattedSize = ByteCountFormatter.string(fromByteCount: Int64(fileData.count), countStyle: .file)
             let attachment = FileAttachment(
                 id: UUID().uuidString,
                 fileName: fileName,
-                fileSize: Int64(fileData.count),
                 fileExtension: (fileName as NSString).pathExtension,
+                fileSizeFormatted: formattedSize,
                 lineCount: lineCount,
-                textPreviewSnippet: extractedSnippet
+                previewSnippet: extractedSnippet
             )
             attachmentsList.append(attachment)
         }
@@ -412,7 +413,7 @@ public struct MacChatView: View {
         let userMessage = Message(
             role: .user,
             content: rawInput,
-            attachments: attachmentsList.isEmpty ? nil : attachmentsList
+            attachments: attachmentsList
         )
         conversation.messages.append(userMessage)
         
@@ -498,7 +499,7 @@ public struct MacChatView: View {
                 // Process Orbits
                 let orbitResults = await OrbitEngine.shared.processOrbitsInText(
                     fullResponse,
-                    userPrompt: displayPrompt,
+                    userPrompt: rawInput,
                     baseUrl: baseUrl,
                     apiKey: apiKey
                 )
