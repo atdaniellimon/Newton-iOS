@@ -12,12 +12,17 @@ import SwiftUI
 public final class WorkspaceManager: ObservableObject {
     public static let shared = WorkspaceManager()
     
-    @AppStorage("activeWorkspaceId") public var activeWorkspaceId: String = "default"
+    @Published public var activeWorkspaceId: String {
+        didSet {
+            UserDefaults.standard.set(activeWorkspaceId, forKey: "activeWorkspaceId")
+        }
+    }
     @Published public var workspaces: [Workspace] = []
     
     private let storageKey = "newton_workspaces_list"
     
     private init() {
+        self.activeWorkspaceId = UserDefaults.standard.string(forKey: "activeWorkspaceId") ?? "default"
         loadWorkspaces()
     }
     
