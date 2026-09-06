@@ -11,6 +11,7 @@ import AppKit
 
 public struct NewtonCodeDashboardView: View {
     @Binding public var inputPrompt: String
+    @Binding public var isSidebarCollapsed: Bool
     public var onStartTask: (String) -> Void
     
     @ObservedObject private var workspace = NewtonCodeWorkspaceManager.shared
@@ -20,26 +21,26 @@ public struct NewtonCodeDashboardView: View {
     
     private var isDark: Bool { colorScheme == .dark }
     
-    public init(inputPrompt: Binding<String>, onStartTask: @escaping (String) -> Void) {
+    public init(inputPrompt: Binding<String>, isSidebarCollapsed: Binding<Bool> = .constant(false), onStartTask: @escaping (String) -> Void) {
         self._inputPrompt = inputPrompt
+        self._isSidebarCollapsed = isSidebarCollapsed
         self.onStartTask = onStartTask
     }
     
     public var body: some View {
         VStack(spacing: 0) {
+            // Top Header Bar
+            topDashboardHeader
+            
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Header: What's up next, daniel?
                     HStack(spacing: 8) {
-                        Text("✴")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(NewtonTheme.sand)
-                        
                         Text("What's up next, daniel?")
                             .font(.system(size: 22, weight: .semibold, design: .serif))
                             .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.99) : Color(red: 0.08, green: 0.11, blue: 0.16))
                     }
-                    .padding(.top, 28)
+                    .padding(.top, 16)
                     
                     // Analytics Card
                     VStack(alignment: .leading, spacing: 16) {
@@ -83,16 +84,12 @@ public struct NewtonCodeDashboardView: View {
                             }
                         }
                         
-                        // 8 Metrics Grid
+                        // 4 Essential Metrics Grid
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                             metricBox(title: "Sessions", value: "\(workspace.realTotalSessionsCount)")
                             metricBox(title: "Messages", value: "\(workspace.realTotalMessagesCount)")
                             metricBox(title: "Total tokens", value: workspace.realTotalTokensFormatted)
-                            metricBox(title: "Active days", value: "\(workspace.activeDaysCount)")
-                            metricBox(title: "Current streak", value: "\(workspace.currentStreak)d")
-                            metricBox(title: "Longest streak", value: "\(workspace.longestStreak)d")
-                            metricBox(title: "Peak hour", value: "6 PM")
-                            metricBox(title: "Favorite model", value: "Singularity")
+                            metricBox(title: "Favourite model", value: "Singularity")
                         }
                         
                         // Activity Heatmap Grid
@@ -130,6 +127,55 @@ public struct NewtonCodeDashboardView: View {
             )
         }
         .background(isDark ? Color(red: 0.08, green: 0.10, blue: 0.13) : Color(red: 0.96, green: 0.97, blue: 0.99))
+    }
+    
+    @ViewBuilder
+    private var topDashboardHeader: some View {
+        HStack(spacing: 10) {
+            if isSidebarCollapsed {
+                Color.clear
+                    .frame(width: 68, height: 28)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isSidebarCollapsed = false
+                    }
+                }) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+                        .frame(width: 28, height: 28)
+                        .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Show Sidebar")
+            }
+            
+            Text("Newton Code")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.99) : Color(red: 0.08, green: 0.11, blue: 0.16))
+            
+            Text(workspace.activeProjectName)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : Color(red: 0.45, green: 0.50, blue: 0.58))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            
+            Spacer()
+        }
+        .padding(.horizontal, isSidebarCollapsed ? 12 : 24)
+        .padding(.top, 14)
+        .padding(.bottom, 6)
+        .frame(height: 52)
+        .overlay(
+            Rectangle()
+                .fill(isDark ? Color(red: 0.18, green: 0.22, blue: 0.28) : Color(red: 0.88, green: 0.90, blue: 0.94))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
     
     @ViewBuilder

@@ -17,23 +17,35 @@ public struct MainMacSplitView: View {
     @State private var selectedConversation: Conversation? = nil
     @State private var selectedSidebarTab: SidebarTab = .chat
     @State private var dashboardPrompt: String = ""
+    @State private var isSidebarCollapsed: Bool = false
     @Environment(\.colorScheme) private var colorScheme
     
     public var body: some View {
         HStack(spacing: 0) {
             // Sidebar Column
-            MacConversationListView(
-                selectedConversation: $selectedConversation,
-                selectedSidebarTab: $selectedSidebarTab
-            )
+            if !isSidebarCollapsed {
+                MacConversationListView(
+                    selectedConversation: $selectedConversation,
+                    selectedSidebarTab: $selectedSidebarTab,
+                    isSidebarCollapsed: $isSidebarCollapsed
+                )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+            }
             
             // Main Canvas Area
             if selectedSidebarTab == .code {
                 if let selected = bindingForSelectedConversation(), !selected.wrappedValue.messages.isEmpty {
-                    NewtonCodeChatView(conversation: selected)
+                    NewtonCodeChatView(
+                        conversation: selected,
+                        isSidebarCollapsed: $isSidebarCollapsed
+                    )
                 } else {
                     NewtonCodeDashboardView(
                         inputPrompt: $dashboardPrompt,
+                        isSidebarCollapsed: $isSidebarCollapsed,
                         onStartTask: { prompt in
                             var newConvo = storage.createConversation()
                             newConvo.workspacePath = workspace.activeWorkspacePath
@@ -47,7 +59,10 @@ public struct MainMacSplitView: View {
                 }
             } else {
                 if let selected = bindingForSelectedConversation() {
-                    MacChatView(conversation: selected)
+                    MacChatView(
+                        conversation: selected,
+                        isSidebarCollapsed: $isSidebarCollapsed
+                    )
                 } else {
                     VStack {
                         Spacer()

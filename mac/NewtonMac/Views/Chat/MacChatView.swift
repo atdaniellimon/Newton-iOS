@@ -12,6 +12,8 @@ import PDFKit
 
 public struct MacChatView: View {
     @Binding public var conversation: Conversation
+    @Binding public var isSidebarCollapsed: Bool
+    
     @StateObject private var storage = StorageManager.shared
     @StateObject private var settings = SettingsManager.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -23,8 +25,9 @@ public struct MacChatView: View {
     @State private var attachedFileName: String? = nil
     @State private var attachedFileData: Data? = nil
     
-    public init(conversation: Binding<Conversation>) {
+    public init(conversation: Binding<Conversation>, isSidebarCollapsed: Binding<Bool> = .constant(false)) {
         self._conversation = conversation
+        self._isSidebarCollapsed = isSidebarCollapsed
     }
     
     private var isDark: Bool { colorScheme == .dark }
@@ -87,7 +90,28 @@ public struct MacChatView: View {
     
     @ViewBuilder
     private var topHeaderBar: some View {
-        HStack {
+        HStack(spacing: 10) {
+            // Traffic Light spacer when sidebar is collapsed
+            if isSidebarCollapsed {
+                Color.clear
+                    .frame(width: 68, height: 28)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isSidebarCollapsed = false
+                    }
+                }) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+                        .frame(width: 28, height: 28)
+                        .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Show Sidebar")
+            }
+            
             // Model Pill matching Web screenshot
             Button(action: {
                 showModelSheet.toggle()
@@ -141,9 +165,10 @@ public struct MacChatView: View {
             
             Spacer()
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 4)
+        .padding(.horizontal, isSidebarCollapsed ? 12 : 24)
+        .padding(.top, 14)
         .padding(.bottom, 6)
+        .frame(height: 52)
     }
     
     @ViewBuilder

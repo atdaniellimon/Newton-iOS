@@ -19,6 +19,7 @@ public enum SidebarTab: String, CaseIterable, Identifiable {
 public struct MacConversationListView: View {
     @Binding public var selectedConversation: Conversation?
     @Binding public var selectedSidebarTab: SidebarTab
+    @Binding public var isSidebarCollapsed: Bool
     
     @StateObject private var storage = StorageManager.shared
     @StateObject private var settings = SettingsManager.shared
@@ -30,10 +31,12 @@ public struct MacConversationListView: View {
     
     public init(
         selectedConversation: Binding<Conversation?>,
-        selectedSidebarTab: Binding<SidebarTab>
+        selectedSidebarTab: Binding<SidebarTab>,
+        isSidebarCollapsed: Binding<Bool> = .constant(false)
     ) {
         self._selectedConversation = selectedConversation
         self._selectedSidebarTab = selectedSidebarTab
+        self._isSidebarCollapsed = isSidebarCollapsed
     }
     
     private var isDark: Bool { colorScheme == .dark }
@@ -79,6 +82,7 @@ public struct MacConversationListView: View {
     @ViewBuilder
     private var topHeaderRow: some View {
         HStack(spacing: 6) {
+            // Traffic Light spacer
             Color.clear
                 .frame(width: 68, height: 28)
             
@@ -95,9 +99,26 @@ public struct MacConversationListView: View {
                     selectedConversation = nil
                 }
             }
+            
+            Button(action: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isSidebarCollapsed.toggle()
+                }
+            }) {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+                    .frame(width: 28, height: 28)
+                    .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Toggle Sidebar")
         }
         .padding(.horizontal, 10)
         .padding(.top, 14)
+        .padding(.bottom, 6)
+        .frame(height: 52)
     }
     
     // MARK: - Chat Mode Sidebar Content
@@ -228,25 +249,6 @@ public struct MacConversationListView: View {
             }
             
             Spacer()
-            
-            // Bottom Profile Badge (daniel · Gateway)
-            HStack(spacing: 8) {
-                Text("✴")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(NewtonTheme.sand)
-                
-                Text("daniel · Gateway")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundColor(isDark ? Color(red: 0.85, green: 0.88, blue: 0.94) : Color(red: 0.20, green: 0.25, blue: 0.32))
-                
-                Spacer()
-                
-                Circle()
-                    .fill(NewtonTheme.forestGreen)
-                    .frame(width: 5.5, height: 5.5)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
     }
     

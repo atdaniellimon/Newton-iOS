@@ -11,6 +11,8 @@ import AppKit
 
 public struct NewtonCodeChatView: View {
     @Binding public var conversation: Conversation
+    @Binding public var isSidebarCollapsed: Bool
+    
     @ObservedObject private var workspace = NewtonCodeWorkspaceManager.shared
     @ObservedObject private var settings = SettingsManager.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -22,8 +24,9 @@ public struct NewtonCodeChatView: View {
     
     private var isDark: Bool { colorScheme == .dark }
     
-    public init(conversation: Binding<Conversation>) {
+    public init(conversation: Binding<Conversation>, isSidebarCollapsed: Binding<Bool> = .constant(false)) {
         self._conversation = conversation
+        self._isSidebarCollapsed = isSidebarCollapsed
     }
     
     public var body: some View {
@@ -79,7 +82,28 @@ public struct NewtonCodeChatView: View {
     
     @ViewBuilder
     private var topProjectHeader: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            // Traffic light spacer when sidebar is collapsed
+            if isSidebarCollapsed {
+                Color.clear
+                    .frame(width: 68, height: 28)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isSidebarCollapsed = false
+                    }
+                }) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(isDark ? Color(red: 0.70, green: 0.75, blue: 0.84) : Color(red: 0.40, green: 0.45, blue: 0.52))
+                        .frame(width: 28, height: 28)
+                        .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Show Sidebar")
+            }
+            
             Text(conversation.title.isEmpty ? "Coding Task" : conversation.title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(isDark ? Color(red: 0.94, green: 0.96, blue: 0.99) : Color(red: 0.08, green: 0.11, blue: 0.16))
@@ -88,7 +112,7 @@ public struct NewtonCodeChatView: View {
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundColor(isDark ? Color(red: 0.65, green: 0.70, blue: 0.78) : Color(red: 0.45, green: 0.50, blue: 0.58))
                 .padding(.horizontal, 7)
-                .padding(.vertical, 2)
+                .padding(.vertical, 3)
                 .background(isDark ? Color(red: 0.16, green: 0.19, blue: 0.25) : Color(red: 0.90, green: 0.92, blue: 0.96))
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             
@@ -111,9 +135,10 @@ public struct NewtonCodeChatView: View {
             .buttonStyle(.plain)
             .help("Toggle Inspector")
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.horizontal, isSidebarCollapsed ? 12 : 24)
+        .padding(.top, 14)
+        .padding(.bottom, 6)
+        .frame(height: 52)
         .overlay(
             Rectangle()
                 .fill(isDark ? Color(red: 0.18, green: 0.22, blue: 0.28) : Color(red: 0.88, green: 0.90, blue: 0.94))

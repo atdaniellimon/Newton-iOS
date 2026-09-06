@@ -97,16 +97,17 @@ zip -r -y "Newton-Mac.zip" "Newton.app"
 hdiutil create -volname "Newton" -srcfolder "Newton.app" -ov -format UDZO "Newton-Mac.dmg"
 cd ..
 
-# 6. Automatically install/replace into ~/Applications and /Applications
+# 6. Auto-deploy to ~/Applications/ and /Applications/
+echo "=== Deploying to Applications ==="
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/Newton.app"
-cp -R "$APP_DIR" "$HOME/Applications/Newton.app"
-echo "=== Installed into $HOME/Applications/Newton.app ==="
+cp -R "build/Newton.app" "$HOME/Applications/Newton.app"
+echo "✅ Successfully deployed to $HOME/Applications/Newton.app"
 
 if [ -w "/Applications" ]; then
-    rm -rf "/Applications/Newton.app" 2>/dev/null || true
-    cp -R "$APP_DIR" "/Applications/Newton.app" 2>/dev/null || true
-    echo "=== Installed into /Applications/Newton.app ==="
+    rm -rf "/Applications/Newton.app"
+    cp -R "build/Newton.app" "/Applications/Newton.app"
+    echo "✅ Successfully deployed to /Applications/Newton.app"
 fi
 
-echo "=== Newton macOS App built successfully at build/Newton.app and build/Newton-Mac.dmg ==="
+echo "=== Newton macOS App built & deployed successfully! ==="
