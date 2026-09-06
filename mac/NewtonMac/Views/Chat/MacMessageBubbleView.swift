@@ -32,9 +32,9 @@ public struct MacMessageBubbleView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     
-                    if let attachments = message.attachments, !attachments.isEmpty {
+                    if !message.attachments.isEmpty {
                         VStack(alignment: .trailing, spacing: 6) {
-                            ForEach(attachments) { att in
+                            ForEach(message.attachments) { att in
                                 AttachmentCardView(attachment: att)
                             }
                         }
