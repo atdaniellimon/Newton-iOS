@@ -49,6 +49,7 @@ public struct Message: Identifiable, Codable, Equatable, Hashable {
     public var thinkingContent: String?
     public var imageUrl: String?
     public var orbitResults: [OrbitExecutionResult]
+    public var attachments: [FileAttachment]
     public let createdAt: Date
     public var isStreaming: Bool
     
@@ -59,6 +60,7 @@ public struct Message: Identifiable, Codable, Equatable, Hashable {
         thinkingContent: String? = nil,
         imageUrl: String? = nil,
         orbitResults: [OrbitExecutionResult] = [],
+        attachments: [FileAttachment] = [],
         createdAt: Date = Date(),
         isStreaming: Bool = false
     ) {
@@ -68,12 +70,13 @@ public struct Message: Identifiable, Codable, Equatable, Hashable {
         self.thinkingContent = thinkingContent
         self.imageUrl = imageUrl
         self.orbitResults = orbitResults
+        self.attachments = attachments
         self.createdAt = createdAt
         self.isStreaming = isStreaming
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, role, content, thinkingContent, imageUrl, orbitResults, createdAt, isStreaming
+        case id, role, content, thinkingContent, imageUrl, orbitResults, attachments, createdAt, isStreaming
     }
     
     public init(from decoder: Decoder) throws {
@@ -84,6 +87,7 @@ public struct Message: Identifiable, Codable, Equatable, Hashable {
         thinkingContent = try container.decodeIfPresent(String.self, forKey: .thinkingContent)
         imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
         orbitResults = try container.decodeIfPresent([OrbitExecutionResult].self, forKey: .orbitResults) ?? []
+        attachments = try container.decodeIfPresent([FileAttachment].self, forKey: .attachments) ?? []
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
     }
@@ -95,6 +99,7 @@ public struct Message: Identifiable, Codable, Equatable, Hashable {
                lhs.thinkingContent == rhs.thinkingContent &&
                lhs.imageUrl == rhs.imageUrl &&
                lhs.orbitResults == rhs.orbitResults &&
+               lhs.attachments == rhs.attachments &&
                lhs.isStreaming == rhs.isStreaming
     }
 }

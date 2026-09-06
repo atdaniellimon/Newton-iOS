@@ -117,6 +117,8 @@ public struct MacChatView: View {
             }
             .buttonStyle(.plain)
             
+            MacWorkspaceSelector()
+            
             if conversation.isGhost {
                 Button(action: {
                     conversation.messages.removeAll()
@@ -360,44 +362,58 @@ public struct MacChatView: View {
     
     private func sendMessage() {
         let rawInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        var displayPrompt = rawInput
         var backendPayloadPrompt = rawInput
+        var attachmentsList: [FileAttachment] = []
         
         let hasFile = attachedFileData != nil
         let fileName = attachedFileName ?? "Document"
         
-        if hasFile {
-            if displayPrompt.isEmpty {
-                displayPrompt = "📎 \(fileName)"
-            } else {
-                displayPrompt = "\(displayPrompt)\n\n📎 \(fileName)"
-            }
+        if hasFile, let fileData = attachedFileData {
+            var extractedSnippet: String? = nil
+            var lineCount: Int? = nil
             
-            if let fileData = attachedFileData {
-                if let textContent = String(data: fileData, encoding: .utf8) {
-                    backendPayloadPrompt += "\n\n[File Attached: \(fileName)]:\n```\n\(textContent)\n```"
-                } else if let pdfDoc = PDFDocument(data: fileData) {
-                    var extractedPdf = ""
-                    for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
-                        if let page = pdfDoc.page(at: pageIdx), let str = page.string {
-                            extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
-                        }
-                    }
-                    if !extractedPdf.isEmpty {
-                        backendPayloadPrompt += "\n\n[Extracted Text from Attached PDF: \(fileName)]:\n```\n\(extractedPdf)\n```"
+            if let textContent = String(data: fileData, encoding: .utf8) {
+                lineCount = textContent.components(separatedBy: "\n").count
+                let previewLines = textContent.components(separatedBy: "\n").prefix(5).joined(separator: "\n")
+                extractedSnippet = previewLines.isEmpty ? nil : previewLines
+                backendPayloadPrompt += "\n\n[File Attached: \(fileName)]:\n```\n\(textContent)\n```"
+            } else if let pdfDoc = PDFDocument(data: fileData) {
+                var extractedPdf = ""
+                for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
+                    if let page = pdfDoc.page(at: pageIdx), let str = page.string {
+                        extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
                     }
                 }
+                if !extractedPdf.isEmpty {
+                    backendPayloadPrompt += "\n\n[Extracted Text from Attached PDF: \(fileName)]:\n```\n\(extractedPdf)\n```"
+                    let previewLines = extractedPdf.components(separatedBy: "\n").prefix(5).joined(separator: "\n")
+                    extractedSnippet = previewLines.isEmpty ? nil : previewLines
+                }
             }
+            
+            let attachment = FileAttachment(
+                id: UUID().uuidString,
+                fileName: fileName,
+                fileSize: Int64(fileData.count),
+                fileExtension: (fileName as NSString).pathExtension,
+                lineCount: lineCount,
+                textPreviewSnippet: extractedSnippet
+            )
+            attachmentsList.append(attachment)
         }
         
-        guard !displayPrompt.isEmpty || attachedFileData != nil else { return }
+        guard !rawInput.isEmpty || !attachmentsList.isEmpty else { return }
         
         let isFirstMessage = conversation.messages.isEmpty
         inputText = ""
         attachedFileName = nil
         attachedFileData = nil
         
-        let userMessage = Message(role: .user, content: displayPrompt)
+        let userMessage = Message(
+            role: .user,
+            content: rawInput,
+            attachments: attachmentsList.isEmpty ? nil : attachmentsList
+        )
         conversation.messages.append(userMessage)
         
         if isFirstMessage {
@@ -427,7 +443,14 @@ public struct MacChatView: View {
             let apiKey = settings.getApiKey(for: provider)
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
-            let systemPrompt = SettingsManager.singularitySystemPrompt
+            var systemPrompt = SettingsManager.singularitySystemPrompt
+            
+            // Append active workspace custom system prompt if available
+            if let activeWs = WorkspaceManager.shared.activeWorkspace,
+               let customPrompt = activeWs.customSystemPrompt,
+               !customPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                systemPrompt += "\n\n[ACTIVE PROJECT WORKSPACE: \(activeWs.name)]\n\(customPrompt)"
+            }
             
             do {
                 let stream = LLMService.shared.streamCompletion(

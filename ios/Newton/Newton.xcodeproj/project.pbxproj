@@ -51,6 +51,15 @@
 		A10042 /* DeviceBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10043 /* DeviceBridgeService.swift */; };
 		A10043 /* MemoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10044 /* MemoryManager.swift */; };
 		A10044 /* EndpointSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10045 /* EndpointSyncService.swift */; };
+		A10050 /* FileAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10050 /* FileAttachment.swift */; };
+		A10051 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10051 /* Workspace.swift */; };
+		A10052 /* WorkspaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10052 /* WorkspaceManager.swift */; };
+		A10053 /* AttachmentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10053 /* AttachmentCardView.swift */; };
+		A10054 /* WebCitationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10054 /* WebCitationCardView.swift */; };
+		A10055 /* InteractiveChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10055 /* InteractiveChartView.swift */; };
+		A10056 /* ShareableCardGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10056 /* ShareableCardGenerator.swift */; };
+		A10057 /* WorkspaceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10057 /* WorkspaceListView.swift */; };
+		A10058 /* NewtonAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10058 /* NewtonAppIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +109,15 @@
 		B10043 /* DeviceBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceBridgeService.swift; sourceTree = "<group>"; };
 		B10044 /* MemoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryManager.swift; sourceTree = "<group>"; };
 		B10045 /* EndpointSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointSyncService.swift; sourceTree = "<group>"; };
+		B10050 /* FileAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAttachment.swift; sourceTree = "<group>"; };
+		B10051 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
+		B10052 /* WorkspaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManager.swift; sourceTree = "<group>"; };
+		B10053 /* AttachmentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentCardView.swift; sourceTree = "<group>"; };
+		B10054 /* WebCitationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebCitationCardView.swift; sourceTree = "<group>"; };
+		B10055 /* InteractiveChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveChartView.swift; sourceTree = "<group>"; };
+		B10056 /* ShareableCardGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareableCardGenerator.swift; sourceTree = "<group>"; };
+		B10057 /* WorkspaceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceListView.swift; sourceTree = "<group>"; };
+		B10058 /* NewtonAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewtonAppIntents.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +167,8 @@
 				B10003 /* AIModel.swift */,
 				B10004 /* Message.swift */,
 				B10005 /* Conversation.swift */,
+				B10050 /* FileAttachment.swift */,
+				B10051 /* Workspace.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -172,6 +192,7 @@
 				B10043 /* DeviceBridgeService.swift */,
 				B10044 /* MemoryManager.swift */,
 				B10045 /* EndpointSyncService.swift */,
+				B10052 /* WorkspaceManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -210,6 +231,12 @@
 				B10039 /* NewtonLiveActivityWidget.swift */,
 				B10040 /* NewtonWidgets.swift */,
 				B10041 /* ImageGenerationPlaceholderView.swift */,
+				B10053 /* AttachmentCardView.swift */,
+				B10054 /* WebCitationCardView.swift */,
+				B10055 /* InteractiveChartView.swift */,
+				B10056 /* ShareableCardGenerator.swift */,
+				B10057 /* WorkspaceListView.swift */,
+				B10058 /* NewtonAppIntents.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -356,6 +383,15 @@
 				A10042 /* DeviceBridgeService.swift in Sources */,
 				A10043 /* MemoryManager.swift in Sources */,
 				A10044 /* EndpointSyncService.swift in Sources */,
+				A10050 /* FileAttachment.swift in Sources */,
+				A10051 /* Workspace.swift in Sources */,
+				A10052 /* WorkspaceManager.swift in Sources */,
+				A10053 /* AttachmentCardView.swift in Sources */,
+				A10054 /* WebCitationCardView.swift in Sources */,
+				A10055 /* InteractiveChartView.swift in Sources */,
+				A10056 /* ShareableCardGenerator.swift in Sources */,
+				A10057 /* WorkspaceListView.swift in Sources */,
+				A10058 /* NewtonAppIntents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

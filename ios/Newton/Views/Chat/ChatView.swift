@@ -16,6 +16,7 @@ private enum ActiveModalSheet: Identifiable {
     case photoLibrary
     case settings
     case modelPicker
+    case workspaces
     
     var id: String {
         switch self {
@@ -23,6 +24,7 @@ private enum ActiveModalSheet: Identifiable {
         case .photoLibrary: return "photoLibrary"
         case .settings: return "settings"
         case .modelPicker: return "modelPicker"
+        case .workspaces: return "workspaces"
         }
     }
 }
@@ -31,6 +33,7 @@ public struct ChatView: View {
     @Binding public var conversation: Conversation
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var storage = StorageManager.shared
+    @ObservedObject var workspaceManager = WorkspaceManager.shared
     
     @State private var inputText: String = ""
     @State private var attachedImage: UIImage? = nil
@@ -244,6 +247,26 @@ public struct ChatView: View {
         .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    Haptics.light()
+                    activeSheet = .workspaces
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: workspaceManager.activeWorkspace?.iconName ?? "globe")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(workspaceManager.activeWorkspace?.name ?? "Global")
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(NewtonTheme.sand)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(NewtonTheme.sand.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+            }
+            
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 // Ghost Mode Toggle
                 Button {
@@ -320,6 +343,8 @@ public struct ChatView: View {
                 SettingsView()
             case .modelPicker:
                 ModelPickerSheet(selectedModelId: $settings.currentModelId)
+            case .workspaces:
+                WorkspaceListView()
             }
         }
         .fileImporter(
@@ -376,37 +401,49 @@ public struct ChatView: View {
         let hasFile = attachedFileData != nil
         let fileName = attachedFileName ?? "Document"
         
+        var createdAttachments: [FileAttachment] = []
+        
         if displayPrompt.isEmpty && attachedImage != nil {
             displayPrompt = "Describe and analyze this image."
             backendPayloadPrompt = displayPrompt
         }
         
-        if hasFile {
-            if displayPrompt.isEmpty {
-                displayPrompt = "📎 \(fileName)"
-            } else {
-                displayPrompt = "\(displayPrompt)\n\n📎 \(fileName)"
-            }
+        if hasFile, let fileData = attachedFileData {
+            let ext = (fileName as NSString).pathExtension
+            let sizeStr = ByteCountFormatter.string(fromByteCount: Int64(fileData.count), countStyle: .file)
+            var previewText: String? = nil
+            var lines: Int? = nil
             
-            if let fileData = attachedFileData {
-                if let textContent = String(data: fileData, encoding: .utf8) {
-                    backendPayloadPrompt += "\n\n[File Attached: \(fileName)]:\n```\n\(textContent)\n```"
-                } else if let pdfDoc = PDFDocument(data: fileData) {
-                    var extractedPdf = ""
-                    for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
-                        if let page = pdfDoc.page(at: pageIdx), let str = page.string {
-                            extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
-                        }
-                    }
-                    if !extractedPdf.isEmpty {
-                        backendPayloadPrompt += "\n\n[Extracted Text from Attached PDF: \(fileName)]:\n```\n\(extractedPdf)\n```"
+            if let textContent = String(data: fileData, encoding: .utf8) {
+                previewText = String(textContent.prefix(500))
+                lines = textContent.components(separatedBy: .newlines).count
+                backendPayloadPrompt += "\n\n[File Attached: \(fileName)]:\n```\n\(textContent)\n```"
+            } else if let pdfDoc = PDFDocument(data: fileData) {
+                var extractedPdf = ""
+                for pageIdx in 0..<min(pdfDoc.pageCount, 25) {
+                    if let page = pdfDoc.page(at: pageIdx), let str = page.string {
+                        extractedPdf += "--- Page \(pageIdx + 1) ---\n\(str)\n"
                     }
                 }
+                if !extractedPdf.isEmpty {
+                    previewText = String(extractedPdf.prefix(500))
+                    lines = extractedPdf.components(separatedBy: .newlines).count
+                    backendPayloadPrompt += "\n\n[Extracted Text from Attached PDF: \(fileName)]:\n```\n\(extractedPdf)\n```"
+                }
             }
+            
+            let attachment = FileAttachment(
+                fileName: fileName,
+                fileExtension: ext,
+                fileSizeFormatted: sizeStr,
+                lineCount: lines,
+                previewSnippet: previewText
+            )
+            createdAttachments.append(attachment)
         }
         
         let userPrompt = displayPrompt
-        guard !displayPrompt.isEmpty || attachedImage != nil || attachedFileData != nil else { return }
+        guard !displayPrompt.isEmpty || attachedImage != nil || hasFile else { return }
         
         let isFirstMessage = conversation.messages.isEmpty
         inputText = ""
@@ -422,7 +459,7 @@ public struct ChatView: View {
         attachedFileData = nil
         errorMessage = nil
         
-        var userMessage = Message(role: .user, content: displayPrompt)
+        var userMessage = Message(role: .user, content: displayPrompt, attachments: createdAttachments)
         userMessage.imageUrl = imgBase64DataUrl
         conversation.messages.append(userMessage)
         
@@ -456,7 +493,10 @@ public struct ChatView: View {
             let apiKey = settings.getApiKey(for: provider)
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
-            let systemPrompt = SettingsManager.singularitySystemPrompt
+            var systemPrompt = SettingsManager.singularitySystemPrompt
+            if let ws = workspaceManager.activeWorkspace, !ws.customSystemPrompt.isEmpty {
+                systemPrompt += "\n\n[ACTIVE PROJECT WORKSPACE: \(ws.name)]\n\(ws.customSystemPrompt)"
+            }
             
             do {
                 let stream = LLMService.shared.streamCompletion(

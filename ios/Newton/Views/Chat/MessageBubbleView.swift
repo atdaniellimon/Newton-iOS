@@ -15,6 +15,7 @@ public struct MessageBubbleView: View {
     
     @State private var copied: Bool = false
     @State private var previewImageString: String? = nil
+    @State private var showingSnapshotCard: Bool = false
     
     public var body: some View {
         HStack {
@@ -30,6 +31,12 @@ public struct MessageBubbleView: View {
                         } label: {
                             UserAttachedImageView(imageString: imgStr)
                         }
+                    }
+                    
+                    // Native Visual File Attachments
+                    ForEach(message.attachments) { att in
+                        AttachmentCardView(attachment: att)
+                            .frame(maxWidth: 280)
                     }
                     
                     if !message.content.isEmpty {
@@ -69,9 +76,32 @@ public struct MessageBubbleView: View {
                         ThinkingCardView(content: thinking)
                     }
                     
-                    // Orbit results
+                    // Orbit results (with Web Citations)
                     ForEach(message.orbitResults) { orbit in
-                        OrbitCardView(result: orbit)
+                        if orbit.orbitName.lowercased().contains("search") || orbit.orbitName.lowercased().contains("web") {
+                            WebCitationCardView(
+                                title: "Búsqueda Web: \(orbit.params)",
+                                urlString: "https://duckduckgo.com/?q=\(orbit.params.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
+                                snippet: orbit.result,
+                                citationNumber: 1
+                            )
+                        } else {
+                            OrbitCardView(result: orbit)
+                        }
+                    }
+                    
+                    // Native Visual File Attachments
+                    ForEach(message.attachments) { att in
+                        AttachmentCardView(attachment: att)
+                    }
+                    
+                    // Interactive Chart if detected
+                    if let chartData = parseChartData(from: message.content) {
+                        InteractiveChartView(
+                            title: chartData.title,
+                            chartType: chartData.type,
+                            dataPoints: chartData.points
+                        )
                     }
                     
                     // Live Image Synthesis Placeholder in Progress
@@ -95,7 +125,7 @@ public struct MessageBubbleView: View {
                             .textSelection(.enabled)
                     }
                     
-                    // Action Buttons Bar (Copy, Share, Regenerate)
+                    // Action Buttons Bar (Copy, TTS, Snapshot Card, Share, Regenerate)
                     if !message.isStreaming && (!message.content.isEmpty || message.imageUrl != nil) {
                         HStack(spacing: 16) {
                             Button(action: {
@@ -119,6 +149,16 @@ public struct MessageBubbleView: View {
                                 Image(systemName: (SpeechService.shared.isSpeaking && SpeechService.shared.currentlySpeakingMessageId == message.id) ? "speaker.wave.3.fill" : "speaker.wave.2")
                                     .font(.system(size: 13))
                                     .foregroundColor((SpeechService.shared.isSpeaking && SpeechService.shared.currentlySpeakingMessageId == message.id) ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                            }
+                            
+                            // Shareable Code / Snapshot Card Button
+                            Button(action: {
+                                showingSnapshotCard = true
+                                Haptics.light()
+                            }) {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(NewtonTheme.sand)
                             }
                             
                             ShareLink(item: message.content) {
@@ -157,6 +197,42 @@ public struct MessageBubbleView: View {
                 previewImageString = nil
             })
         }
+        .sheet(isPresented: $showingSnapshotCard) {
+            ShareableCardGenerator(codeSnippet: message.content, language: "swift", title: "Newton Singularity")
+        }
+    }
+    
+    private struct ParsedChartInfo {
+        let title: String
+        let type: String
+        let points: [ChartDataPoint]
+    }
+    
+    private func parseChartData(from text: String) -> ParsedChartInfo? {
+        guard text.contains("<chart") || text.contains("```chart") else { return nil }
+        var title = "Data Chart"
+        let type = "bar"
+        if let titleRange = text.range(of: "title=\"([^\"]+)\"", options: .regularExpression) {
+            let match = String(text[titleRange]).replacingOccurrences(of: "title=\"", with: "").replacingOccurrences(of: "\"", with: "")
+            title = match
+        }
+        var points: [ChartDataPoint] = []
+        let pattern = "([A-Za-z0-9_ ]+):\\s*([0-9.]+)"
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let nsString = text as NSString
+            let results = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length))
+            for match in results.prefix(8) {
+                let label = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                let valStr = nsString.substring(with: match.range(at: 2))
+                if let val = Double(valStr) {
+                    points.append(ChartDataPoint(label: label, value: val))
+                }
+            }
+        }
+        if !points.isEmpty {
+            return ParsedChartInfo(title: title, type: type, points: points)
+        }
+        return nil
     }
 }
 

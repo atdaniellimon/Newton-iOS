@@ -32,6 +32,14 @@ public struct MacMessageBubbleView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     
+                    if let attachments = message.attachments, !attachments.isEmpty {
+                        VStack(alignment: .trailing, spacing: 6) {
+                            ForEach(attachments) { att in
+                                AttachmentCardView(attachment: att)
+                            }
+                        }
+                    }
+                    
                     if !message.content.isEmpty {
                         Text(message.content)
                             .font(.system(size: 14))
@@ -70,6 +78,24 @@ public struct MacMessageBubbleView: View {
                     // Orbit results (PDF, Web Search, Calculator)
                     ForEach(message.orbitResults) { orbit in
                         MacOrbitCardView(result: orbit)
+                    }
+                    
+                    // Web Search Citations extracted from response
+                    let citations = WebCitationCardView.extractCitations(from: message.content)
+                    if !citations.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(citations) { cite in
+                                    WebCitationCardView(citation: cite)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    
+                    // Interactive Data Charts
+                    if let chartData = InteractiveChartView.extractChartData(from: message.content) {
+                        InteractiveChartView(data: chartData)
                     }
                     
                     // Live Image Synthesis Placeholder in Progress
