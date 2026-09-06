@@ -24,6 +24,7 @@ jobs:
       - name: Build Newton iOS App
         run: |
           mkdir -p build/Release-iphoneos
+          set -o pipefail
           xcodebuild build \
             -project "ios/Newton/Newton.xcodeproj" \
             -scheme "Newton" \
@@ -34,7 +35,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            CONFIGURATION_BUILD_DIR="$(pwd)/build/Release-iphoneos"
+            CONFIGURATION_BUILD_DIR="$(pwd)/build/Release-iphoneos" 2>&1 | tee /tmp/xcodebuild.log
 
       - name: Package into IPA
         run: |
