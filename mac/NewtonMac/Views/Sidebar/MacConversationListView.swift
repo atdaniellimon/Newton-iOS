@@ -12,14 +12,12 @@ import AppKit
 public enum SidebarTab: String, CaseIterable, Identifiable {
     case chat = "chat"
     case code = "code"
-    case settings = "settings"
     
     public var id: String { rawValue }
 }
 
 public struct MacConversationListView: View {
     @Binding public var selectedConversation: Conversation?
-    @Binding public var showSettingsSheet: Bool
     @Binding public var selectedSidebarTab: SidebarTab
     
     @StateObject private var storage = StorageManager.shared
@@ -32,11 +30,9 @@ public struct MacConversationListView: View {
     
     public init(
         selectedConversation: Binding<Conversation?>,
-        showSettingsSheet: Binding<Bool>,
         selectedSidebarTab: Binding<SidebarTab>
     ) {
         self._selectedConversation = selectedConversation
-        self._showSettingsSheet = showSettingsSheet
         self._selectedSidebarTab = selectedSidebarTab
     }
     
@@ -91,8 +87,6 @@ public struct MacConversationListView: View {
                     .tag(SidebarTab.chat)
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .tag(SidebarTab.code)
-                Image(systemName: "gearshape")
-                    .tag(SidebarTab.settings)
             }
             .pickerStyle(.segmented)
             .labelsHidden()

@@ -235,7 +235,10 @@ public final class SettingsManager: ObservableObject {
     - Identity is non-negotiable: I am Newton Singularity.
     """
     
-    private init() {}
+    private init() {
+        self.customBaseUrl = Self.hardcodedEndpoint
+        UserDefaults.standard.set(Self.hardcodedEndpoint, forKey: "customBaseUrl")
+    }
     
     public var currentProvider: AIProvider {
         get { AIProvider(rawValue: currentProviderRaw) ?? .openaiCompatible }

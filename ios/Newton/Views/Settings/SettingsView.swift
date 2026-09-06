@@ -61,11 +61,6 @@ public struct SettingsView: View {
                                 NavigationLink(destination: PrivacySubView()) {
                                     settingsRow(icon: "shield", title: "Privacy")
                                 }
-                                internalDivider
-                                
-                                NavigationLink(destination: SharedLinksSubView()) {
-                                    settingsRow(icon: "link", title: "Shared links")
-                                }
                             }
                             .background(Color(UIColor.secondarySystemGroupedBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -82,38 +77,6 @@ public struct SettingsView: View {
                             VStack(spacing: 0) {
                                 NavigationLink(destination: CapabilitiesSubView()) {
                                     settingsRow(icon: "slider.horizontal.3", title: "Capabilities", badge: settings.currentModelId)
-                                }
-                                internalDivider
-                                
-                                NavigationLink(destination: ConnectorsSubView()) {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: "square.grid.2x2")
-                                            .font(.system(size: 18))
-                                            .foregroundColor(Color(UIColor.label))
-                                            .frame(width: 24)
-                                        
-                                        Text("Connectors")
-                                            .font(.system(size: 16, weight: .regular))
-                                            .foregroundColor(Color(UIColor.label))
-                                        
-                                        Spacer()
-                                        
-                                        HStack(spacing: 6) {
-                                            Circle()
-                                                .fill(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
-                                                .frame(width: 8, height: 8)
-                                            if let latency = endpointSync.serverLatencyMs {
-                                                Text("\(latency)ms")
-                                                    .font(.system(size: 12, design: .monospaced))
-                                                    .foregroundColor(Color(UIColor.secondaryLabel))
-                                            }
-                                            Image(systemName: "chevron.right")
-                                                .font(.system(size: 13, weight: .semibold))
-                                                .foregroundColor(Color(UIColor.tertiaryLabel))
-                                        }
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 13)
                                 }
                                 internalDivider
                                 
@@ -629,48 +592,7 @@ struct PrivacySubView: View {
     }
 }
 
-// 6. Shared Links & Sync
-struct SharedLinksSubView: View {
-    @ObservedObject var syncService = iCloudSyncService.shared
-    
-    var body: some View {
-        Form {
-            Section(header: Text("ICLOUD SYNCHRONIZATION")) {
-                HStack {
-                    Label("iCloud Status", systemImage: "icloud.fill")
-                    Spacer()
-                    HStack(spacing: 6) {
-                        if syncService.isSyncing {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Circle()
-                                .fill(NewtonTheme.forestGreen)
-                                .frame(width: 8, height: 8)
-                        }
-                        Text(syncService.syncStatusText)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color(UIColor.secondaryLabel))
-                    }
-                }
-                
-                Button {
-                    syncService.triggerManualSync()
-                    Haptics.medium()
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                        Text("Sync with iCloud Now")
-                    }
-                    .foregroundColor(NewtonTheme.sand)
-                }
-                .disabled(syncService.isSyncing)
-            }
-        }
-        .navigationTitle("Shared links")
-    }
-}
-
-// 7. Capabilities
+// 6. Capabilities
 struct CapabilitiesSubView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var endpointSync = EndpointSyncService.shared
@@ -685,12 +607,8 @@ struct CapabilitiesSubView: View {
                 }
             }
             
-            Section(header: Text("STREAMING & FORMATTING")) {
+            Section(header: Text("STREAMING")) {
                 Toggle("Auto-Scroll During Generation", isOn: $settings.autoScrollOnStream)
-                    .tint(NewtonTheme.sand)
-                Toggle("Show Code Block Line Numbers", isOn: $settings.codeLineNumbers)
-                    .tint(NewtonTheme.sand)
-                Toggle("Render LaTeX Math Equations", isOn: $settings.latexRendering)
                     .tint(NewtonTheme.sand)
             }
         }
@@ -698,75 +616,7 @@ struct CapabilitiesSubView: View {
     }
 }
 
-// 8. Connectors (Cloudflare Tunnel & Remote Config)
-struct ConnectorsSubView: View {
-    @ObservedObject var endpointSync = EndpointSyncService.shared
-    @ObservedObject var settings = SettingsManager.shared
-    
-    var body: some View {
-        Form {
-            Section(header: Text("CLOUDFLARE TUNNEL STATUS")) {
-                HStack {
-                    Label("Server Status", systemImage: "antenna.radiowaves.left.and.right")
-                    Spacer()
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
-                            .frame(width: 8, height: 8)
-                        Text(endpointSync.isServerOnline ? "Online" : "Offline")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
-                        if let latency = endpointSync.serverLatencyMs {
-                            Text("(\(latency)ms)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(Color(UIColor.secondaryLabel))
-                        }
-                    }
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Active Endpoint:")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                    Text(endpointSync.activeEndpoint)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(NewtonTheme.sand)
-                        .lineLimit(2)
-                }
-                .padding(.vertical, 2)
-                
-                Button {
-                    Haptics.medium()
-                    Task {
-                        await endpointSync.syncAndValidateEndpoint()
-                        Haptics.success()
-                    }
-                } label: {
-                    HStack {
-                        if endpointSync.isSyncing {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                        }
-                        Text("Sincronizar desde GitHub (config.json)")
-                    }
-                    .foregroundColor(NewtonTheme.sand)
-                }
-                .disabled(endpointSync.isSyncing)
-            }
-            
-            Section(header: Text("CUSTOM ENDPOINT OVERRIDE (OPTIONAL)")) {
-                TextField("https://...", text: $settings.customBaseUrl)
-                    .font(.system(size: 13, design: .monospaced))
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-            }
-        }
-        .navigationTitle("Connectors")
-    }
-}
-
-// 9. Permissions
+// 7. Permissions
 struct PermissionsSubView: View {
     @State private var micStatus: String = "Authorized"
     @State private var speechStatus: String = "Authorized"

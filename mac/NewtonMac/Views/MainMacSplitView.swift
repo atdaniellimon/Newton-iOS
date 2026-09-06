@@ -15,7 +15,6 @@ public struct MainMacSplitView: View {
     @ObservedObject private var workspace = NewtonCodeWorkspaceManager.shared
     
     @State private var selectedConversation: Conversation? = nil
-    @State private var showSettingsSheet: Bool = false
     @State private var selectedSidebarTab: SidebarTab = .chat
     @State private var dashboardPrompt: String = ""
     @Environment(\.colorScheme) private var colorScheme
@@ -25,7 +24,6 @@ public struct MainMacSplitView: View {
             // Sidebar Column
             MacConversationListView(
                 selectedConversation: $selectedConversation,
-                showSettingsSheet: $showSettingsSheet,
                 selectedSidebarTab: $selectedSidebarTab
             )
             
@@ -68,9 +66,6 @@ public struct MainMacSplitView: View {
             if selectedConversation == nil {
                 selectedConversation = storage.conversations.first ?? storage.createConversation()
             }
-        }
-        .sheet(isPresented: $showSettingsSheet) {
-            MacSettingsView()
         }
     }
     

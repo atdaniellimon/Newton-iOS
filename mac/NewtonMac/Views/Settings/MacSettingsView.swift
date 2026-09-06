@@ -12,9 +12,7 @@ import AppKit
 public struct MacSettingsView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var storage = StorageManager.shared
-    @ObservedObject var syncService = iCloudSyncService.shared
     @ObservedObject var memoryManager = MemoryManager.shared
-    @ObservedObject var endpointSync = EndpointSyncService.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
@@ -31,11 +29,11 @@ public struct MacSettingsView: View {
             // Header Bar
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "gearshape.fill")
+                    Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 15))
                         .foregroundColor(NewtonTheme.sand)
                     
-                    Text("Settings")
+                    Text("Preferences")
                         .font(.system(size: 16, weight: .bold, design: .serif))
                         .foregroundColor(Color(NSColor.labelColor))
                 }
@@ -69,78 +67,6 @@ public struct MacSettingsView: View {
             // Settings Content
             ScrollView {
                 VStack(spacing: 16) {
-                    // Server & Cloud Tunnel Status Card
-                    settingsCard(title: "SERVER & CLOUD TUNNEL", icon: "antenna.radiowaves.left.and.right") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Status:")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Color(NSColor.secondaryLabelColor))
-                                Spacer()
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
-                                        .frame(width: 8, height: 8)
-                                    Text(endpointSync.isServerOnline ? "Online" : "Offline")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(endpointSync.isServerOnline ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
-                                    if let latency = endpointSync.serverLatencyMs {
-                                        Text("(\(latency)ms)")
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(Color(NSColor.tertiaryLabelColor))
-                                    }
-                                }
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Active Endpoint:")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(Color(NSColor.secondaryLabelColor))
-                                
-                                Text(endpointSync.activeEndpoint)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(NewtonTheme.sand)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .padding(6)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color(NSColor.windowBackgroundColor).opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            }
-                            
-                            HStack {
-                                Button(action: {
-                                    Task {
-                                        await endpointSync.syncAndValidateEndpoint()
-                                    }
-                                }) {
-                                    HStack(spacing: 6) {
-                                        if endpointSync.isSyncing {
-                                            ProgressView().controlSize(.small)
-                                        } else {
-                                            Image(systemName: "arrow.triangle.2.circlepath")
-                                        }
-                                        Text("Sincronizar desde GitHub (config.json)")
-                                    }
-                                    .font(.system(size: 11.5, weight: .medium))
-                                    .foregroundColor(NewtonTheme.sand)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(Color(NSColor.controlBackgroundColor))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                            .stroke(Color(NSColor.separatorColor), lineWidth: 0.8)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(endpointSync.isSyncing)
-                                
-                                Spacer()
-                            }
-                        }
-                    }
-                    
                     // Appearance & Theme Card
                     settingsCard(title: "APPEARANCE & THEME", icon: "paintbrush.fill") {
                         VStack(alignment: .leading, spacing: 12) {
@@ -152,12 +78,6 @@ public struct MacSettingsView: View {
                             }
                             .pickerStyle(.segmented)
                             .padding(.vertical, 2)
-                            
-                            Divider()
-                                .padding(.vertical, 2)
-                            
-                            Toggle("Show Code Block Line Numbers", isOn: $settings.codeLineNumbers)
-                            Toggle("Render LaTeX Math Equations", isOn: $settings.latexRendering)
                         }
                     }
                     
@@ -182,54 +102,6 @@ public struct MacSettingsView: View {
                                 
                                 Slider(value: $settings.speechRate, in: 0.35...0.75, step: 0.05)
                             }
-                        }
-                    }
-                    
-                    // iCloud Synchronization Card
-                    settingsCard(title: "ICLOUD SYNCHRONIZATION", icon: "icloud.fill") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("iCloud Sync Status:")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Color(NSColor.secondaryLabelColor))
-                                
-                                Spacer()
-                                
-                                HStack(spacing: 6) {
-                                    if syncService.isSyncing {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    } else {
-                                        Circle()
-                                            .fill(NewtonTheme.forestGreen)
-                                            .frame(width: 7, height: 7)
-                                    }
-                                    Text(syncService.syncStatusText)
-                                        .font(.system(size: 11.5, weight: .medium))
-                                        .foregroundColor(Color(NSColor.secondaryLabelColor))
-                                }
-                            }
-                            
-                            Button(action: {
-                                syncService.triggerManualSync()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                    Text("Sync with iCloud Now")
-                                }
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(NewtonTheme.sand)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color(NSColor.controlBackgroundColor))
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .stroke(Color(NSColor.separatorColor), lineWidth: 0.8)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(syncService.isSyncing)
                         }
                     }
                     
@@ -381,7 +253,7 @@ public struct MacSettingsView: View {
                         }
                     }
                     
-                    // Storage & Privacy Card
+                    // Storage & Data Card
                     settingsCard(title: "STORAGE & DATA", icon: "internaldrive.fill") {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
@@ -445,7 +317,7 @@ public struct MacSettingsView: View {
                 .padding(20)
             }
         }
-        .frame(width: 460, height: 520)
+        .frame(width: 460, height: 480)
         .background(Color(NSColor.windowBackgroundColor))
         .preferredColorScheme(settings.appTheme.colorScheme)
         .alert(isPresented: $showingWipeMemoriesAlert) {
@@ -484,3 +356,4 @@ public struct MacSettingsView: View {
         )
     }
 }
+
