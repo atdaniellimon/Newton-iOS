@@ -127,6 +127,7 @@ public struct ShareableCardGenerator: View {
         }
     }
     
+    @MainActor
     private func renderImage() -> Image {
         let renderer = ImageRenderer(content: cardView)
         renderer.scale = 3.0

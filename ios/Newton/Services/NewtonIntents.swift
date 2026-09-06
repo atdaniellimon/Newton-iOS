@@ -109,6 +109,32 @@ public struct StartGhostSessionIntent: AppIntent {
 }
 
 @available(iOS 16.0, macOS 13.0, *)
+public struct AddMemoryIntent: AppIntent {
+    public static var title: LocalizedStringResource = "Save Memory to Newton"
+    public static var description = IntentDescription("Saves a permanent fact or instruction to Newton's long-term memory.")
+    
+    @Parameter(title: "Memory Content")
+    public var content: String
+    
+    public init() {}
+    
+    public init(content: String) {
+        self.content = content
+    }
+    
+    @MainActor
+    public func perform() async throws -> some IntentResult & ProvidesDialog {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return .result(dialog: IntentDialog(stringLiteral: "No se proporcionó ningún recuerdo para guardar."))
+        }
+        
+        MemoryManager.shared.addMemory(trimmed)
+        return .result(dialog: IntentDialog(stringLiteral: "Recuerdo guardado permanentemente en Newton Singularity."))
+    }
+}
+
+@available(iOS 16.0, macOS 13.0, *)
 public struct NewtonShortcutsProvider: AppShortcutsProvider {
     public static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -139,6 +165,15 @@ public struct NewtonShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Ghost Session",
             systemImageName: "ghost.fill"
+        )
+        AppShortcut(
+            intent: AddMemoryIntent(),
+            phrases: [
+                "Save memory in \(.applicationName)",
+                "Guardar recuerdo en \(.applicationName)"
+            ],
+            shortTitle: "Save Memory",
+            systemImageName: "brain.head.profile"
         )
     }
 }

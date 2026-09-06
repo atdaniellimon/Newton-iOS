@@ -79,12 +79,12 @@ public struct MessageBubbleView: View {
                     // Orbit results (with Web Citations)
                     ForEach(message.orbitResults) { orbit in
                         if orbit.orbitName.lowercased().contains("search") || orbit.orbitName.lowercased().contains("web") {
-                            WebCitationCardView(
+                            WebCitationCardView(citation: WebCitation(
                                 title: "Búsqueda Web: \(orbit.params)",
                                 urlString: "https://duckduckgo.com/?q=\(orbit.params.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
                                 snippet: orbit.result,
                                 citationNumber: 1
-                            )
+                            ))
                         } else {
                             OrbitCardView(result: orbit)
                         }
@@ -96,12 +96,8 @@ public struct MessageBubbleView: View {
                     }
                     
                     // Interactive Chart if detected
-                    if let chartData = parseChartData(from: message.content) {
-                        InteractiveChartView(
-                            title: chartData.title,
-                            chartType: chartData.type,
-                            dataPoints: chartData.points
-                        )
+                    if let chartPayload = InteractiveChartView.extractChartData(from: message.content) {
+                        InteractiveChartView(data: chartPayload)
                     }
                     
                     // Live Image Synthesis Placeholder in Progress
@@ -200,39 +196,6 @@ public struct MessageBubbleView: View {
         .sheet(isPresented: $showingSnapshotCard) {
             ShareableCardGenerator(codeSnippet: message.content, language: "swift", title: "Newton Singularity")
         }
-    }
-    
-    private struct ParsedChartInfo {
-        let title: String
-        let type: String
-        let points: [ChartDataPoint]
-    }
-    
-    private func parseChartData(from text: String) -> ParsedChartInfo? {
-        guard text.contains("<chart") || text.contains("```chart") else { return nil }
-        var title = "Data Chart"
-        let type = "bar"
-        if let titleRange = text.range(of: "title=\"([^\"]+)\"", options: .regularExpression) {
-            let match = String(text[titleRange]).replacingOccurrences(of: "title=\"", with: "").replacingOccurrences(of: "\"", with: "")
-            title = match
-        }
-        var points: [ChartDataPoint] = []
-        let pattern = "([A-Za-z0-9_ ]+):\\s*([0-9.]+)"
-        if let regex = try? NSRegularExpression(pattern: pattern) {
-            let nsString = text as NSString
-            let results = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length))
-            for match in results.prefix(8) {
-                let label = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                let valStr = nsString.substring(with: match.range(at: 2))
-                if let val = Double(valStr) {
-                    points.append(ChartDataPoint(label: label, value: val))
-                }
-            }
-        }
-        if !points.isEmpty {
-            return ParsedChartInfo(title: title, type: type, points: points)
-        }
-        return nil
     }
 }
 
