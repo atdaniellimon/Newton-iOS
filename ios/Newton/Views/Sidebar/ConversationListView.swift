@@ -18,6 +18,7 @@ public struct ConversationListView: View {
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
     @State private var showArtGallery: Bool = false
+    @State private var showWorkspaces: Bool = false
     
     public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
@@ -58,7 +59,7 @@ public struct ConversationListView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 16)
                 
-                // Studio Section Navigation Items (Chats and Art gallery)
+                // Studio Section Navigation Items (Chats, Ghost, Workspaces, Art gallery)
                 VStack(spacing: 4) {
                     SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
                     
@@ -69,6 +70,13 @@ public struct ConversationListView: View {
                         onSelectConversation?(ghost.id)
                     } label: {
                         SidebarItemRow(icon: "ghost", title: "Ghost Session", isSelected: false)
+                    }
+                    
+                    Button {
+                        Haptics.light()
+                        showWorkspaces = true
+                    } label: {
+                        SidebarItemRow(icon: "folder.fill", title: "Workspaces", isSelected: false)
                     }
                     
                     Button {
@@ -208,6 +216,9 @@ public struct ConversationListView: View {
         }
         .sheet(isPresented: $showArtGallery) {
             ArtGalleryView()
+        }
+        .sheet(isPresented: $showWorkspaces) {
+            WorkspaceListView()
         }
     }
     
