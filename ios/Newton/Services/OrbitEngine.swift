@@ -149,7 +149,7 @@ public final class OrbitEngine {
         // 1. Determinar la URL del API (soporta servidor local 8765, túnel Cloudflare y custom URL)
         var activeBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         if activeBase.isEmpty {
-            activeBase = SettingsManager.shared.customBaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            activeBase = SettingsManager.shared.effectiveBaseUrl(for: .openaiCompatible).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if activeBase.isEmpty {
             activeBase = "http://127.0.0.1:8765/v1"

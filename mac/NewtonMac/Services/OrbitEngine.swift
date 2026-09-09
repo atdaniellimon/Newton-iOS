@@ -127,7 +127,7 @@ public final class OrbitEngine {
     /// Generate an image from a prompt calling ONLY the official API endpoint
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let targetBase = !baseUrl.isEmpty ? baseUrl : SettingsManager.hardcodedEndpoint
+        let targetBase = !baseUrl.isEmpty ? baseUrl : SettingsManager.shared.effectiveBaseUrl(for: .openaiCompatible)
         let cleanBase = targetBase.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
         

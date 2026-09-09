@@ -273,6 +273,6 @@ public final class SettingsManager: ObservableObject {
     }
     
     public func effectiveBaseUrl(for provider: AIProvider) -> String {
-        return Self.hardcodedEndpoint
+        return customBaseUrl.isEmpty ? Self.hardcodedEndpoint : customBaseUrl
     }
 }
