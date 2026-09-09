@@ -305,20 +305,22 @@ public struct NewtonCodeChatView: View {
             }
             
             // Process Code Orbits
-            let processed = await OrbitEngine.shared.processOrbitsInText(fullStreamed, userPrompt: lastUserMsg)
-            
+            let (finalContent, orbitResults, detectedImgUrl, thinkingContent) = await OrbitEngine.shared.processOrbitsInText(fullStreamed, userPrompt: lastUserMsg)
+
             await MainActor.run {
                 let assistantMsg = Message(
                     role: .assistant,
-                    content: processed.processedText.isEmpty ? fullStreamed : processed.processedText,
-                    orbitResults: processed.results
+                    content: finalContent.isEmpty ? fullStreamed : finalContent,
+                    thinkingContent: thinkingContent,
+                    imageUrl: detectedImgUrl,
+                    orbitResults: orbitResults
                 )
                 self.conversation.messages.append(assistantMsg)
                 self.isStreaming = false
                 self.streamingText = ""
                 self.workspace.sessionTokensUsed = self.conversation.messages.reduce(0) { $0 + $1.content.count / 4 }
                 StorageManager.shared.saveConversations()
-                
+
                 // Send completion notification if unfocused
                 NotificationService.shared.sendCompletionNotification(
                     title: "Newton Code · \(self.workspace.activeProjectName)",

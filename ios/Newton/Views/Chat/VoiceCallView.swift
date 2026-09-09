@@ -272,7 +272,7 @@ public struct VoiceCallView: View {
                 }
                 
                 // Process tool calling
-                let (finalContent, _, _) = await OrbitEngine.shared.processOrbitsInText(
+                let (finalContent, _, _, _) = await OrbitEngine.shared.processOrbitsInText(
                     fullResponse,
                     userPrompt: userPrompt,
                     baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
