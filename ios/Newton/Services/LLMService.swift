@@ -148,8 +148,8 @@ public final class LLMService {
         // Inject Persistent User Long-Term Memory
         let memoryFacts = MemoryManager.shared.formattedMemoryPrompt()
         effectiveSystemPrompt += """
-        
-        
+
+
         ==================================================
         PERSISTENT USER LONG-TERM MEMORY SYSTEM
         ==================================================
@@ -157,12 +157,12 @@ public final class LLMService {
         - You DO remember past facts stored in your memory system. NEVER claim you cannot remember things across sessions or that you have no memory.
         - When the user asks who they are, what you remember, or what you know about them, recite their stored facts clearly.
         - Current stored user memories:
-        \(memoryFacts.isEmpty ? "(No specific facts stored yet. When the user tells you about themselves, their stack, or says 'remember that...', invoke [ORBIT:save_memory]{\"fact\": \"...\"}[/ORBIT] organically to save it permanently.)" : memoryFacts)
-        
+        \(memoryFacts.isEmpty ? "(No specific facts stored yet. When the user tells you about themselves, their stack, or says 'remember that...', invoke <orbit:save_memory>{\"fact\": \"...\"}</orbit:save_memory> organically to save it permanently.)" : memoryFacts)
+
         MEMORY USAGE DIRECTIVES (STRICT):
         - Naturally ground your technical depth, recommendations, architectural solutions, and tone using this knowledge.
         - DO NOT nag the user or force awkward conversational small talk (NEVER spontaneously ask 'How is project X going?' or 'How is your company doing?'). Only reference past projects or facts when directly relevant to answering the user's current request.
-        - If the user shares new persistent facts about themselves or says 'remember that...', invoke `[ORBIT:save_memory]{"fact": "..."}[/ORBIT]` organically.
+        - If the user shares new persistent facts about themselves or says 'remember that...', invoke `<orbit:save_memory>{"fact": "..."}</orbit:save_memory>` organically.
         """
         
         if provider == .anthropic {
