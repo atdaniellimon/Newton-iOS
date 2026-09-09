@@ -14,30 +14,122 @@ public final class OrbitEngine {
     private init() {}
     
     /// Process any [ORBIT:name]{...}[/ORBIT], JSON tool calls, or image intent in text
-    public func processOrbitsInText(_ text: String, userPrompt: String = "", baseUrl: String = "", apiKey: String = "") async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?) {
+    public func processOrbitsInText(_ text: String, userPrompt: String = "", baseUrl: String = "", apiKey: String = "") async -> (processedText: String, results: [OrbitExecutionResult], imageUrl: String?, thinkingContent: String?) {
         var outputText = text
         var results: [OrbitExecutionResult] = []
         var detectedImageUrl: String? = nil
-        
-        // 1. Process explicit [ORBIT:name]...[/ORBIT]
+        var accumulatedThinking: String = ""
+
+        // 1. Process <thinking>...</thinking> blocks - Chain of Thought
+        let thinkingPattern = "<thinking>([\\s\\S]*?)</thinking>"
+        if let thinkingRegex = try? NSRegularExpression(pattern: thinkingPattern, options: [.caseInsensitive]) {
+            let nsString = outputText as NSString
+            let matches = thinkingRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsString.length))
+
+            for match in matches.reversed() {
+                guard match.numberOfRanges >= 2 else { continue }
+                let fullMatch = nsString.substring(with: match.range(at: 0))
+                let thinkingContent = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if !thinkingContent.isEmpty {
+                    if !accumulatedThinking.isEmpty {
+                        accumulatedThinking += "\n\n---\n\n"
+                    }
+                    accumulatedThinking += thinkingContent
+                }
+
+                // Remove thinking blocks from output (they'll be shown in ThinkingCardView)
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
+            }
+        }
+
+        // 2. Process <orbit:tool_name>...</orbit:tool_name> blocks (natural syntax with JSON params)
+        let naturalOrbitPattern = "<orbit:(\\w+)>([\\s\\S]*?)</orbit:\\1>"
+        if let naturalRegex = try? NSRegularExpression(pattern: naturalOrbitPattern, options: [.caseInsensitive]) {
+            let nsString = outputText as NSString
+            let matches = naturalRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsString.length))
+
+            for match in matches.reversed() {
+                guard match.numberOfRanges >= 3 else { continue }
+                let fullMatch = nsString.substring(with: match.range(at: 0))
+                let orbitName = nsString.substring(with: match.range(at: 1)).lowercased()
+                let paramsJson = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+                let result = await executeOrbit(name: orbitName, paramsJson: paramsJson, baseUrl: baseUrl, apiKey: apiKey)
+                results.append(result)
+
+                if orbitName == "generate_image" || orbitName == "image_gen" {
+                    detectedImageUrl = result.result
+                }
+
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
+            }
+        }
+
+        // 2b. Process simple <orbit:generate>prompt</orbit:generate> for image generation
+        let simpleGeneratePattern = "<orbit:generate>([\\s\\S]*?)</orbit:generate>"
+        if let simpleGenerateRegex = try? NSRegularExpression(pattern: simpleGeneratePattern, options: [.caseInsensitive]) {
+            let nsString = outputText as NSString
+            let matches = simpleGenerateRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsString.length))
+
+            for match in matches.reversed() {
+                guard match.numberOfRanges >= 2 else { continue }
+                let fullMatch = nsString.substring(with: match.range(at: 0))
+                let prompt = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+                let result = await executeOrbit(name: "generate_image", paramsJson: "{\"prompt\": \"\(prompt.replacingOccurrences(of: "\"", with: "\\\""))\"}", baseUrl: baseUrl, apiKey: apiKey)
+                results.append(result)
+                detectedImageUrl = result.result
+
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
+            }
+        }
+
+        // 3. Process <download>...</download> blocks - Result/Download notifications
+        let downloadPattern = "<download>([\\s\\S]*?)</download>"
+        if let downloadRegex = try? NSRegularExpression(pattern: downloadPattern, options: [.caseInsensitive]) {
+            let nsString = outputText as NSString
+            let matches = downloadRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsString.length))
+
+            for match in matches.reversed() {
+                guard match.numberOfRanges >= 2 else { continue }
+                let fullMatch = nsString.substring(with: match.range(at: 0))
+                let downloadContent = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+                // Add download content as an orbit result for display
+                if !downloadContent.isEmpty {
+                    let result = OrbitExecutionResult(
+                        orbitName: "download",
+                        params: "",
+                        result: downloadContent,
+                        isSuccess: true
+                    )
+                    results.append(result)
+                }
+
+                outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
+            }
+        }
+
+        // 4. Process explicit [ORBIT:name]...[/ORBIT] (legacy support)
         let pattern = "\\[ORBIT:(\\w+)\\]([\\s\\S]*?)(?:\\[/ORBIT\\]|$)"
         if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
             let nsString = text as NSString
             let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
-            
+
             for match in matches {
                 guard match.numberOfRanges >= 3 else { continue }
                 let fullMatch = nsString.substring(with: match.range(at: 0))
                 let orbitName = nsString.substring(with: match.range(at: 1))
                 let paramsJson = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                
+
                 let result = await executeOrbit(name: orbitName, paramsJson: paramsJson, baseUrl: baseUrl, apiKey: apiKey)
                 results.append(result)
-                
+
                 if orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" || orbitName.lowercased() == "generate_image" {
                     detectedImageUrl = result.result
                 }
-                
+
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
             }
         }
@@ -121,7 +213,7 @@ public final class OrbitEngine {
             }
         }
         
-        return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl)
+        return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl, accumulatedThinking.isEmpty ? nil : accumulatedThinking)
     }
     
     /// Generate an image from a prompt calling ONLY the official API endpoint

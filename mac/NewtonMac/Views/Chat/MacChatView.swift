@@ -520,24 +520,25 @@ public struct MacChatView: View {
                     }
                 }
                 
-                // Process Orbits
-                let orbitResults = await OrbitEngine.shared.processOrbitsInText(
+                // Process Orbits + Chain of Thought
+                let (finalContent, orbitResults, detectedImgUrl, thinkingContent) = await OrbitEngine.shared.processOrbitsInText(
                     fullResponse,
                     userPrompt: rawInput,
                     baseUrl: baseUrl,
                     apiKey: apiKey
                 )
                 if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                    conversation.messages[idx].content = orbitResults.processedText
-                    conversation.messages[idx].orbitResults = orbitResults.results
-                    conversation.messages[idx].imageUrl = orbitResults.imageUrl
+                    conversation.messages[idx].content = finalContent
+                    conversation.messages[idx].orbitResults = orbitResults
+                    conversation.messages[idx].imageUrl = detectedImgUrl
+                    conversation.messages[idx].thinkingContent = thinkingContent
                     conversation.messages[idx].isStreaming = false
                     storage.updateConversation(conversation)
                     
                     // Notify if unfocused
                     NotificationService.shared.sendCompletionNotification(
                         title: "Newton Singularity",
-                        body: orbitResults.processedText
+                        body: finalContent
                     )
                 }
             } catch {

@@ -27,6 +27,8 @@ public struct OrbitCardView: View {
             WebSearchSourcesCardView(result: result)
         } else if name == "kick" || name == "terminate" {
             KickProtocolCardView(result: result)
+        } else if name == "download" {
+            DownloadResultCardView(result: result)
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -297,6 +299,42 @@ public struct WebSearchSourcesCardView: View {
         )) { item in
             SafariView(url: item.url)
         }
+    }
+}
+
+public struct DownloadResultCardView: View {
+    public let result: OrbitExecutionResult
+
+    public init(result: OrbitExecutionResult) {
+        self.result = result
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(NewtonTheme.sand)
+
+                Text("Archivo Generado")
+                    .font(.system(size: 13.5, weight: .semibold, design: .serif))
+                    .foregroundColor(NewtonTheme.textPrimary)
+
+                Spacer()
+            }
+
+            Text(result.result)
+                .font(.system(size: 12))
+                .foregroundColor(NewtonTheme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .background(NewtonTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(NewtonTheme.border, lineWidth: 0.8)
+        )
     }
 }
 
