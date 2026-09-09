@@ -2,6 +2,6 @@
   "endpoint": "https://messenger-lamps-bloggers-concept.trycloudflare.com/v1",
   "default_model": "newton-singularity",
   "status": "online",
-  "version": "7.0",
-  "last_updated": "2026-09-06T20:17:00Z"
+  "version": "1.0",
+  "last_updated": "2026-09-09T20:17:00Z"
 }
