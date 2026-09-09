@@ -1,0 +1,147 @@
+RISCV-Summary.pages
+   
+   
+
+theybelongto,sinceMachineModeisthehighestprivilegelevel.InSupervisor
+
+##### Mode,onlytheSupervisorandUserCSRscanbeaccessed.Finally,whenrunningin
+
+UserMode,onlyUserCSRsareaccessible.
+
+##### Tostatethesamethinganotherway,aMachineCSRcanonlybereadorwritten
+
+###### whenrunninginMachineMode.ASupervisorCSRcanbewrittenwhenrunningin
+
+##### eitherMachineModeorSupervisorMode.Finally,aUserCSRcanbereadorwritten
+
+regardlessofthecurrentprivilegemode.
+
+###### EachCSRhasaname.
+
+Inmanycases,the2irstletteroftheregisternameindicateswhichgroupitisin
+
+(either“u”,“s”,or“m”).
+
+Examplesthatfollowthe2irstletterconventionaremstatusandmisa(accessible
+
+##### onlyinMachineMode),sstatusandsatp(accessibleinSupervisorandMachine
+
+Modes),andustatusanducause(accessibleinUser,Supervisor,andMachine
+
+#### RISC-VArchitectureSummary/Porter Page249of323
+
+Chapter8:PrivilegeModes
+
+##### Modes).Counterexamplesarecycle,time,andinstretwhichoughttobeginwith
+
+“u”sincetheyareaccessibleinUser,Supervisor,andMachineModes.
+
+##### AparticularimplementationmayaddnewCSRsinadditiontothosedescribedinthe
+
+##### RISC-Vstandard.EachCSRregisterhasanaddressandtheaddressesare12bits
+
+wide,allowingforupto4,096CSRs.
+Details:TheaddressspaceforCSRsusesa12-bitaddress,allowingfor4,096 differentCSRregisters.Thisaddressspaceispartitionedinto4regions,with upto1,024registerseach.Thereisoneblockofregistersforeachmode(U, S,andM)alongwithanextra“reserved”blockwhichwasformerlyusedfor
+
+##### HypervisorMode.HypervisorModehasbeeneliminated.
+
+Introduction to RISC V
+   
+   
+
+Mouser Now Stocking Renesas Electronics RZ/Five-RISC-V Microprocessor for IoT Endpoint and Industrial Gateway Apps
+   
+   
+
+Introducción a RISC-V
+   
+   
+
+Fancy style for PULP presentations (v1.0 – 03.2020)
+   
+   
+
+Efficient Architecture for RISC-V Vector Memory Access | alphaXiv
+   
+   
+
+EARTH (Efficient Architecture for RISC-V vector memory access using sHifting-based sTrategies - Arquitectura eficiente para el acceso a la memoria vectorial RISC-V mediante estrategias basadas en desplazamientos) introduce un enfoque fundamentalmente diferente basado en operaciones de desplazamiento en lugar de soluciones tradicionales basadas en barra cruzada o búferes. La arquitectura comprende tres innovaciones clave:
+
+### Módulo de Reorganización de Datos (DROM)
+
+El DROM sirve como la base de las capacidades de manejo de datos de EARTH, implementando redes de desplazamiento eficientes tanto para operaciones de recolección como de dispersión de datos. El módulo consta de:
+
+**Redes de desplazamiento**: Dos redes especializadas manejan la reorganización de datos: la Red de Desplazamiento para Recolección (GSN) para operaciones de carga y la Red de Desplazamiento para Dispersión (SSN) para operaciones de almacenamiento. Estas redes utilizan una arquitectura en capas donde cada capa permite desplazamientos de potencias de 2, creando un diseño flexible y escalable. Las redes mantienen una operación libre de conflictos a través de propiedades de "preservación del orden" y "preservación de la separación", asegurando un enrutamiento de datos eficiente sin interferencia de rutas.
+
+**Generación de Conteo de Desplazamiento (SCG)**: Este componente calcula dinámicamente las cantidades de desplazamiento precisas requeridas para cada elemento vectorial basándose en los parámetros de acceso a la memoria, incluyendo el paso (stride), el ancho del elemento y el desplazamiento (offset). El SCG utiliza operaciones aritméticas eficientes para generar señales de control para las redes de desplazamiento.
+
+La relación matemática para el cálculo del conteo de desplazamiento se puede expresar como:
+
+Risc V Instruction Decoder
+   
+   
+
+The architecture of the RISC-V instruction decoder is designed to efficiently handle the varying instruction formats and types found within the RISC-V ISA.
+
+### Instruction Formats in RISC-V
+
+RISC-V defines several instruction formats, each tailored for different operations: - R-Type: Used for registertoregister operations, such as addition and subtraction. - I-Type: Used for immediate values and load operations. - S-Type: Used for store operations. - B-Type: Used for conditional branches. - U-Type: Used for instructions that require a large immediate value. - JType: Used for jump instructions. Each format has a specific layout, comprising fields such as
+
+opcode, destination register, source registers, and immediate values, which the decoder interprets.
+
+### Components of the Instruction Decoder
+
+The instruction decoder typically consists of the following components: 1. Opcode Decoder: This part of the decoder interprets the opcode field of the instruction, determining the type of operation to be performed. 2. Field Extractors: These extract various fields from the instruction format, such as register addresses and immediate values. 3. Control Signal Logic: This component generates the control signals based on the decoded instruction, directing the
+
+execution units accordingly.
+
+Efficient Architecture for RISC-V Vector Memory Access | alphaXiv
+   
+   
+
+En los benchmarks estándar, EARTH supera consistentemente al procesador vectorial Saturn de referencia, particularmente para cargas de trabajo que utilizan intensamente operaciones de zancada y segmento:
+
+*Figura 11: Comparación de rendimiento normalizado entre EARTH y la línea de base para los benchmarks de E-Config.*
+
+*Figura 12: Comparación de rendimiento normalizado para los benchmarks de P-Config que muestra las ventajas de EARTH.*
+
+Las mejoras más notables aparecen en los benchmarks intensivos en acceso con zancada, donde EARTH logra mejoras de rendimiento de 4 a 8 veces:
+
+*Figura 13: Rendimiento en benchmarks intensivos en acceso con zancada que muestra mejoras dramáticas a medida que aumenta la intensidad de la zancada.*
+
+## Eficiencia de Área y Energía
+
+A pesar de sus ventajas de rendimiento, EARTH en realidad reduce el área de hardware en un 9% en comparación con la implementación de referencia de Saturn:
+
+*Figura 14: Comparación de área entre Saturn y EARTH para diferentes configuraciones que muestra los requisitos de hardware reducidos de EARTH.*
+
+La eficiencia del manejo de segmentos de EARTH es particularmente notable en los benchmarks intensivos en segmentos:
+
+*Figura 15: Rendimiento en benchmarks intensivos en segmentos que muestra el rendimiento comparable o mejor de EARTH a pesar de eliminar los búferes de segmento dedicados.*
+
+El análisis del consumo de energía muestra que EARTH reduce el consumo general de energía en un 41% en comparación con la línea de base:
+
+*Figura 16: Comparación del consumo de energía que muestra las ventajas de eficiencia de EARTH tanto para las operaciones de zancada como para las de segmento.*
+
+## Conclusión e Importancia
+
+EARTH representa un avance significativo en el diseño de procesadores vectoriales al abordar un cuello de botella crítico: la eficiencia del acceso a la memoria. El enfoque basado en el desplazamiento introducido por EARTH ofrece varias ventajas clave:
+
+1. **Mejora del Rendimiento**: Aceleración de 4 a 8 veces para las operaciones de acceso con zancada con beneficios crecientes a medida que aumenta la intensidad de la zancada
+2. **Eficiencia del Hardware**: Reducción del 9% en el área y reducción del 41% en el consumo de energía en comparación con los diseños convencionales
+3. **Innovación Arquitectónica**: Eliminación de los búferes de segmento dedicados manteniendo o mejorando el rendimiento en las operaciones de segmento
+4. **Implementación Práctica**: Integrado con éxito con un procesador vectorial RISC-V de código abierto (Saturn) y verificado en FPGA
+
+La importancia de EARTH se extiende más allá de sus mejoras inmediatas de rendimiento. Al hacer que los procesadores vectoriales sean más eficientes, EARTH ayuda a posicionar las arquitecturas vectoriales como alternativas viables a las GPU para ciertas cargas de trabajo, particularmente en entornos con recursos limitados. El enfoque basado en el desplazamiento también representa una reconsideración fundamental de cómo se puede manejar la reorganización de datos en la arquitectura del procesador.
+
+A medida que RISC-V continúa ganando adopción, especialmente en aplicaciones integradas y específicas de dominio, las innovaciones como EARTH que mejoran el rendimiento al tiempo que reducen los costos de hardware serán cruciales para el crecimiento del ecosistema. La investigación demuestra que es posible lograr mejoras significativas en el rendimiento incluso dentro de las limitaciones de una ISA establecida como RISC-V al centrarse en las optimizaciones arquitectónicas en lugar de las extensiones de ISA.
+
+Rv1106 Linux Development Board Risc-v Architecture 256mb Flash 100mbps Ethernet Port Artificial Int | Fruugo ES
+   
+   
+
+RISC-V: diseño y fundamentos de la ISA
+   
+   
+
+Staff View: Implementación de un procesador RISC-V en VHDL para aplicaciones académicas, soportando programación a alto nivel y periféricos a la medida
