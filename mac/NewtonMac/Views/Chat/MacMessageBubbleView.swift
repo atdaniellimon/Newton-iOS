@@ -239,6 +239,19 @@ public struct MacFormattedAssistantContent: View {
         if let regex = try? NSRegularExpression(pattern: orbitPattern, options: [.caseInsensitive]) {
             text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
         }
+        // Strip natural chain-of-thought + orbit/download tags (parsed into cards, never shown raw)
+        let thinkTagPattern = "<think(?:ing)?>[\\s\\S]*?(?:</think(?:ing)?>|$)"
+        if let regex = try? NSRegularExpression(pattern: thinkTagPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        let natOrbitPattern = "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)"
+        if let regex = try? NSRegularExpression(pattern: natOrbitPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        let dlTagPattern = "<download>[\\s\\S]*?(?:</download>|$)"
+        if let regex = try? NSRegularExpression(pattern: dlTagPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
         let jsonPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```"
         if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {
             text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
@@ -387,26 +400,55 @@ public struct MacCodeBlockView: View {
 
 public struct MacGeneratedImageView: View {
     public let urlStr: String
-    
+    @State private var nsImage: NSImage? = nil
+
+    private func decodeBase64ToNSImage(_ base64Str: String) -> NSImage? {
+        var base64 = base64Str
+        if let commaIndex = base64Str.firstIndex(of: ",") {
+            base64 = String(base64Str[base64Str.index(after: commaIndex)...])
+        }
+        let clean = base64
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        guard let data = Data(base64Encoded: clean, options: .ignoreUnknownCharacters) else { return nil }
+        return NSImage(data: data)
+    }
+
     public var body: some View {
-        if let url = URL(string: urlStr) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .frame(width: 240, height: 240)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 420)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                case .failure:
-                    Text("Failed to load generated image")
-                        .font(.system(size: 11))
-                        .foregroundColor(NewtonTheme.coralRed)
-                @unknown default:
-                    EmptyView()
+        Group {
+            if let img = nsImage {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 420)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else if urlStr.hasPrefix("data:image/") {
+                ProgressView()
+                    .frame(width: 240, height: 240)
+                    .task(id: urlStr) {
+                        self.nsImage = decodeBase64ToNSImage(urlStr)
+                    }
+            } else if let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 240, height: 240)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 420)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    case .failure:
+                        Text("Failed to load generated image")
+                            .font(.system(size: 11))
+                            .foregroundColor(NewtonTheme.coralRed)
+                    @unknown default:
+                        EmptyView()
+                    }
                 }
             }
         }

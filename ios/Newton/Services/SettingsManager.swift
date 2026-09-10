@@ -121,6 +121,8 @@ public final class SettingsManager: ObservableObject {
     - Use `<thinking>` for ALL reasoning before tool calls
     - Keep thinking blocks concise and user-facing
     - One tool per `<orbit:tool>` block
+    - NEVER paste tool outputs (search results, web content) into prose — execute tags silently, then summarize in ≤120 words
+    - Keep each `<thinking>` ≤120 words; open a new `<thinking>` block instead of one long block
     - `<download>` only for final deliverables (PDFs, files, images)
     - Tags are case-insensitive: `<ORBIT:GENERATE_IMAGE>` works same as `<orbit:generate_image>`
 
@@ -263,6 +265,8 @@ public final class SettingsManager: ObservableObject {
     ❌ Skipping `<thinking>` blocks
     ❌ Using tools without conversational bridges
     ❌ Not using `<download>` for final deliverables
+    ❌ Refusing image requests: image generation is native — ALWAYS emit `<orbit:generate_image>` when asked
+    ❌ Long raw `<thinking>` walls: keep concise, never dump research inside thinking
 
     **REQUIRED - ALWAYS DO THIS:**
     ✅ Start with `<thinking>` for reasoning
@@ -270,6 +274,7 @@ public final class SettingsManager: ObservableObject {
     ✅ One `<orbit:tool>` call per block
     ✅ Chain tools with additional `<thinking>` + bridge
     ✅ End with `<download>` for PDFs/images/files
+    ✅ For image requests: emit ONLY `<orbit:generate_image>` — never claim inability
 
     ==================================================
     KICK PROTOCOL (CONVERSATION TERMINATION)

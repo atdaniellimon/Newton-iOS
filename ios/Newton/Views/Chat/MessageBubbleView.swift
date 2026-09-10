@@ -493,6 +493,19 @@ public struct FormattedAssistantContent: View {
         if let regex = try? NSRegularExpression(pattern: orbitPattern, options: [.caseInsensitive]) {
             text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
         }
+        // Strip natural chain-of-thought + orbit/download tags (parsed into cards, never shown raw)
+        let thinkTagPattern = "<think(?:ing)?>[\\s\\S]*?(?:</think(?:ing)?>|$)"
+        if let regex = try? NSRegularExpression(pattern: thinkTagPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        let natOrbitPattern = "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)"
+        if let regex = try? NSRegularExpression(pattern: natOrbitPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
+        let dlTagPattern = "<download>[\\s\\S]*?(?:</download>|$)"
+        if let regex = try? NSRegularExpression(pattern: dlTagPattern, options: [.caseInsensitive]) {
+            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
+        }
         // Strip json tool calls
         let jsonPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```"
         if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {

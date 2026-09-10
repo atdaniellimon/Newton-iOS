@@ -37,8 +37,8 @@ public final class OrbitEngine {
             }
         }
 
-        // 1. Process <thinking>...</thinking> blocks - Chain of Thought
-        let thinkingPattern = "<thinking>([\\s\\S]*?)</thinking>"
+        // 1. Process <thinking>...</thinking> blocks - Chain of Thought (also legacy <think>)
+        let thinkingPattern = "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>"
         if let thinkingRegex = try? NSRegularExpression(pattern: thinkingPattern, options: [.caseInsensitive]) {
             let nsString = outputText as NSString
             let matches = thinkingRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsString.length))
@@ -49,15 +49,36 @@ public final class OrbitEngine {
                 let thinkingContent = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
 
                 if !thinkingContent.isEmpty {
-                    if !accumulatedThinking.isEmpty {
-                        accumulatedThinking += "\n\n---\n\n"
-                    }
-                    accumulatedThinking += thinkingContent
+                    // Prepend: we iterate matches.reversed(), so this preserves document order.
+                    accumulatedThinking = thinkingContent + (accumulatedThinking.isEmpty ? "" : "\n\n---\n\n" + accumulatedThinking)
                 }
 
                 // Remove thinking blocks from output (they'll be shown in ThinkingCardView)
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
             }
+        }
+
+        // 1b. Recover unclosed trailing <thinking> (truncated stream: no closing tag).
+        // Extract it into thinking instead of leaving raw text cut off in chat.
+        if let openRange = outputText.range(of: "<think", options: [.caseInsensitive]) {
+            let tail = String(outputText[openRange.lowerBound...])
+            if tail.range(of: "</think", options: [.caseInsensitive]) == nil {
+                var thoughtTail = tail
+                if let tagEnd = thoughtTail.range(of: ">") {
+                    thoughtTail = String(thoughtTail[tagEnd.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                if !thoughtTail.isEmpty {
+                    if !accumulatedThinking.isEmpty {
+                        accumulatedThinking += "\n\n---\n\n"
+                    }
+                    accumulatedThinking += thoughtTail
+                }
+                outputText = String(outputText[..<openRange.lowerBound])
+            }
+        }
+        // Strip any stray closing think tags left behind
+        if let strayClose = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive]) {
+            outputText = strayClose.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
         }
 
         // 2. Process <orbit:tool_name>...</orbit:tool_name> blocks (natural syntax with JSON params)
@@ -76,7 +97,9 @@ public final class OrbitEngine {
                 results.append(result)
 
                 if orbitName == "generate_image" || orbitName == "image_gen" {
-                    detectedImageUrl = result.result
+                    if !result.result.isEmpty {
+                        detectedImageUrl = result.result
+                    }
                 }
 
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
@@ -96,7 +119,9 @@ public final class OrbitEngine {
 
                 let result = await executeOrbit(name: "generate_image", paramsJson: "{\"prompt\": \"\(prompt.replacingOccurrences(of: "\"", with: "\\\""))\"}", baseUrl: baseUrl, apiKey: apiKey)
                 results.append(result)
-                detectedImageUrl = result.result
+                if !result.result.isEmpty {
+                    detectedImageUrl = result.result
+                }
 
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
             }
@@ -144,7 +169,9 @@ public final class OrbitEngine {
                 results.append(result)
 
                 if orbitName.lowercased() == "image_gen" || orbitName.lowercased() == "imagine" || orbitName.lowercased() == "generate_image" {
-                    detectedImageUrl = result.result
+                    if !result.result.isEmpty {
+                        detectedImageUrl = result.result
+                    }
                 }
 
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
@@ -165,7 +192,9 @@ public final class OrbitEngine {
                 let result = await executeOrbit(name: toolName, paramsJson: paramsJson, baseUrl: baseUrl, apiKey: apiKey)
                 results.append(result)
                 if toolName.lowercased() == "generate_image" || toolName.lowercased() == "image_gen" {
-                    detectedImageUrl = result.result
+                    if !result.result.isEmpty {
+                        detectedImageUrl = result.result
+                    }
                 }
                 outputText = outputText.replacingOccurrences(of: fullMatch, with: "")
             }
@@ -178,7 +207,11 @@ public final class OrbitEngine {
                 let nsOut = outputText as NSString
                 let matches = dumpRegex.matches(in: outputText, options: [], range: NSRange(location: 0, length: nsOut.length))
                 for match in matches {
-                    let dumpText = nsOut.substring(with: match.range(at: 0))
+                    var dumpText = nsOut.substring(with: match.range(at: 0))
+                    // Truncate mega-dumps: cards stay readable, no walls of raw text
+                    if dumpText.count > 2000 {
+                        dumpText = String(dumpText.prefix(2000)) + "\n\n... (resultado recortado)"
+                    }
                     results.append(OrbitExecutionResult(orbitName: "web_search", params: "", result: dumpText, isSuccess: true))
                     outputText = outputText.replacingOccurrences(of: dumpText, with: "")
                 }
@@ -230,7 +263,29 @@ public final class OrbitEngine {
             }
         }
         
-        return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, detectedImageUrl, accumulatedThinking.isEmpty ? nil : accumulatedThinking)
+        // 5. Image-intent fallback: user asked for an image but the model replied
+        // in prose (e.g. claimed inability) without emitting any image orbit tag.
+        // Detect intent client-side and generate anyway so natural requests work.
+        if detectedImageUrl == nil && !results.contains(where: { ["image_gen", "generate_image", "imagine", "draw"].contains($0.orbitName.lowercased()) }) {
+            let lowerPrompt = userPrompt.lowercased()
+            let imageKeywords = ["genera una imagen", "generame una imagen", "crea una imagen", "haz una imagen", "dibuja", "draw", "generate an image", "create an image", "make an image", "generate a picture", "/imagine"]
+            let wantsImage = imageKeywords.contains(where: { lowerPrompt.contains($0) }) || lowerPrompt.hasPrefix("imagine")
+            if wantsImage {
+                let cleanUserPrompt = userPrompt.replacingOccurrences(of: "\"", with: " ").replacingOccurrences(of: "\n", with: " ")
+                let fallback = await executeOrbit(name: "generate_image", paramsJson: "{\"prompt\": \"\(cleanUserPrompt)\"}", baseUrl: baseUrl, apiKey: apiKey)
+                results.append(fallback)
+                if !fallback.result.isEmpty {
+                    detectedImageUrl = fallback.result
+                    // Strip refusal prose since the image was actually produced
+                    if let refusalRegex = try? NSRegularExpression(pattern: "(?i)(?:no puedo (?:generar|crear)[^\n.]*[\n.]?|lo siento[^\n]*imagen[^\n]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)", options: []) {
+                        outputText = refusalRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+                    }
+                }
+            }
+        }
+
+        let finalImageUrl: String? = (detectedImageUrl?.isEmpty == true) ? nil : detectedImageUrl
+        return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, finalImageUrl, accumulatedThinking.isEmpty ? nil : accumulatedThinking)
     }
     
     /// Generate an image from a prompt calling endpoint or downloading high-res data URL

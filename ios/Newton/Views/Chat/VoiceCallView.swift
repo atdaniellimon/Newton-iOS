@@ -272,7 +272,7 @@ public struct VoiceCallView: View {
                 }
                 
                 // Process tool calling
-                let (finalContent, _, _, _) = await OrbitEngine.shared.processOrbitsInText(
+                let (finalContent, voiceOrbits, voiceImgUrl, voiceThinking) = await OrbitEngine.shared.processOrbitsInText(
                     fullResponse,
                     userPrompt: userPrompt,
                     baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
@@ -280,7 +280,7 @@ public struct VoiceCallView: View {
                 )
                 
                 await MainActor.run {
-                    let assistantMessage = Message(role: .assistant, content: finalContent, isStreaming: false)
+                    let assistantMessage = Message(role: .assistant, content: finalContent, thinkingContent: voiceThinking, imageUrl: voiceImgUrl, orbitResults: voiceOrbits, isStreaming: false)
                     conversation.messages.append(assistantMessage)
                     StorageManager.shared.updateConversation(conversation)
                     

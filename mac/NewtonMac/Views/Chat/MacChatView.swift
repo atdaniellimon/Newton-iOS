@@ -462,6 +462,7 @@ public struct MacChatView: View {
             var fullResponse = ""
             var currentThinking = ""
             var isInsideThinkingTag = false
+            var rawStream = ""
             
             let provider = settings.currentProvider
             let modelId = settings.currentModelId
@@ -492,26 +493,58 @@ public struct MacChatView: View {
                 for try await token in stream {
                     if Task.isCancelled { break }
                     
-                    var cleanToken = token
-                    
-                    if cleanToken.contains("<think>") {
-                        isInsideThinkingTag = true
-                        cleanToken = cleanToken.replacingOccurrences(of: "<think>", with: "")
-                    }
-                    
-                    if isInsideThinkingTag {
-                        if cleanToken.contains("</think>") {
-                            let parts = cleanToken.components(separatedBy: "</think>")
-                            currentThinking += parts.first ?? ""
-                            isInsideThinkingTag = false
-                            if parts.count > 1 {
-                                fullResponse += parts[1]
-                            }
-                        } else {
-                            currentThinking += cleanToken
-                        }
+                    rawStream += token
+                    if !token.contains("<") && !token.contains(">") && !isInsideThinkingTag {
+                        // Fast path: plain prose, no tag activity — skip full re-parse.
+                        fullResponse += token
+                    } else if !token.contains("<") && !token.contains(">") {
+                        // Inside an open thinking block: plain prose extends the thought.
+                        currentThinking += token
                     } else {
-                        fullResponse += cleanToken
+                    // Re-derive live display from rawStream so tags split across chunks still parse.
+                    // Handles both <think> and <thinking>, hides orbit/download tags until executed.
+                    do {
+                        var display = rawStream
+                        var think = ""
+                        if let re = try? NSRegularExpression(pattern: "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>", options: [.caseInsensitive]) {
+                            let ns = display as NSString
+                            let matches = re.matches(in: display, options: [], range: NSRange(location: 0, length: ns.length))
+                            for m in matches.reversed() where m.numberOfRanges >= 2 {
+                                let inner = ns.substring(with: m.range(at: 1))
+                                think = inner + (think.isEmpty ? "" : "\n\n---\n\n" + think)
+                                display = (display as NSString).replacingCharacters(in: m.range, with: "")
+                            }
+                        }
+                        var inside = false
+                        if let openRange = display.range(of: "<think", options: [.caseInsensitive]) {
+                            let tail = String(display[openRange.lowerBound...])
+                            if tail.range(of: "</think", options: [.caseInsensitive]) == nil {
+                                var thoughtTail = tail
+                                if let tagEnd = thoughtTail.range(of: ">") {
+                                    thoughtTail = String(thoughtTail[tagEnd.upperBound...])
+                                } else {
+                                    thoughtTail = ""
+                                }
+                                if !thoughtTail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    think += (think.isEmpty ? "" : "\n\n---\n\n") + thoughtTail
+                                }
+                                display = String(display[..<openRange.lowerBound])
+                                inside = true
+                            }
+                        }
+                        if let stray = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive]) {
+                            display = stray.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+                        }
+                        if let reOrbit = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive]) {
+                            display = reOrbit.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+                        }
+                        if let reDl = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive]) {
+                            display = reDl.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+                        }
+                        isInsideThinkingTag = inside
+                        currentThinking = think
+                        fullResponse = display
+                    }
                     }
                     
                     if let idx = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
@@ -522,7 +555,7 @@ public struct MacChatView: View {
                 
                 // Process Orbits + Chain of Thought
                 let (finalContent, orbitResults, detectedImgUrl, thinkingContent) = await OrbitEngine.shared.processOrbitsInText(
-                    fullResponse,
+                    rawStream,
                     userPrompt: rawInput,
                     baseUrl: baseUrl,
                     apiKey: apiKey
@@ -531,7 +564,15 @@ public struct MacChatView: View {
                     conversation.messages[idx].content = finalContent
                     conversation.messages[idx].orbitResults = orbitResults
                     conversation.messages[idx].imageUrl = detectedImgUrl
-                    conversation.messages[idx].thinkingContent = thinkingContent
+                    let liveTrim = currentThinking.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let engTrim = (thinkingContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let mergedThinking: String
+                    if liveTrim.isEmpty { mergedThinking = engTrim }
+                    else if engTrim.isEmpty { mergedThinking = liveTrim }
+                    else if engTrim.contains(liveTrim) { mergedThinking = engTrim }
+                    else if liveTrim.contains(engTrim) { mergedThinking = liveTrim }
+                    else { mergedThinking = liveTrim + "\n\n---\n\n" + engTrim }
+                    conversation.messages[idx].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
                     conversation.messages[idx].isStreaming = false
                     storage.updateConversation(conversation)
                     

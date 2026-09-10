@@ -267,7 +267,7 @@ public final class LLMService {
             
             if let delta = firstChoice["delta"] as? [String: Any] {
                 if let reasoning = delta["reasoning_content"] as? String, !reasoning.isEmpty {
-                    return "<think>\(reasoning)</think>"
+                    return "<thinking>\(reasoning)</thinking>"
                 }
                 if let content = delta["content"] as? String {
                     return content

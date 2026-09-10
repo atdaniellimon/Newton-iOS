@@ -22,3 +22,8 @@ DerivedData/
 *.xcarchive
 *.ipa
 .swiftpm/
+
+# Newton debug dumps (never commit)
+/yap.txt
+/log.txt
+/*.log

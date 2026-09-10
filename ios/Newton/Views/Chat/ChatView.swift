@@ -486,6 +486,7 @@ public struct ChatView: View {
             var fullResponse = ""
             var currentThinking = ""
             var isInsideThinkingTag = false
+            var rawStream = ""
             
             let provider = settings.currentProvider
             let modelId = settings.currentModelId
@@ -513,18 +514,58 @@ public struct ChatView: View {
                 for try await token in stream {
                     guard !Task.isCancelled else { break }
                     
-                    if token.contains("<think>") {
-                        isInsideThinkingTag = true
-                    }
-                    
-                    if isInsideThinkingTag {
-                        currentThinking += token.replacingOccurrences(of: "<think>", with: "")
-                        if token.contains("</think>") {
-                            isInsideThinkingTag = false
-                            currentThinking = currentThinking.replacingOccurrences(of: "</think>", with: "")
-                        }
-                    } else {
+                    rawStream += token
+                    if !token.contains("<") && !token.contains(">") && !isInsideThinkingTag {
+                        // Fast path: plain prose, no tag activity — skip full re-parse.
                         fullResponse += token
+                    } else if !token.contains("<") && !token.contains(">") {
+                        // Inside an open thinking block: plain prose extends the thought.
+                        currentThinking += token
+                    } else {
+                    // Re-derive live display from rawStream so tags split across chunks still parse.
+                    // Handles both <think> and <thinking>, hides orbit/download tags until executed.
+                    do {
+                        var display = rawStream
+                        var think = ""
+                        if let re = try? NSRegularExpression(pattern: "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>", options: [.caseInsensitive]) {
+                            let ns = display as NSString
+                            let matches = re.matches(in: display, options: [], range: NSRange(location: 0, length: ns.length))
+                            for m in matches.reversed() where m.numberOfRanges >= 2 {
+                                let inner = ns.substring(with: m.range(at: 1))
+                                think = inner + (think.isEmpty ? "" : "\n\n---\n\n" + think)
+                                display = (display as NSString).replacingCharacters(in: m.range, with: "")
+                            }
+                        }
+                        var inside = false
+                        if let openRange = display.range(of: "<think", options: [.caseInsensitive]) {
+                            let tail = String(display[openRange.lowerBound...])
+                            if tail.range(of: "</think", options: [.caseInsensitive]) == nil {
+                                var thoughtTail = tail
+                                if let tagEnd = thoughtTail.range(of: ">") {
+                                    thoughtTail = String(thoughtTail[tagEnd.upperBound...])
+                                } else {
+                                    thoughtTail = ""
+                                }
+                                if !thoughtTail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    think += (think.isEmpty ? "" : "\n\n---\n\n") + thoughtTail
+                                }
+                                display = String(display[..<openRange.lowerBound])
+                                inside = true
+                            }
+                        }
+                        if let stray = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive]) {
+                            display = stray.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+                        }
+                        if let reOrbit = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive]) {
+                            display = reOrbit.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+                        }
+                        if let reDl = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive]) {
+                            display = reDl.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+                        }
+                        isInsideThinkingTag = inside
+                        currentThinking = think
+                        fullResponse = display
+                    }
                     }
                     
                     await MainActor.run {
@@ -537,7 +578,7 @@ public struct ChatView: View {
                 
                 // Process tool calling (image generation, web search, calculator) + chain of thought
                 let (finalContent, orbitResults, detectedImgUrl, thinkingContent) = await OrbitEngine.shared.processOrbitsInText(
-                    fullResponse,
+                    rawStream,
                     userPrompt: userPrompt,
                     baseUrl: baseUrl,
                     apiKey: apiKey
@@ -548,7 +589,15 @@ public struct ChatView: View {
                         conversation.messages[index].content = finalContent
                         conversation.messages[index].imageUrl = detectedImgUrl
                         conversation.messages[index].orbitResults = orbitResults
-                        conversation.messages[index].thinkingContent = thinkingContent
+                        let liveTrim = currentThinking.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let engTrim = (thinkingContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        let mergedThinking: String
+                        if liveTrim.isEmpty { mergedThinking = engTrim }
+                        else if engTrim.isEmpty { mergedThinking = liveTrim }
+                        else if engTrim.contains(liveTrim) { mergedThinking = engTrim }
+                        else if liveTrim.contains(engTrim) { mergedThinking = liveTrim }
+                        else { mergedThinking = liveTrim + "\n\n---\n\n" + engTrim }
+                        conversation.messages[index].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
                         conversation.messages[index].isStreaming = false
                     }
                     
