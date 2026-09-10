@@ -3,6 +3,7 @@
 //  NewtonMac
 //
 //  Login / Register screen shown when no ntwn-key is in Keychain.
+//  Elegant dark theme with Newton branding.
 //
 
 import SwiftUI
@@ -14,118 +15,250 @@ public struct AuthView: View {
     @State private var password: String = ""
     @State private var passwordConfirm: String = ""
     @State private var shakeError: Bool = false
+    @State private var showPassword: Bool = false
 
     private enum Mode { case login, register }
 
     public var body: some View {
         ZStack {
+            Color.black.ignoresSafeArea()
+
             LinearGradient(
-                colors: [Color.black, Color(white: 0.07)],
-                startPoint: .top, endPoint: .bottom
+                colors: [
+                    Color(red: 0.05, green: 0.08, blue: 0.12).opacity(0.8),
+                    Color.black.opacity(0.3)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer()
 
-                // Logo + title
-                VStack(spacing: 12) {
-                    Image(systemName: "atom")
-                        .font(.system(size: 52, weight: .ultraLight))
-                        .foregroundStyle(.white)
+                // Logo + Branding
+                VStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        NewtonTheme.sand.opacity(0.3),
+                                        NewtonTheme.sand.opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 20,
+                                    endRadius: 50
+                                )
+                            )
+                            .frame(width: 100, height: 100)
 
-                    Text("Newton")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        Image(systemName: "atom")
+                            .font(.system(size: 42, weight: .ultraLight))
+                            .foregroundStyle(NewtonTheme.sand)
+                    }
 
-                    Text("Singularity · Newton Labs")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.45))
+                    VStack(spacing: 6) {
+                        Text("Newton")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+
+                        Text("Singularity")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(NewtonTheme.sand.opacity(0.8))
+                            .tracking(3)
+                    }
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 50)
 
-                // Card
-                VStack(spacing: 20) {
-                    // Mode switcher
+                // Auth Card
+                VStack(spacing: 24) {
+                    // Mode Toggle
                     HStack(spacing: 0) {
                         modeButton("Iniciar sesión", selected: mode == .login) {
-                            withAnimation(.easeInOut(duration: 0.2)) { mode = .login }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                mode = .login
+                            }
                         }
                         modeButton("Crear cuenta", selected: mode == .register) {
-                            withAnimation(.easeInOut(duration: 0.2)) { mode = .register }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                mode = .register
+                            }
                         }
                     }
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(4)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                     // Fields
-                    VStack(spacing: 12) {
-                        field(icon: "person", placeholder: "Usuario", text: $username)
-                        secureField(icon: "lock", placeholder: "Contraseña", text: $password)
+                    VStack(spacing: 16) {
+                        // Username
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Usuario")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.6))
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(NewtonTheme.sand.opacity(0.6))
+                                    .frame(width: 20)
+                                TextField("", text: $username)
+                                    .foregroundStyle(.white)
+                                    .font(.system(size: 16))
+                                    .textFieldStyle(.plain)
+                            }
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 16)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
 
+                        // Password
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Contraseña")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.6))
+                            HStack(spacing: 12) {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(NewtonTheme.sand.opacity(0.6))
+                                    .frame(width: 20)
+                                if showPassword {
+                                    TextField("", text: $password)
+                                        .foregroundStyle(.white)
+                                        .font(.system(size: 16))
+                                        .textFieldStyle(.plain)
+                                } else {
+                                    SecureField("", text: $password)
+                                        .foregroundStyle(.white)
+                                        .font(.system(size: 16))
+                                        .textFieldStyle(.plain)
+                                }
+                                Button {
+                                    showPassword.toggle()
+                                } label: {
+                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 16)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+
+                        // Confirm Password (register only)
                         if mode == .register {
-                            secureField(icon: "lock.fill", placeholder: "Confirmar contraseña", text: $passwordConfirm)
-                                .transition(.move(edge: .top).combined(with: .opacity))
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Confirmar contraseña")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                HStack(spacing: 12) {
+                                    Image(systemName: "lock.shield.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(NewtonTheme.sand.opacity(0.6))
+                                        .frame(width: 20)
+                                    SecureField("", text: $passwordConfirm)
+                                        .foregroundStyle(.white)
+                                        .font(.system(size: 16))
+                                        .textFieldStyle(.plain)
+                                }
+                                .padding(.vertical, 14)
+                                .padding(.horizontal, 16)
+                                .background(Color.white.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
 
-                    // Error
+                    // Error Message
                     if let err = auth.lastError {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.circle.fill")
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 14))
                             Text(err)
+                                .font(.system(size: 14))
                         }
-                        .font(.caption)
-                        .foregroundStyle(.red.opacity(0.9))
-                        .multilineTextAlignment(.center)
-                        .offset(x: shakeError ? -6 : 0)
+                        .foregroundStyle(Color(red: 1.0, green: 0.4, blue: 0.4))
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .offset(x: shakeError ? -8 : 0)
                         .transition(.opacity)
                     }
 
-                    // Action button
+                    // Action Button
                     Button {
                         Task { await submit() }
                     } label: {
                         ZStack {
                             if auth.isLoading {
-                                ProgressView().tint(.black)
+                                ProgressView()
+                                    .tint(.black)
+                                    .frame(height: 22)
                             } else {
-                                Text(mode == .login ? "Entrar" : "Crear cuenta")
+                                Text(mode == .login ? "Iniciar sesión" : "Crear cuenta")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(.black)
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .frame(height: 52)
+                        .background(
+                            LinearGradient(
+                                colors: [NewtonTheme.sand, NewtonTheme.sandLight],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
                     .disabled(auth.isLoading || username.isEmpty || password.isEmpty)
-                    .opacity((auth.isLoading || username.isEmpty || password.isEmpty) ? 0.5 : 1)
+                    .opacity((auth.isLoading || username.isEmpty || password.isEmpty) ? 0.6 : 1)
 
-                    // Trial note
+                    // Trial info
                     if mode == .register {
-                        Text("30 días gratis · $100 MXN/mes después")
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.3))
-                            .transition(.opacity)
+                        VStack(spacing: 4) {
+                            Text("30 días gratis")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(NewtonTheme.sand)
+                            Text("$100 MXN/mes después")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                        .padding(.top, 4)
+                        .transition(.opacity)
                     }
                 }
                 .padding(28)
-                .frame(width: 380)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .frame(width: 400)
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.white.opacity(0.03))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
                 )
 
                 Spacer()
-                Spacer()
+
+                // Footer
+                Text("Newton Labs © 2026")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.25))
+                    .padding(.bottom, 20)
             }
         }
-        .frame(minWidth: 480, minHeight: 520)
+        .frame(minWidth: 520, minHeight: 620)
     }
 
     // ── Helpers ──────────────────────────────────────────────────
@@ -136,12 +269,16 @@ public struct AuthView: View {
 
         if mode == .register {
             guard password == passwordConfirm else {
-                AuthManager.shared.lastError = "Las contraseñas no coinciden"
+                await MainActor.run {
+                    AuthManager.shared.lastError = "Las contraseñas no coinciden"
+                }
                 triggerShake()
                 return
             }
             guard password.count >= 8 else {
-                AuthManager.shared.lastError = "La contraseña debe tener al menos 8 caracteres"
+                await MainActor.run {
+                    AuthManager.shared.lastError = "Mínimo 8 caracteres"
+                }
                 triggerShake()
                 return
             }
@@ -154,67 +291,32 @@ public struct AuthView: View {
     }
 
     private func triggerShake() {
-        withAnimation(.easeInOut(duration: 0.08).repeatCount(3, autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 0.06).repeatCount(4, autoreverses: true)) {
             shakeError = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { shakeError = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { shakeError = false }
     }
 
     @ViewBuilder
     private func modeButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? .white : .white.opacity(0.45))
+                .font(.system(size: 14, weight: selected ? .semibold : .medium))
+                .foregroundStyle(selected ? .black : .white.opacity(0.6))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(selected ? Color.white.opacity(0.12) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.vertical, 12)
+                .background(
+                    selected ?
+                    LinearGradient(
+                        colors: [NewtonTheme.sand, NewtonTheme.sandLight],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ) :
+                    LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
-        .padding(2)
-    }
-
-    @ViewBuilder
-    private func field(icon: String, placeholder: String, text: Binding<String>) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 15))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 20)
-            TextField(placeholder, text: text)
-                .foregroundStyle(.white)
-                .font(.system(size: 15))
-                .textFieldStyle(.plain)
-        }
-        .padding(14)
-        .background(Color.white.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-
-    @ViewBuilder
-    private func secureField(icon: String, placeholder: String, text: Binding<String>) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 15))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 20)
-            SecureField(placeholder, text: text)
-                .foregroundStyle(.white)
-                .font(.system(size: 15))
-                .textFieldStyle(.plain)
-        }
-        .padding(14)
-        .background(Color.white.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
     }
 }
 

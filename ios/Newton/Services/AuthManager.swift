@@ -78,7 +78,7 @@ public final class AuthManager: ObservableObject {
         defer { isLoading = false }
 
         guard let url = URL(string: authBaseURL + endpoint) else {
-            lastError = "Invalid server URL"
+            lastError = "URL inválida"
             return false
         }
 
@@ -92,9 +92,35 @@ public final class AuthManager: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
             let http = response as? HTTPURLResponse
 
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            // Debug: print response
+            #if DEBUG
+            if let respStr = String(data: data, encoding: .utf8) {
+                print(" Auth response (\(http?.statusCode ?? 0)): \(respStr)")
+            }
+            #endif
 
-            if let http, http.statusCode == 200 || http.statusCode == 201,
+            // Try to parse JSON
+            let json: [String: Any]
+            do {
+                guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    lastError = "Respuesta inválida del servidor"
+                    return false
+                }
+                json = parsed
+            } catch {
+                lastError = "El servidor devolvió una respuesta inválida"
+                return false
+            }
+
+            // Check for error in response
+            if let errObj = json["error"] as? [String: Any],
+               let msg = errObj["message"] as? String {
+                lastError = msg
+                return false
+            }
+
+            // Check for successful auth
+            if let http, (http.statusCode == 200 || http.statusCode == 201),
                let key = json["nwtn_key"] as? String, key.hasPrefix("ntwn-"),
                let user = json["username"] as? String {
 
@@ -111,17 +137,11 @@ public final class AuthManager: ObservableObject {
                 }
                 return true
             } else {
-                // Extract error message
-                if let errObj = json["error"] as? [String: Any],
-                   let msg = errObj["message"] as? String {
-                    lastError = msg
-                } else {
-                    lastError = "Server error (\(http?.statusCode ?? 0))"
-                }
+                lastError = "Error del servidor (\(http?.statusCode ?? 0))"
                 return false
             }
         } catch {
-            lastError = error.localizedDescription
+            lastError = "Error de conexión: \(error.localizedDescription)"
             return false
         }
     }

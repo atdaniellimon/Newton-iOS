@@ -36,13 +36,39 @@ QUOTA_5H_SECS   = 5 * 3600
 QUOTA_WEEK_MSGS = 1200  # messages per week
 QUOTA_WEEK_TOK  = 6_000_000  # tokens per week
 
-# Lazy-import bcrypt so missing dep gives helpful error at runtime
-def _bcrypt():
+# Password hashing using PBKDF2 (stdlib, no external deps)
+import hashlib
+import secrets
+import base64
+
+def _hash_password(password: str) -> str:
+    """Hash password with PBKDF2-HMAC-SHA256. Returns 'pbkdf2$salt$hash'."""
+    salt = secrets.token_hex(16)
+    hash_bytes = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    hash_b64 = base64.b64encode(hash_bytes).decode()
+    return f"pbkdf2${salt}${hash_b64}"
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Verify password against stored PBKDF2 hash."""
     try:
-        import bcrypt
-        return bcrypt
-    except ImportError:
-        raise RuntimeError("Install bcrypt: pip install bcrypt")
+        if stored_hash.startswith("pbkdf2$"):
+            parts = stored_hash.split("$")
+            if len(parts) != 3:
+                return False
+            _, salt, hash_b64 = parts
+            expected = base64.b64decode(hash_b64)
+            computed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+            return secrets.compare_digest(expected, computed)
+        # Legacy bcrypt support (if any existing hashes)
+        elif stored_hash.startswith("$2"):
+            try:
+                import bcrypt
+                return bcrypt.checkpw(password.encode(), stored_hash.encode())
+            except ImportError:
+                return False
+        return False
+    except Exception:
+        return False
 
 # ──────────────────────────────────────────────
 # DB helpers
@@ -266,8 +292,7 @@ class NWTNHandler(BaseHTTPRequestHandler):
         nwtn_key_prefix = nwtn_key[5:17]  # 12 chars after "ntwn-"
 
         # Hash password
-        bcrypt = _bcrypt()
-        pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        pw_hash = _hash_password(password)
 
         trial_ends_at = None
         if trial_days > 0:
@@ -309,13 +334,7 @@ class NWTNHandler(BaseHTTPRequestHandler):
         if not user["active"]:
             return self._send_json(401, {"error": {"code": "unauthorized", "message": "Account revoked"}})
 
-        bcrypt = _bcrypt()
-        try:
-            pw_ok = bcrypt.checkpw(password.encode(), user["password_hash"].encode())
-        except Exception:
-            pw_ok = False
-
-        if not pw_ok:
+        if not _verify_password(password, user["password_hash"]):
             return self._send_json(401, {"error": {"code": "unauthorized", "message": "Invalid credentials"}})
 
         self._send_json(200, {
