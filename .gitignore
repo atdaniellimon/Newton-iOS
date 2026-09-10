@@ -16,6 +16,10 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Newton backend database (contains user data — never commit)
+backend/users.db
+backend/.env
+
 # iOS & Xcode
 build/
 DerivedData/
@@ -27,3 +31,18 @@ DerivedData/
 /yap.txt
 /log.txt
 /*.log
+
+# Local helper scripts (never commit, may contain machine-specific paths)
+/push.sh
+
+# Android (local SDK, build outputs, wrapper binaries)
+/local.properties
+android/local.properties
+android/.gradle/
+android/build/
+android/shared/build/
+android/app/build/
+android/gradle/wrapper/gradle-wrapper.jar
+*.apk
+*.aab
+*.ap_

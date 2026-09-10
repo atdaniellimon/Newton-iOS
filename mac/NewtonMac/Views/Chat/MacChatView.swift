@@ -464,10 +464,6 @@ public struct MacChatView: View {
             var isInsideThinkingTag = false
             var rawStream = ""
             
-            let provider = settings.currentProvider
-            let modelId = settings.currentModelId
-            let baseUrl = settings.effectiveBaseUrl(for: provider)
-            let apiKey = settings.getApiKey(for: provider)
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
             var systemPrompt = SettingsManager.singularitySystemPrompt
@@ -481,12 +477,6 @@ public struct MacChatView: View {
             do {
                 let stream = LLMService.shared.streamCompletion(
                     messages: messagesToSend,
-                    provider: provider,
-                    modelId: modelId,
-                    baseUrl: baseUrl,
-                    apiKey: apiKey,
-                    temperature: temp,
-                    maxTokens: maxTokens,
                     systemPrompt: systemPrompt
                 )
                 

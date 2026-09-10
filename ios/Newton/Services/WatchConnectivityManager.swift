@@ -64,11 +64,7 @@ public final class WatchConnectivityManager: NSObject, ObservableObject, WCSessi
                 
                 do {
                     let stream = LLMService.shared.streamCompletion(
-                        messages: [dummyMsg],
-                        provider: settings.currentProvider,
-                        modelId: settings.currentModelId,
-                        baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
-                        apiKey: settings.currentApiKey
+                        messages: [dummyMsg]
                     )
                     for try await token in stream {
                         responseText += token

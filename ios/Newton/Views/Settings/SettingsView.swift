@@ -76,7 +76,7 @@ public struct SettingsView: View {
                             
                             VStack(spacing: 0) {
                                 NavigationLink(destination: CapabilitiesSubView()) {
-                                    settingsRow(icon: "slider.horizontal.3", title: "Capabilities", badge: settings.currentModelId)
+                                    settingsRow(icon: "slider.horizontal.3", title: "Capabilities")
                                 }
                                 internalDivider
                                 

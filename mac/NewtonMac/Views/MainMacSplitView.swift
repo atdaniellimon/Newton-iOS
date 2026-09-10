@@ -13,6 +13,7 @@ public struct MainMacSplitView: View {
     @StateObject private var storage = StorageManager.shared
     @StateObject private var settings = SettingsManager.shared
     @ObservedObject private var workspace = NewtonCodeWorkspaceManager.shared
+    @ObservedObject private var auth = AuthManager.shared
     
     @State private var selectedConversation: Conversation? = nil
     @State private var selectedSidebarTab: SidebarTab = .chat
@@ -21,6 +22,9 @@ public struct MainMacSplitView: View {
     @Environment(\.colorScheme) private var colorScheme
     
     public var body: some View {
+        if !auth.isLoggedIn {
+            AuthView()
+        } else {
         HStack(spacing: 0) {
             // Sidebar Column
             if !isSidebarCollapsed {
@@ -82,6 +86,7 @@ public struct MainMacSplitView: View {
                 selectedConversation = storage.conversations.first ?? storage.createConversation()
             }
         }
+        } // end else (auth)
     }
     
     private func bindingForSelectedConversation() -> Binding<Conversation>? {

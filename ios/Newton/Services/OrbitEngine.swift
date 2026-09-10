@@ -288,66 +288,42 @@ public final class OrbitEngine {
         return (outputText.trimmingCharacters(in: .whitespacesAndNewlines), results, finalImageUrl, accumulatedThinking.isEmpty ? nil : accumulatedThinking)
     }
     
-    /// Generate an image from a prompt calling endpoint or downloading high-res data URL
+    /// Generate an image via NWTN /images endpoint
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 1. Determinar la URL del API (soporta servidor local 8765, túnel Cloudflare y custom URL)
-        var activeBase = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        if activeBase.isEmpty {
-            activeBase = SettingsManager.shared.effectiveBaseUrl(for: .openaiCompatible).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        if activeBase.isEmpty {
-            activeBase = "http://127.0.0.1:8765/v1"
-        }
-        
-        let cleanBase = activeBase.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let endpointStr: String
-        if cleanBase.hasSuffix("/v1/images/generations") || cleanBase.hasSuffix("/images/generations") {
-            endpointStr = cleanBase
-        } else if cleanBase.hasSuffix("/v1") {
-            endpointStr = "\(cleanBase)/images/generations"
-        } else {
-            endpointStr = "\(cleanBase)/v1/images/generations"
-        }
-        
-        // 2. Llamar directamente a tu API /v1/images/generations con 30 segundos de timeout
-        if let endpointUrl = URL(string: endpointStr) {
-            var request = URLRequest(url: endpointUrl)
-            request.httpMethod = "POST"
-            request.timeoutInterval = 30
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let activeKey = apiKey.isEmpty ? SettingsManager.shared.customApiKey : apiKey
-            if !activeKey.isEmpty {
-                request.setValue("Bearer \(activeKey)", forHTTPHeaderField: "Authorization")
+        guard !cleanPrompt.isEmpty else { return "" }
+
+        // Always use NWTN images endpoint
+        let endpointStr = SettingsManager.nwtnBaseURL + "/images"
+        let nwtnKey = apiKey.isEmpty ? AuthManager.shared.nwtnKey : apiKey
+
+        guard let endpointUrl = URL(string: endpointStr), !nwtnKey.isEmpty else { return "" }
+
+        var request = URLRequest(url: endpointUrl)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(nwtnKey)", forHTTPHeaderField: "Authorization")
+
+        let payload: [String: Any] = ["prompt": cleanPrompt, "n": 1]
+
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: payload) else { return "" }
+        request.httpBody = bodyData
+
+        if let (data, response) = try? await URLSession.shared.data(for: request),
+           let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let images = json["images"] as? [[String: Any]],
+           let first = images.first {
+            // NWTN returns { "images": [{ "url": "https://..." }] }
+            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
+                return imgUrl
             }
-            
-            let payload: [String: Any] = [
-                "prompt": cleanPrompt,
-                "n": 1,
-                "size": "1024x1024",
-                "model": "dall-e-3"
-            ]
-            
-            if let bodyData = try? JSONSerialization.data(withJSONObject: payload) {
-                request.httpBody = bodyData
-                if let (data, response) = try? await URLSession.shared.data(for: request),
-                   let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) {
-                    
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let dataArr = json["data"] as? [[String: Any]],
-                       let first = dataArr.first {
-                        if let b64 = first["b64_json"] as? String, !b64.isEmpty {
-                            return "data:image/png;base64,\(b64)"
-                        }
-                        if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
-                            return imgUrl
-                        }
-                    }
-                }
+            if let b64 = first["b64_json"] as? String, !b64.isEmpty {
+                return "data:image/png;base64,\(b64)"
             }
         }
-        
+
         return ""
     }
     

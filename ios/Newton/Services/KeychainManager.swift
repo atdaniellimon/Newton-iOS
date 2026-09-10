@@ -2,7 +2,7 @@
 //  KeychainManager.swift
 //  Newton
 //
-//  Created for Newton iOS.
+//  Generic Keychain helper. Provider-specific API removed — use AuthManager for nwtn keys.
 //
 
 import Foundation
@@ -11,57 +11,64 @@ import Security
 public final class KeychainManager {
     public static let shared = KeychainManager()
     private let serviceName = "com.newton.ai.keychain"
-    
+
     private init() {}
-    
-    public func saveApiKey(_ key: String, for provider: AIProvider) {
-        let account = "apiKey_\(provider.rawValue)"
-        guard let data = key.data(using: .utf8) else { return }
-        
-        // Delete existing item first
-        deleteApiKey(for: provider)
-        
-        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return
-        }
-        
+
+    // MARK: - Generic string-keyed API
+
+    public func save(_ value: String, forKey key: String) {
+        guard let data = value.data(using: .utf8) else { return }
+        delete(forKey: key)
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
+            kSecClass as String:          kSecClassGenericPassword,
+            kSecAttrService as String:    serviceName,
+            kSecAttrAccount as String:    key,
+            kSecValueData as String:      data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
-        
         SecItemAdd(query as CFDictionary, nil)
     }
-    
-    public func getApiKey(for provider: AIProvider) -> String {
-        let account = "apiKey_\(provider.rawValue)"
+
+    public func get(forKey key: String) -> String? {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
+            kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecAttrAccount as String: key,
+            kSecReturnData as String:  true,
+            kSecMatchLimit as String:  kSecMatchLimitOne
         ]
-        
-        var dataTypeRef: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
-        
-        if status == errSecSuccess, let data = dataTypeRef as? Data, let key = String(data: data, encoding: .utf8) {
-            return key
-        }
-        return ""
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let str = String(data: data, encoding: .utf8) else { return nil }
+        return str
     }
-    
-    public func deleteApiKey(for provider: AIProvider) {
-        let account = "apiKey_\(provider.rawValue)"
+
+    public func delete(forKey key: String) {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
+            kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: key
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    // MARK: - Legacy provider-keyed shims (kept for build compatibility — no-ops)
+    @available(*, deprecated, message: "Use AuthManager for NWTN keys")
+    public func saveApiKey(_ key: String, for account: String) {
+        save(key, forKey: "apiKey_\(account)")
+    }
+
+    @available(*, deprecated, message: "Use AuthManager for NWTN keys")
+    public func getApiKey(for account: String) -> String {
+        get(forKey: "apiKey_\(account)") ?? ""
+    }
+
+    @available(*, deprecated, message: "Use AuthManager for NWTN keys")
+    public func deleteApiKey(for account: String) {
+        delete(forKey: "apiKey_\(account)")
     }
 }

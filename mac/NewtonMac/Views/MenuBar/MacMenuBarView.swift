@@ -78,20 +78,9 @@ public struct MacMenuBarView: View {
         quickAnswer = ""
         
         Task {
-            let provider = settings.currentProvider
-            let modelId = settings.currentModelId
-            let baseUrl = settings.effectiveBaseUrl(for: provider)
-            let apiKey = settings.getApiKey(for: provider)
-            
             do {
                 let stream = LLMService.shared.streamCompletion(
                     messages: [Message(role: .user, content: prompt)],
-                    provider: provider,
-                    modelId: modelId,
-                    baseUrl: baseUrl,
-                    apiKey: apiKey,
-                    temperature: 0.7,
-                    maxTokens: 1024,
                     systemPrompt: SettingsManager.singularitySystemPrompt
                 )
                 

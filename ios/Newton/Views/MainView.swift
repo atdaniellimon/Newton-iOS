@@ -12,13 +12,18 @@ public struct MainView: View {
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var syncService = iCloudSyncService.shared
-    
+    @ObservedObject var auth = AuthManager.shared
+
     @State private var navigationPath = NavigationPath()
     @State private var selectedConversationId: String? = nil
-    
+
     public init() {}
-    
+
     public var body: some View {
+        // Gate: show AuthView if not logged in
+        if !auth.isLoggedIn {
+            AuthView()
+        } else {
         NavigationStack(path: $navigationPath) {
             ConversationListView(
                 selectedConversationId: $selectedConversationId,
@@ -46,8 +51,9 @@ public struct MainView: View {
         .onAppear {
             syncService.triggerManualSync()
         }
+        } // end auth.isLoggedIn
     }
-    
+
     private func handleDeepLink(_ url: URL) {
         let host = url.host?.lowercased() ?? url.path.lowercased().replacingOccurrences(of: "/", with: "")
         

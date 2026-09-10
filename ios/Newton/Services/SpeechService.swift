@@ -52,10 +52,10 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         self.currentlySpeakingMessageId = messageId
         self.isSpeaking = true
         
-        // 1. Try Neural OpenAI/Proxy TTS if available
+        // TTS: use system AVSpeechSynthesizer (NWTN doesn't expose a TTS endpoint)
         let settings = SettingsManager.shared
-        let baseUrl = settings.effectiveBaseUrl(for: settings.currentProvider)
         let apiKey = settings.currentApiKey
+        let baseUrl = settings.customBaseUrl
         
         if !baseUrl.isEmpty && (baseUrl.contains("openai.com") || baseUrl.contains("openrouter") || baseUrl.contains("8765") || baseUrl.contains("8000")) {
             Task {

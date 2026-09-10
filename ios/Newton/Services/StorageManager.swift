@@ -37,32 +37,17 @@ public final class StorageManager: ObservableObject {
         NSUbiquitousKeyValueStore.default.synchronize()
     }
     
-    public func createConversation(provider: AIProvider, modelId: String, title: String = "New Conversation") -> Conversation {
-        let newConvo = Conversation(
-            title: title,
-            provider: provider,
-            modelId: modelId,
-            messages: []
-        )
+    public func createConversation(title: String = "New Conversation") -> Conversation {
+        let newConvo = Conversation(title: title, messages: [])
         conversations.insert(newConvo, at: 0)
         sortConversations()
         saveConversations()
         return newConvo
     }
-    
-    public func createConversation(title: String = "New Conversation") -> Conversation {
-        let provider = SettingsManager.shared.currentProvider
-        let modelId = SettingsManager.shared.currentModelId
-        return createConversation(provider: provider, modelId: modelId, title: title)
-    }
-    
+
     public func createGhostConversation(title: String = "Ghost Session") -> Conversation {
-        let provider = SettingsManager.shared.currentProvider
-        let modelId = SettingsManager.shared.currentModelId
         let ghostConvo = Conversation(
             title: title,
-            provider: provider,
-            modelId: modelId,
             messages: [],
             isPinned: false,
             isGhost: true

@@ -15,16 +15,14 @@ private enum ActiveModalSheet: Identifiable {
     case camera
     case photoLibrary
     case settings
-    case modelPicker
     case workspaces
-    
+
     var id: String {
         switch self {
-        case .camera: return "camera"
+        case .camera:       return "camera"
         case .photoLibrary: return "photoLibrary"
-        case .settings: return "settings"
-        case .modelPicker: return "modelPicker"
-        case .workspaces: return "workspaces"
+        case .settings:     return "settings"
+        case .workspaces:   return "workspaces"
         }
     }
 }
@@ -341,8 +339,6 @@ public struct ChatView: View {
                 }
             case .settings:
                 SettingsView()
-            case .modelPicker:
-                ModelPickerSheet(selectedModelId: $settings.currentModelId)
             case .workspaces:
                 WorkspaceListView()
             }
@@ -488,26 +484,16 @@ public struct ChatView: View {
             var isInsideThinkingTag = false
             var rawStream = ""
             
-            let provider = settings.currentProvider
-            let modelId = settings.currentModelId
-            let baseUrl = settings.effectiveBaseUrl(for: provider)
-            let apiKey = settings.getApiKey(for: provider)
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
             var systemPrompt = SettingsManager.singularitySystemPrompt
             if let ws = workspaceManager.activeWorkspace, !ws.customSystemPrompt.isEmpty {
                 systemPrompt += "\n\n[ACTIVE PROJECT WORKSPACE: \(ws.name)]\n\(ws.customSystemPrompt)"
             }
-            
+
             do {
                 let stream = LLMService.shared.streamCompletion(
                     messages: messagesToSend,
-                    provider: provider,
-                    modelId: modelId,
-                    baseUrl: baseUrl,
-                    apiKey: apiKey,
-                    temperature: temp,
-                    maxTokens: maxTokens,
                     systemPrompt: systemPrompt
                 )
                 
@@ -643,20 +629,9 @@ public struct ChatView: View {
             Message(role: .user, content: "Create a concise, descriptive 2-4 word title in the language of this query: \"\(prompt)\". Output ONLY the title, no quotes or punctuation.")
         ]
         
-        let provider = settings.currentProvider
-        let modelId = settings.currentModelId
-        let baseUrl = settings.effectiveBaseUrl(for: provider)
-        let apiKey = settings.getApiKey(for: provider)
-        
         do {
             let stream = LLMService.shared.streamCompletion(
                 messages: titlePrompt,
-                provider: provider,
-                modelId: modelId,
-                baseUrl: baseUrl,
-                apiKey: apiKey,
-                temperature: 0.3,
-                maxTokens: 15,
                 systemPrompt: "You are a concise title generator. Reply ONLY with a 2-4 word title."
             )
             

@@ -260,22 +260,18 @@ public struct VoiceCallView: View {
             
             do {
                 let stream = LLMService.shared.streamCompletion(
-                    messages: messagesToSend,
-                    provider: settings.currentProvider,
-                    modelId: settings.currentModelId,
-                    baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
-                    apiKey: settings.currentApiKey
+                    messages: messagesToSend
                 )
-                
+
                 for try await token in stream {
                     fullResponse += token
                 }
-                
+
                 // Process tool calling
                 let (finalContent, voiceOrbits, voiceImgUrl, voiceThinking) = await OrbitEngine.shared.processOrbitsInText(
                     fullResponse,
                     userPrompt: userPrompt,
-                    baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
+                    baseUrl: settings.customBaseUrl,
                     apiKey: settings.currentApiKey
                 )
                 

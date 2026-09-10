@@ -18,7 +18,7 @@ public struct StatusPillView: View {
                 .fill(settings.isConfigured() ? NewtonTheme.forestGreen : NewtonTheme.coralRed)
                 .frame(width: 7, height: 7)
             
-            Text("\(settings.currentProvider.displayName) • \(shortModelName(settings.currentModelId))")
+            Text("Newton · Singularity")
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundColor(NewtonTheme.textPrimary)
                 .lineLimit(1)

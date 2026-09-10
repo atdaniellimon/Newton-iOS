@@ -100,10 +100,6 @@ public final class MemoryManager: ObservableObject {
         do {
             let stream = LLMService.shared.streamCompletion(
                 messages: messages,
-                provider: settings.currentProvider,
-                modelId: settings.currentModelId,
-                baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
-                apiKey: settings.currentApiKey,
                 systemPrompt: "You are a precise, cold, factual memory management tool. Output bullet points only."
             )
             var response = ""

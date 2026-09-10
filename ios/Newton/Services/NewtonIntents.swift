@@ -37,12 +37,6 @@ public struct AskNewtonIntent: AppIntent {
         do {
             let stream = LLMService.shared.streamCompletion(
                 messages: messages,
-                provider: settings.currentProvider,
-                modelId: settings.currentModelId,
-                baseUrl: settings.effectiveBaseUrl(for: settings.currentProvider),
-                apiKey: settings.getApiKey(for: settings.currentProvider),
-                temperature: 0.7,
-                maxTokens: 1024,
                 systemPrompt: SettingsManager.singularitySystemPrompt
             )
             

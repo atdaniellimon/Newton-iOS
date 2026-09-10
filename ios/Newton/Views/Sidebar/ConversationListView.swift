@@ -224,10 +224,7 @@ public struct ConversationListView: View {
     
     private func createNewChat() {
         Haptics.light()
-        let newConvo = storage.createConversation(
-            provider: settings.currentProvider,
-            modelId: settings.currentModelId
-        )
+        let newConvo = storage.createConversation()
         selectedConversationId = newConvo.id
         onSelectConversation?(newConvo.id)
     }

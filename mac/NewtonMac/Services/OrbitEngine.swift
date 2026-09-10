@@ -274,48 +274,42 @@ public final class OrbitEngine {
     /// Generate an image from a prompt calling ONLY the official API endpoint
     public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let targetBase = !baseUrl.isEmpty ? baseUrl : SettingsManager.shared.effectiveBaseUrl(for: .openaiCompatible)
-        let cleanBase = targetBase.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let endpointStr = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/images/generations" : (cleanBase.hasSuffix("/images/generations") ? cleanBase : "\(cleanBase)/v1/images/generations")
-        
+        let endpointStr = SettingsManager.nwtnBaseURL + "/images"
+
         guard let endpointUrl = URL(string: endpointStr) else { return "" }
-        
+
         var request = URLRequest(url: endpointUrl)
         request.httpMethod = "POST"
         request.timeoutInterval = 45
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !apiKey.isEmpty {
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let nwtnKey = AuthManager.shared.nwtnKey
+        if !nwtnKey.isEmpty {
+            request.setValue("Bearer \(nwtnKey)", forHTTPHeaderField: "Authorization")
         }
-        
+
         let payload: [String: Any] = [
             "prompt": cleanPrompt,
-            "n": 1,
-            "size": "1024x1024",
-            "response_format": "b64_json"
+            "n": 1
         ]
-        
+
         guard let bodyData = try? JSONSerialization.data(withJSONObject: payload) else { return "" }
         request.httpBody = bodyData
-        
+
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
                 return ""
             }
-            
+
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let dataArr = json["data"] as? [[String: Any]],
-               let first = dataArr.first {
-                if let b64 = first["b64_json"] as? String, !b64.isEmpty {
-                    return "data:image/png;base64,\(b64)"
-                }
+               let images = json["images"] as? [[String: Any]],
+               let first = images.first {
                 if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
                     return imgUrl
                 }
             }
         } catch {
-            print("Official Image API error: \(error)")
+            print("NWTN Image API error: \(error)")
         }
         
         return ""

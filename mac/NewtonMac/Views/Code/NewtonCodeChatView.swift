@@ -285,10 +285,6 @@ public struct NewtonCodeChatView: View {
             do {
                 let stream = LLMService.shared.streamCompletion(
                     messages: conversation.messages,
-                    provider: conversation.provider,
-                    modelId: conversation.modelId,
-                    baseUrl: settings.effectiveBaseUrl(for: conversation.provider),
-                    apiKey: settings.getApiKey(for: conversation.provider),
                     systemPrompt: systemPrompt
                 )
                 for try await chunk in stream {
