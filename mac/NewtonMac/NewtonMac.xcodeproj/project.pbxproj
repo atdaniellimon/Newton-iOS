@@ -115,6 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				N10006 /* KeychainManager.swift */,
+					N10025 /* AuthManager.swift */,
 				N10007 /* SettingsManager.swift */,
 				N10008 /* LLMService.swift */,
 				N10009 /* StorageManager.swift */,
@@ -138,6 +139,7 @@
 			isa = PBXGroup;
 			children = (
 				N10023 /* MainMacSplitView.swift */,
+					N10026 /* AuthView.swift */,
 				N10015 /* MacHero3DCanvasView.swift */,
 				N10016 /* MacOrbitCardView.swift */,
 				N10017 /* MacMessageBubbleView.swift */,
@@ -225,6 +227,7 @@
 				M10004 /* Message.swift in Sources */,
 				M10005 /* Conversation.swift in Sources */,
 				M10006 /* KeychainManager.swift in Sources */,
+				M10025 /* AuthManager.swift in Sources */,
 				M10007 /* SettingsManager.swift in Sources */,
 				M10008 /* LLMService.swift in Sources */,
 				M10009 /* StorageManager.swift in Sources */,
@@ -242,6 +245,7 @@
 				M10021 /* MacSettingsView.swift in Sources */,
 				M10022 /* MacMenuBarView.swift in Sources */,
 				M10023 /* MainMacSplitView.swift in Sources */,
+				M10026 /* AuthView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -13,6 +13,7 @@
 		A10004 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004 /* Message.swift */; };
 		A10005 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005 /* Conversation.swift */; };
 		A10006 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* KeychainManager.swift */; };
+A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10058 /* AuthManager.swift */; };
 		A10007 /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* SettingsManager.swift */; };
 		A10008 /* OrbitEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* OrbitEngine.swift */; };
 		A10009 /* StorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* StorageManager.swift */; };
@@ -59,6 +60,7 @@
 		A10055 /* InteractiveChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10055 /* InteractiveChartView.swift */; };
 		A10056 /* ShareableCardGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10056 /* ShareableCardGenerator.swift */; };
 		A10057 /* WorkspaceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10057 /* WorkspaceListView.swift */; };
+			A10059 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10059 /* AuthView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -116,6 +118,8 @@
 		B10055 /* InteractiveChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveChartView.swift; sourceTree = "<group>"; };
 		B10056 /* ShareableCardGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareableCardGenerator.swift; sourceTree = "<group>"; };
 		B10057 /* WorkspaceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceListView.swift; sourceTree = "<group>"; };
+			B10058 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+			B10059 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -175,6 +179,7 @@
 			isa = PBXGroup;
 			children = (
 				B10006 /* KeychainManager.swift */,
+					B10058 /* AuthManager.swift */,
 				B10007 /* SettingsManager.swift */,
 				B10008 /* OrbitEngine.swift */,
 				B10009 /* StorageManager.swift */,
@@ -208,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				B10023 /* MainView.swift */,
+					E10014 /* Auth */,
 				E10008 /* Components */,
 				E10009 /* Chat */,
 				E10010 /* Settings */,
@@ -275,6 +281,14 @@
 			);
 			path = Workspaces;
 			sourceTree = "<group>";
+			};
+			E10014 /* Auth */ = {
+				isa = PBXGroup;
+				children = (
+					B10059 /* AuthView.swift */,
+				);
+				path = Auth;
+				sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
@@ -351,6 +365,7 @@
 				A10004 /* Message.swift in Sources */,
 				A10005 /* Conversation.swift in Sources */,
 				A10006 /* KeychainManager.swift in Sources */,
+					A10058 /* AuthManager.swift in Sources */,
 				A10007 /* SettingsManager.swift in Sources */,
 				A10008 /* OrbitEngine.swift in Sources */,
 				A10009 /* StorageManager.swift in Sources */,
@@ -368,6 +383,7 @@
 				A10021 /* SettingsView.swift in Sources */,
 				A10022 /* ConversationListView.swift in Sources */,
 				A10023 /* MainView.swift in Sources */,
+					A10059 /* AuthView.swift in Sources */,
 				A10024 /* Hero3DCanvasView.swift in Sources */,
 				A10025 /* ThinkingOrbView.swift in Sources */,
 				A10027 /* ImagePicker.swift in Sources */,

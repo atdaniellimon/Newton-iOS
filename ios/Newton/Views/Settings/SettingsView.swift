@@ -599,14 +599,12 @@ struct CapabilitiesSubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("AI MODEL SELECTION")) {
-                Picker("Active Model", selection: $settings.currentModelId) {
-                    ForEach(endpointSync.availableModels, id: \.self) { model in
-                        Text(model).tag(model)
-                    }
-                }
+            Section(header: Text("AI MODEL")) {
+                Text("Newton Singularity")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(NewtonTheme.textPrimary)
             }
-            
+
             Section(header: Text("STREAMING")) {
                 Toggle("Auto-Scroll During Generation", isOn: $settings.autoScrollOnStream)
                     .tint(NewtonTheme.sand)

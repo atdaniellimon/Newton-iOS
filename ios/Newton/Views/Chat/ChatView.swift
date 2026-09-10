@@ -566,8 +566,8 @@ public struct ChatView: View {
                 let (finalContent, orbitResults, detectedImgUrl, thinkingContent) = await OrbitEngine.shared.processOrbitsInText(
                     rawStream,
                     userPrompt: userPrompt,
-                    baseUrl: baseUrl,
-                    apiKey: apiKey
+                    baseUrl: settings.customBaseUrl,
+                    apiKey: settings.currentApiKey
                 )
 
                 await MainActor.run {
