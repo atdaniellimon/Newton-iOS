@@ -30,7 +30,6 @@ public struct AskNewtonIntent: AppIntent {
             return .result(value: "Please ask a question.", dialog: "What would you like to ask Newton?")
         }
         
-        let settings = SettingsManager.shared
         let messages = [Message(role: .user, content: trimmed)]
         
         var responseText = ""

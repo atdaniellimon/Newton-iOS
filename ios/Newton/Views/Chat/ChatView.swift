@@ -485,7 +485,6 @@ public struct ChatView: View {
             var rawStream = ""
             
             let temp = settings.temperature
-            let maxTokens = settings.maxTokens
             var systemPrompt = SettingsManager.singularitySystemPrompt
             if let ws = workspaceManager.activeWorkspace, !ws.customSystemPrompt.isEmpty {
                 systemPrompt += "\n\n[ACTIVE PROJECT WORKSPACE: \(ws.name)]\n\(ws.customSystemPrompt)"

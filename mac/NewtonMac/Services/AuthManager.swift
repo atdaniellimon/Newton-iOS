@@ -28,6 +28,17 @@ public final class AuthManager: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var lastError: String? = nil
 
+    // Quota data from /auth/me
+    @Published public var req5hUsed: Int = 0
+    @Published public var req5hLimit: Int = 150
+    @Published public var req5hResetAt: Date? = nil
+    @Published public var msgsWeekUsed: Int = 0
+    @Published public var msgsWeekLimit: Int = 1200
+    @Published public var msgsWeekResetAt: Date? = nil
+    @Published public var tokensWeekUsed: Int = 0
+    @Published public var tokensWeekLimit: Int = 6_000_000
+    @Published public var tokensWeekResetAt: Date? = nil
+
     private init() {
         // Restore session from Keychain on launch
         if let key = keychainGet(account: keychainKeyAccount), key.hasPrefix("ntwn-"),
@@ -67,6 +78,66 @@ public final class AuthManager: ObservableObject {
             self.creditsUsed = 0
             self.trialEndsAt = nil
         }
+    }
+
+    // ── User info / quotas ────────────────────────────────
+
+    /// Fetches fresh quota + account data from GET /auth/me.
+    @MainActor
+    public func refreshUserInfo() async {
+        let key = nwtnKey
+        guard !key.isEmpty else { return }
+
+        guard let url = URL(string: authBaseURL + "/auth/me") else { return }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 20
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let http = response as? HTTPURLResponse
+            guard let http, http.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return
+            }
+
+            if let u = json["username"] as? String, !u.isEmpty {
+                self.username = u
+                keychainSet(account: keychainUserAccount, value: u)
+            }
+            self.creditsTotal = json["credits_total"] as? Int ?? self.creditsTotal
+            self.creditsUsed  = json["credits_used"] as? Int ?? self.creditsUsed
+            if let ts = json["trial_ends_at"] as? TimeInterval {
+                self.trialEndsAt = Date(timeIntervalSince1970: ts)
+            }
+
+            if let q = json["quotas"] as? [String: Any] {
+                if let r = q["req_5h"] as? [String: Any] {
+                    self.req5hUsed  = r["used"] as? Int ?? self.req5hUsed
+                    self.req5hLimit = r["limit"] as? Int ?? self.req5hLimit
+                    self.req5hResetAt = resetDate(r)
+                }
+                if let m = q["msgs_week"] as? [String: Any] {
+                    self.msgsWeekUsed  = m["used"] as? Int ?? self.msgsWeekUsed
+                    self.msgsWeekLimit = m["limit"] as? Int ?? self.msgsWeekLimit
+                    self.msgsWeekResetAt = resetDate(m)
+                }
+                if let t = q["tokens_week"] as? [String: Any] {
+                    self.tokensWeekUsed  = t["used"] as? Int ?? self.tokensWeekUsed
+                    self.tokensWeekLimit = t["limit"] as? Int ?? self.tokensWeekLimit
+                    self.tokensWeekResetAt = resetDate(t)
+                }
+            }
+        } catch {
+            // Quietly ignore — UI keeps last known values.
+        }
+    }
+
+    private func resetDate(_ dict: [String: Any]) -> Date? {
+        if let ts = dict["reset_at"] as? TimeInterval {
+            return Date(timeIntervalSince1970: ts)
+        }
+        return nil
     }
 
     // ── Private helpers ──────────────────────────────────────────
@@ -109,6 +180,9 @@ public final class AuthManager: ObservableObject {
                 if let ts = json["trial_ends_at"] as? TimeInterval {
                     self.trialEndsAt = Date(timeIntervalSince1970: ts)
                 }
+
+                // Fetch fresh quota data in the background
+                Task { await self.refreshUserInfo() }
                 return true
             } else {
                 // Extract error message

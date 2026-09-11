@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 // MARK: - NWTN attachment type
 public struct NWTNAttachment: Encodable {

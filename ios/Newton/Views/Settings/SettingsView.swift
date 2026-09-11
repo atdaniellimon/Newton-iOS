@@ -370,7 +370,7 @@ struct ProfileSubView: View {
     private var trialStatusText: String {
         guard let end = auth.trialEndsAt else { return "Active" }
         if end < Date() { return "Trial Ended" }
-        return "Trial — \(end, formatter: Self.shortDate)"
+        return "Trial — \(Self.shortDate.string(from: end))"
     }
 
     static let shortDate: DateFormatter = {
