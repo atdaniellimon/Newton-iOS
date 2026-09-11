@@ -67,9 +67,11 @@ public struct AuthView: View {
                         Text("Singularity")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(NewtonTheme.sand.opacity(0.8))
-                            .if(ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 13) { view in
-                                view.tracking(3)
-                            }
+                        #if os(macOS)
+                        if #available(macOS 13.0, *) {
+                            .tracking(3)
+                        }
+                        #endif
                     }
                 }
                 .padding(.bottom, 50)
