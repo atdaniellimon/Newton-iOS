@@ -67,7 +67,9 @@ public struct AuthView: View {
                         Text("Singularity")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(NewtonTheme.sand.opacity(0.8))
-                            .tracking(3)
+                            .if(@available(macOS 12.0, *)) { view in
+                                view.tracking(3)
+                            }
                     }
                 }
                 .padding(.bottom, 50)
@@ -322,4 +324,17 @@ public struct AuthView: View {
 
 #Preview {
     AuthView()
+}
+
+// MARK: - Extensions
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
 }
