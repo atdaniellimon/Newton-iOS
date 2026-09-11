@@ -78,12 +78,6 @@ public struct MacChatView: View {
     private var modelDisplayName: String {
         if settings.currentModelId.contains("singularity") {
             return "Singularity"
-        } else if settings.currentModelId.contains("sonnet") {
-            return "Newton I"
-        } else if settings.currentModelId.contains("r1") {
-            return "Newton R1"
-        } else if settings.currentModelId.contains("gpt-4o") {
-            return "Newton Omni"
         }
         return "Singularity"
     }

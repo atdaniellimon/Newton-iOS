@@ -28,7 +28,7 @@ public struct ThinkingCardView: View {
                         .font(.system(size: 12))
                         .foregroundColor(NewtonTheme.aqua)
                     
-                    Text("Reasoning Chain")
+                    Text("Thinked")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(NewtonTheme.aqua)
                     

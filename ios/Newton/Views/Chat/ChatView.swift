@@ -64,13 +64,6 @@ public struct ChatView: View {
                 // Ghost Mode Banner
                 if conversation.isGhost {
                     HStack(spacing: 8) {
-                        Image(systemName: "ghost.fill")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
-                        Text("Ghost Mode • Messages vanish when session ends")
-                            .font(.system(size: 11.5, weight: .medium, design: .serif))
-                            .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
-                        Spacer()
                         Button("Vanish") {
                             Haptics.success()
                             conversation.messages.removeAll()

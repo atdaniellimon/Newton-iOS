@@ -92,17 +92,9 @@ public struct KickProtocolCardView: View {
                     .foregroundColor(NewtonTheme.coralRed)
                 
                 Spacer()
-                
-                Text("TERMINATED")
-                    .font(.system(size: 9, weight: .black, design: .monospaced))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(NewtonTheme.coralRed)
-                    .clipShape(Capsule())
             }
             
-            Text("Reason: \(kickReason)")
+            Text("\(kickReason)")
                 .font(.system(size: 12, design: .serif))
                 .foregroundColor(NewtonTheme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
