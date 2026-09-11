@@ -460,6 +460,8 @@ public struct MacChatView: View {
             
             let temp = settings.temperature
             let maxTokens = settings.maxTokens
+            let baseUrl = settings.baseUrl
+            let apiKey = settings.apiKey 
             var systemPrompt = SettingsManager.singularitySystemPrompt
             
             // Append active workspace custom system prompt if available
