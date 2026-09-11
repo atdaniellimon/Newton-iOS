@@ -64,4 +64,4 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         lhs.isGhost   == rhs.isGhost   &&
         lhs.updatedAt == rhs.updatedAt
     }
-}.
+}
