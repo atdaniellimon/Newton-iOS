@@ -67,7 +67,7 @@ public struct AuthView: View {
                         Text("Singularity")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(NewtonTheme.sand.opacity(0.8))
-                            .if(@available(macOS 12.0, *)) { view in
+                            .if(#available(macOS 12.0, *)) { view in
                                 view.tracking(3)
                             }
                     }
