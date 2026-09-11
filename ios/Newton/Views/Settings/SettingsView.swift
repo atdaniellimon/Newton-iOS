@@ -495,7 +495,7 @@ struct TimeAndFocusSubView: View {
         Form {
             Section(header: Text("Long-term memory")) {
                 HStack {
-                    Label("Registered memories")
+                    Text("Registered memories")
                     Spacer()
                     Text("\(memoryManager.memories.count)")
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -602,7 +602,7 @@ struct PrivacySubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("STORAGE METRICS")) {
+            Section(header: Text("Storage Metrics")) {
                 HStack {
                     Text("Total Conversations")
                     Spacer()
@@ -621,7 +621,7 @@ struct PrivacySubView: View {
                 }
             }
             
-            Section(header: Text("CACHE MANAGEMENT")) {
+            Section(header: Text("Cache")) {
                 Button(role: .destructive) {
                     URLCache.shared.removeAllCachedResponses()
                     cacheCleared = true
@@ -646,13 +646,13 @@ struct CapabilitiesSubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("AI MODEL")) {
+            Section(header: Text("AI Model")) {
                 Text("Newton Singularity")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(NewtonTheme.textPrimary)
             }
 
-            Section(header: Text("STREAMING")) {
+            Section(header: Text("Streaming")) {
                 Toggle("Auto-Scroll During Generation", isOn: $settings.autoScrollOnStream)
                     .tint(NewtonTheme.sand)
             }
@@ -716,7 +716,7 @@ struct VoiceSubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("SPEECH RATE & AUDIO")) {
+            Section(header: Text("Speech rate & audio")) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Speech Rate")
@@ -732,11 +732,11 @@ struct VoiceSubView: View {
                 .padding(.vertical, 4)
             }
             
-            Section(header: Text("VOICE ENGINE")) {
+            Section(header: Text("Voice Engine")) {
                 HStack {
                     Text("Engine")
                     Spacer()
-                    Text("AVSpeechSynthesizer (Enhanced Neural)")
+                    Text("Enhanced Neural")
                         .font(.system(size: 12))
                         .foregroundColor(Color(UIColor.secondaryLabel))
                 }
@@ -753,11 +753,11 @@ struct InfoSubView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("ABOUT NEWTON")) {
+                Section(header: Text("About Newton")) {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("6.0 (Universal)")
+                        Text("1.0 (Universal)")
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundColor(Color(UIColor.secondaryLabel))
                     }
@@ -765,14 +765,14 @@ struct InfoSubView: View {
                     HStack {
                         Text("Architecture")
                         Spacer()
-                        Text("Newton Singularity Core")
+                        Text("Newton Singularity")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(NewtonTheme.sand)
                     }
                 }
                 
                 Section(header: Text("CREDITS")) {
-                    Text("Designed & Built by Daniel Limón")
+                    Text("Designed & Built by Daniel Limon")
                         .font(.system(size: 14))
                 }
             }
