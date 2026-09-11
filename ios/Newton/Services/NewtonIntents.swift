@@ -119,11 +119,11 @@ public struct AddMemoryIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ProvidesDialog {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            return .result(dialog: IntentDialog(stringLiteral: "No se proporcionó ningún recuerdo para guardar."))
+            return .result(dialog: IntentDialog(stringLiteral: "No memory to save."))
         }
         
         MemoryManager.shared.addMemory(trimmed)
-        return .result(dialog: IntentDialog(stringLiteral: "Recuerdo guardado permanentemente en Newton Singularity."))
+        return .result(dialog: IntentDialog(stringLiteral: "Memory saved to newton."))
     }
 }
 

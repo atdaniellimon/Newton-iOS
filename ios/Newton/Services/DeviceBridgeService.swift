@@ -67,7 +67,7 @@ public final class DeviceBridgeService: NSObject, CLLocationManagerDelegate {
         let lat = json["lat"] as? Double ?? 0.0
         let lon = json["lon"] as? Double ?? 0.0
         
-        return "📍 Ubicación detectada: \(city), \(region), \(country) (Lat: \(lat), Lon: \(lon), Zona Horaria: \(tz))"
+        return "Location detected: \(city), \(region), \(country) (Lat: \(lat), Lon: \(lon), Time Zone: \(tz))"
     }
     
     // MARK: - Date & Time Orbit
@@ -85,25 +85,25 @@ public final class DeviceBridgeService: NSObject, CLLocationManagerDelegate {
         let tzOffset = tz.secondsFromGMT() / 3600
         
         return """
-        ⏰ Información de Fecha y Hora en Tiempo Real:
-        - Fecha y Hora Local: \(dateFormatter.string(from: now))
-        - Zona Horaria: \(tz.identifier) (GMT\(tzOffset >= 0 ? "+\(tzOffset)" : "\(tzOffset)"))
-        - Formato ISO 8601: \(isoFormatter.string(from: now))
+        Real time Date & Time information:
+        - Date & time: \(dateFormatter.string(from: now))
+        - Timezone: \(tz.identifier) (GMT\(tzOffset >= 0 ? "+\(tzOffset)" : "\(tzOffset)"))
+        - ISO 8601: \(isoFormatter.string(from: now))
         - Timestamp UNIX: \(Int(now.timeIntervalSince1970))
         """
     }
     
     // MARK: - Reminders Orbit
     public func getReminders(filter: String = "all") async -> String {
-        var output = "📋 Recordatorios Activos:\n"
+        var output = "Active reminders:\n"
         
         if customReminders.isEmpty {
-            return "📋 No tienes recordatorios pendientes."
+            return "No active reminders"
         }
         
         for (i, rem) in customReminders.enumerated() {
-            let title = rem["title"] ?? "Sin título"
-            let due = rem["dueDate"] ?? "Sin fecha límite"
+            let title = rem["title"] ?? "Untitled"
+            let due = rem["dueDate"] ?? "No limit date"
             output += "\(i + 1). [ ] \(title) (Vence: \(due))\n"
         }
         return output
@@ -111,18 +111,18 @@ public final class DeviceBridgeService: NSObject, CLLocationManagerDelegate {
     
     public func createReminder(title: String, dueDate: String = "") -> String {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanTitle.isEmpty else { return "Error: El recordatorio debe tener un título." }
+        guard !cleanTitle.isEmpty else { return "Error: Reminder must have a title" }
         
         let newReminder: [String: String] = [
             "id": UUID().uuidString,
             "title": cleanTitle,
-            "dueDate": dueDate.isEmpty ? "Hoy" : dueDate,
+            "dueDate": dueDate.isEmpty ? "Today" : dueDate,
             "createdAt": ISO8601DateFormatter().string(from: Date())
         ]
         
         customReminders.append(newReminder)
         saveLocalData()
-        return "✅ Recordatorio creado: \"\(cleanTitle)\" (Vence: \(newReminder["dueDate"] ?? "Hoy"))"
+        return "Reminder created succesfully: \"\(cleanTitle)\" (Ends: \(newReminder["dueDate"] ?? "Today"))"
     }
     
     // MARK: - Calendar Events Orbit
@@ -130,34 +130,34 @@ public final class DeviceBridgeService: NSObject, CLLocationManagerDelegate {
         if customCalendarEvents.isEmpty {
             let df = DateFormatter()
             df.dateStyle = .medium
-            return "📅 Agenda despejada para los próximos \(daysAhead) días (a partir de \(df.string(from: Date())))."
+            return "Agenda free for the next \(daysAhead) days (starting from \(df.string(from: Date())))."
         }
         
-        var output = "📅 Próximos Eventos en Calendario:\n"
+        var output = "Following calendar events:\n"
         for (i, ev) in customCalendarEvents.enumerated() {
-            let title = ev["title"] ?? "Evento"
-            let start = ev["startDate"] ?? "Fecha por definir"
+            let title = ev["title"] ?? "Event"
+            let start = ev["startDate"] ?? "Date not specified"
             let notes = ev["notes"] ?? ""
-            output += "\(i + 1). 🗓️ **\(title)** — \(start) \(notes.isEmpty ? "" : "(\(notes))")\n"
+            output += "\(i + 1). **\(title)** — \(start) \(notes.isEmpty ? "" : "(\(notes))")\n"
         }
         return output
     }
     
     public func createCalendarEvent(title: String, startDate: String, endDate: String = "", notes: String = "") -> String {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanTitle.isEmpty else { return "Error: El evento debe tener un título." }
+        guard !cleanTitle.isEmpty else { return "Error: Event must have a title." }
         
         let newEvent: [String: String] = [
             "id": UUID().uuidString,
             "title": cleanTitle,
-            "startDate": startDate.isEmpty ? "Hoy" : startDate,
+            "startDate": startDate.isEmpty ? "Today" : startDate,
             "endDate": endDate,
             "notes": notes
         ]
         
         customCalendarEvents.append(newEvent)
         saveLocalData()
-        return "✅ Evento agendado en el calendario: \"\(cleanTitle)\" para \(newEvent["startDate"] ?? "Hoy")."
+        return "Event added to the calendar: \"\(cleanTitle)\" for \(newEvent["startDate"] ?? "Today")."
     }
     
     // MARK: - Persistence

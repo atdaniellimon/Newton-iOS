@@ -22,7 +22,7 @@ public final class ConversationExportManager {
         md += "*Exported from Newton AI on \(Date().formatted(date: .abbreviated, time: .shortened))*\n\n---\n\n"
         
         for msg in conversation.messages {
-            let roleHeader = msg.role == .user ? "### 👤 User" : "### 🔮 Newton"
+            let roleHeader = msg.role == .user ? "### User" : "### Newton"
             md += "\(roleHeader)\n\n"
             
             if let thinking = msg.thinkingContent, !thinking.isEmpty {

@@ -154,7 +154,7 @@ public struct MessageBubbleView: View {
                             }) {
                                 Image(systemName: "photo.on.rectangle.angled")
                                     .font(.system(size: 13))
-                                    .foregroundColor(NewtonTheme.sand)
+                                    .foregroundColor(NewtonTheme.textSecondary)
                             }
                             
                             ShareLink(item: message.content) {

@@ -54,7 +54,7 @@ public struct SettingsView: View {
                                 internalDivider
                                 
                                 NavigationLink(destination: TimeAndFocusSubView()) {
-                                    settingsRow(icon: "moon.stars", title: "Time & focus", badge: "\(memoryManager.memories.count)")
+                                    settingsRow(icon: "moon.stars", title: "Memories", badge: "\(memoryManager.memories.count)")
                                 }
                                 internalDivider
                                 
@@ -334,7 +334,7 @@ struct ProfileSubView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("USER PROFILE")) {
+            Section(header: Text("User profile")) {
                 HStack(spacing: 14) {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 44))
@@ -351,9 +351,9 @@ struct ProfileSubView: View {
                 .padding(.vertical, 6)
             }
 
-            Section(header: Text("STATUS & TIER")) {
+            Section(header: Text("Status & tier")) {
                 HStack {
-                    Text("Singularity Tier")
+                    Text("Newton Tier")
                     Spacer()
                     Text(trialStatusText)
                         .font(.system(size: 13, weight: .bold))
@@ -391,7 +391,7 @@ struct BillingSubView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("SUBSCRIPTION & TOKENS")) {
+            Section(header: Text("Subscription & Tokens")) {
                 HStack {
                     Text("Plan")
                     Spacer()
@@ -413,7 +413,7 @@ struct BillingSubView: View {
                 }
             }
 
-            Section(header: Text("USAGE — 5 HOURS")) {
+            Section(header: Text("Usage")) {
                 HStack {
                     Text("Requests")
                     Spacer()
@@ -421,9 +421,6 @@ struct BillingSubView: View {
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
                         .foregroundColor(NewtonTheme.sand)
                 }
-            }
-
-            Section(header: Text("USAGE — THIS WEEK")) {
                 HStack {
                     Text("Messages")
                     Spacer()
@@ -432,7 +429,7 @@ struct BillingSubView: View {
                         .foregroundColor(NewtonTheme.sand)
                 }
                 HStack {
-                    Text("Tokens")
+                    Text("Tokens (Weekly)")
                     Spacer()
                     Text("\(tokenShort) / \(tokenLimitShort)")
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -475,7 +472,7 @@ struct NotificationsSubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("ALERTS")) {
+            Section(header: Text("Alerts")) {
                 Toggle("Live Activity Updates", isOn: $enableLiveActivity)
                     .tint(NewtonTheme.sand)
                 Toggle("Completion Haptics", isOn: $enableCompletionSounds)
@@ -496,9 +493,9 @@ struct TimeAndFocusSubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("MEMORIA PERSISTENTE (LONG-TERM MEMORY)")) {
+            Section(header: Text("Long-term memory")) {
                 HStack {
-                    Label("Recuerdos Registrados", systemImage: "brain.head.profile")
+                    Label("Registered memories")
                     Spacer()
                     Text("\(memoryManager.memories.count)")
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -506,7 +503,7 @@ struct TimeAndFocusSubView: View {
                 }
                 
                 if memoryManager.memories.isEmpty {
-                    Text("No hay recuerdos registrados aún. Newton aprende y guarda datos sobre ti de forma orgánica conforme conversas, o puedes añadirlos abajo.")
+                    Text("No memories registered yet.")
                         .font(.system(size: 12))
                         .foregroundColor(Color(UIColor.secondaryLabel))
                         .padding(.vertical, 4)
@@ -537,9 +534,9 @@ struct TimeAndFocusSubView: View {
                 }
             }
             
-            Section(header: Text("AÑADIR O SINTETIZAR CON IA")) {
+            Section(header: Text("Add memories")) {
                 VStack(alignment: .leading, spacing: 10) {
-                    TextField("Instrucción o recuerdo para Newton...", text: $newMemoryInput)
+                    TextField("Memory for Newton...", text: $newMemoryInput)
                         .font(.system(size: 14))
                     
                     HStack(spacing: 12) {
@@ -551,41 +548,13 @@ struct TimeAndFocusSubView: View {
                                 Haptics.success()
                             }
                         } label: {
-                            Text("Añadir")
+                            Text("Add")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(NewtonTheme.sand)
                         }
                         .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSynthesizingMemory)
                         
                         Spacer()
-                        
-                        Button {
-                            let trimmed = newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
-                            isSynthesizingMemory = true
-                            newMemoryInput = ""
-                            Haptics.medium()
-                            Task {
-                                let result = await memoryManager.synthesizeMemories(instruction: trimmed)
-                                await MainActor.run {
-                                    isSynthesizingMemory = false
-                                    synthesisStatusText = result
-                                    Haptics.success()
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                if isSynthesizingMemory {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Image(systemName: "sparkles")
-                                }
-                                Text("Sintetizar con IA")
-                            }
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(NewtonTheme.sand)
-                        }
-                        .disabled(newMemoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSynthesizingMemory)
                     }
                     
                     if let status = synthesisStatusText {
@@ -604,19 +573,19 @@ struct TimeAndFocusSubView: View {
                     } label: {
                         HStack {
                             Image(systemName: "trash.fill")
-                            Text("Borrar toda la memoria definitivamente")
+                            Text("Delete all memories.")
                         }
                         .foregroundColor(NewtonTheme.coralRed)
                     }
                 }
             }
         }
-        .navigationTitle("Time & focus")
+        .navigationTitle("Memories")
         .alert(isPresented: $showingWipeAlert) {
             Alert(
-                title: Text("¿Borrar toda la memoria definitivamente?"),
-                message: Text("Esta acción eliminará permanentemente todos los recuerdos y hechos aprendidos por Newton."),
-                primaryButton: .destructive(Text("Borrar Todo")) {
+                title: Text("Delete all memories?"),
+                message: Text("This action can not be reversed."),
+                primaryButton: .destructive(Text("Delete everything")) {
                     memoryManager.clearAllMemories()
                 },
                 secondaryButton: .cancel()

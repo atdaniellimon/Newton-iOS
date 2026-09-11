@@ -38,11 +38,8 @@ public final class WorkspaceManager: ObservableObject {
            let list = try? JSONDecoder().decode([Workspace].self, from: data) {
             self.workspaces = list
         } else {
-            // Default initial workspaces
             self.workspaces = [
-                Workspace(name: "Newton Core", iconName: "brain.head.profile", colorHex: "#F5A623", customSystemPrompt: "Specialized in Newton architecture, Swift concurrency, Metal, and AI algorithms."),
-                Workspace(name: "Systems & RISC-V", iconName: "cpu", colorHex: "#4CD964", customSystemPrompt: "Focused on RISC-V assembly, C systems programming, OS kernels, and microcontrollers."),
-                Workspace(name: "ZTRN Luxury", iconName: "cube.transparent", colorHex: "#5856D6", customSystemPrompt: "Focused on luxury interior design, materials, 3D spatial concepts, and aesthetics.")
+                
             ]
             saveWorkspaces()
         }

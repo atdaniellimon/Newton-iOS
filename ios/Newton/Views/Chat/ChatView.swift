@@ -227,7 +227,7 @@ public struct ChatView: View {
                             showFileImporter = true
                         },
                         onTriggerWebSearch: {
-                            inputText += "[ORBIT:web_search]{\"query\": \"\"}[/ORBIT]"
+                            inputText += "Can you please look online for "
                         },
                         onSend: sendMessage,
                         onStop: stopStreaming
@@ -672,6 +672,14 @@ public struct ChatView: View {
 // MARK: - Newton Hero Welcome View (Matching Screenshot 5)
 
 public struct NewtonHeroWelcomeView: View {
+    let discoverySubtitles = [
+        "What will you discover today?",
+        "An apple falls, an idea grows.",
+        "Uncover the laws of the universe.",
+        "What is your next big question?",
+        "Seeking truth in the data."
+    ]
+    @State private var currentSubtitle: String = "What will you discover today?"
     public let onPromptSelected: (String) -> Void
     
     public init(onPromptSelected: @escaping (String) -> Void) {
@@ -708,61 +716,65 @@ public struct NewtonHeroWelcomeView: View {
         CardItem(
             icon: "sparkles",
             title: "Analyze & Compare",
-            subtitle: "Claude 3.5 vs DeepSeek R1",
-            prompt: "Compare the reasoning capabilities, architecture, and tradeoffs of Claude 3.5 Sonnet vs DeepSeek R1."
+            subtitle: "Newton Singularity vs Opus 4.8",
+            prompt: "Compare the reasoning capabilities, architecture, and tradeoffs of Newotn Singularity vs Claude Opus 4.8"
         )
     ]
     
-    public var body: some View {
-        VStack(spacing: 24) {
-            // Clean Newton Brand
-            VStack(spacing: 6) {
-                Text("Newton")
-                    .font(.system(size: 32, weight: .bold, design: .serif))
-                    .foregroundColor(NewtonTheme.textPrimary)
+    public var body: some View {         
+        VStack(spacing: 24) {             
+            // Clean Newton Brand             
+            VStack(spacing: 6) {                 
+                Text("Newton")                     
+                    .font(.system(size: 32, weight: .bold, design: .serif))                     
+                    .foregroundColor(NewtonTheme.textPrimary)                                  
                 
-                Text("What will you discover today?")
-                    .font(.system(size: 19, weight: .regular, design: .serif))
-                    .italic()
-                    .foregroundColor(NewtonTheme.textSecondary)
-            }
-            .padding(.top, 16)
+                // Usamos la variable de estado aquí
+                Text(currentSubtitle)                     
+                    .font(.system(size: 19, weight: .regular, design: .serif))                     
+                    .italic()                     
+                    .foregroundColor(NewtonTheme.textSecondary)             
+            }             
+            .padding(.top, 16)                          
             
-            // 2x2 Grid of Pill Cards matching Newton Web
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(cards) { item in
-                    Button(action: {
-                        Haptics.selection()
-                        onPromptSelected(item.prompt)
-                    }) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                Image(systemName: item.icon)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(NewtonTheme.sand)
-                                Text(item.title)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(NewtonTheme.textPrimary)
-                            }
-                            
-                            Text(item.subtitle)
-                                .font(.system(size: 11))
-                                .foregroundColor(NewtonTheme.textSecondary)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(NewtonTheme.card.opacity(0.85))
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(NewtonTheme.border, lineWidth: 0.8)
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
+            // 2x2 Grid of Pill Cards matching Newton Web             
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {                 
+                ForEach(cards) { item in                     
+                    Button(action: {                         
+                        Haptics.selection()                         
+                        onPromptSelected(item.prompt)                     
+                    }) {                         
+                        VStack(alignment: .leading, spacing: 4) {                             
+                            HStack(spacing: 6) {                                 
+                                Image(systemName: item.icon)                                     
+                                    .font(.system(size: 12))                                     
+                                    .foregroundColor(NewtonTheme.sand)                                 
+                                Text(item.title)                                     
+                                    .font(.system(size: 13, weight: .semibold))                                     
+                                    .foregroundColor(NewtonTheme.textPrimary)                             
+                            }                                                          
+                            Text(item.subtitle)                                 
+                                .font(.system(size: 11))                                 
+                                .foregroundColor(NewtonTheme.textSecondary)                                 
+                                .lineLimit(1)                         
+                        }                         
+                        .frame(maxWidth: .infinity, alignment: .leading)                         
+                        .padding(.horizontal, 14)                         
+                        .padding(.vertical, 12)                         
+                        .background(NewtonTheme.card.opacity(0.85))                         
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))                         
+                        .overlay(                             
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)                                 
+                                .stroke(NewtonTheme.border, lineWidth: 0.8)                         
+                        )                     
+                    }                 
+                }             
+            }             
+            .padding(.horizontal, 20)         
+        }
+        // Selecciona una frase al azar cuando aparece la vista
+        .onAppear {
+            currentSubtitle = discoverySubtitles.randomElement() ?? "What will you discover today?"
         }
     }
 }
