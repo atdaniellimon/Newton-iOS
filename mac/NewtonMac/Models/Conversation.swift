@@ -16,6 +16,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
     public var isGhost: Bool
     public let createdAt: Date
     public var updatedAt: Date
+    public var workspacePath: String? = nil
 
     // Forward-compat shims so callers that reference these don't hard-fail
     public var provider: String { "nwtn" }
@@ -63,4 +64,4 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         lhs.isGhost   == rhs.isGhost   &&
         lhs.updatedAt == rhs.updatedAt
     }
-}
+}.
