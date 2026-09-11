@@ -11,12 +11,19 @@ import sqlite3
 import urllib.request
 import urllib.error
 import json
+import ssl
+import certifi
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+# SSL context with certifi CA bundle (fixes macOS SSL verification)
+def _ssl_ctx() -> ssl.SSLContext:
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    return ctx
 
 
 def get_env_var(name: str, default: str = None) -> str:
@@ -50,7 +57,7 @@ def call_nwtn_admin_revoke(key_prefix: str) -> bool:
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, context=_ssl_ctx(), timeout=30) as response:
             response_data = json.loads(response.read().decode('utf-8'))
             return response_data.get('success', False)
     except urllib.error.HTTPError as e:

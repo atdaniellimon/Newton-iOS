@@ -38,6 +38,7 @@ public struct NewtonTheme {
     public static let obsidian = Color(red: 0.08, green: 0.10, blue: 0.11)
     public static let cream = Color(red: 0.98, green: 0.97, blue: 0.95)
     public static let sand = Color(red: 0.88, green: 0.74, blue: 0.50)
+    public static let sandLight = Color(red: 0.95, green: 0.86, blue: 0.70)
     public static let gold = Color(red: 0.95, green: 0.78, blue: 0.35)
     public static let forestGreen = Color(red: 0.22, green: 0.65, blue: 0.45)
     public static let coralRed = Color(red: 0.88, green: 0.35, blue: 0.30)

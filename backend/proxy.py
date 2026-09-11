@@ -19,8 +19,14 @@ import urllib.error
 import ssl
 from pathlib import Path
 from dotenv import load_dotenv
+import certifi
 
 load_dotenv()
+
+# SSL context with certifi CA bundle (fixes macOS SSL verification)
+def _ssl_ctx() -> ssl.SSLContext:
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    return ctx
 
 # ──────────────────────────────────────────────
 # Config
@@ -183,12 +189,18 @@ def create_nwtn_key(name: str, credits: int = 100000, rpm: int = 60) -> str:
     payload = json.dumps({"name": name, "credits": credits, "rpm_limit": rpm}).encode()
     req = urllib.request.Request(url, data=payload, headers={
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {NWTN_ADMIN_TOKEN}"
+        "Authorization": f"Bearer {NWTN_ADMIN_TOKEN}",
+        "User-Agent": "Newton-iOS/2.0"
     }, method="POST")
-    ctx = ssl.create_default_context()
-    with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
-        data = json.loads(resp.read())
-        return data.get("key") or data.get("api_key") or data.get("nwtn_key", "")
+    ctx = _ssl_ctx()
+    try:
+        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return data.get("key") or data.get("api_key") or data.get("nwtn_key", "")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        print(f"[create_nwtn_key] Admin API error {e.code}: {body}")
+        raise
 
 # ──────────────────────────────────────────────
 # HTTP Handler
@@ -234,10 +246,58 @@ class NWTNHandler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         if p in ("/health", "/api/health"):
             self._send_json(200, {"status": "ok", "service": "newton-proxy"})
+        elif p == "/auth/me":
+            self._handle_auth_me()
         elif p.startswith("/nwtn/"):
             self._handle_nwtn_proxy()
         else:
             self._send_json(404, {"error": {"code": "not_found", "message": "Not found"}})
+
+    def _handle_auth_me(self):
+        """Return current user's quota and usage info."""
+        key = self._extract_bearer()
+        if not key or not key.startswith("ntwn-"):
+            return self._send_json(401, {"error": {"code": "unauthorized", "message": "Missing or invalid API key"}})
+
+        user = get_user_by_key(key)
+        if not user:
+            return self._send_json(401, {"error": {"code": "unauthorized", "message": "Key not found or revoked"}})
+
+        now = int(time.time())
+        window_5h = now - QUOTA_5H_SECS
+        week_start = get_monday_epoch()
+
+        with get_db() as conn:
+            # 5-hour rolling window
+            row5h = conn.execute(
+                "SELECT COUNT(*) as cnt FROM usage_log WHERE user_id=? AND timestamp>=? AND status_code<400",
+                (user["id"], window_5h)
+            ).fetchone()
+            req_5h = row5h["cnt"]
+
+            # Weekly
+            row_wk = conn.execute(
+                """SELECT COUNT(*) as msgs, COALESCE(SUM(total_tokens),0) as toks
+                   FROM usage_log WHERE user_id=? AND timestamp>=? AND status_code<400""",
+                (user["id"], week_start)
+            ).fetchone()
+            msgs_week = row_wk["msgs"]
+            toks_week = row_wk["toks"]
+
+        self._send_json(200, {
+            "ok": True,
+            "username": user["username"],
+            "credits_total": user["credits_total"],
+            "credits_used": user["credits_used"],
+            "credits_left": max(0, user["credits_total"] - user["credits_used"]),
+            "trial_ends_at": user["trial_ends_at"],
+            "rpm_limit": user["rpm_limit"],
+            "quotas": {
+                "req_5h": {"used": req_5h, "limit": QUOTA_5H_MAX, "reset_at": window_5h + QUOTA_5H_SECS},
+                "msgs_week": {"used": msgs_week, "limit": QUOTA_WEEK_MSGS, "reset_at": week_start + 7*86400},
+                "tokens_week": {"used": toks_week, "limit": QUOTA_WEEK_TOK, "reset_at": week_start + 7*86400}
+            }
+        })
 
     def do_POST(self):
         p = urlparse(self.path).path
@@ -284,6 +344,8 @@ class NWTNHandler(BaseHTTPRequestHandler):
         try:
             nwtn_key = create_nwtn_key(username, credits, rpm)
         except Exception as e:
+            print(f"[register] ERROR creating key for '{username}': {e}")
+            print(f"[register] Admin token used: {'adm-…'+NWTN_ADMIN_TOKEN[-4:] if NWTN_ADMIN_TOKEN.startswith('adm-') else 'INVALID/OLD token (not adm- prefix)'}")
             return self._send_json(502, {"error": {"code": "upstream_error", "message": f"Could not create key: {e}"}})
 
         if not nwtn_key or not nwtn_key.startswith("ntwn-"):
@@ -392,7 +454,7 @@ class NWTNHandler(BaseHTTPRequestHandler):
 
         req = urllib.request.Request(target_url, data=body or None, headers=headers, method=self.command)
 
-        ctx = ssl.create_default_context()
+        ctx = _ssl_ctx()
         t_start = int(time.time())
 
         if is_stream:

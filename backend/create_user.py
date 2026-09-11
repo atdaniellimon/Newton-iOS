@@ -13,6 +13,10 @@ import json
 import urllib.request
 import urllib.error
 import ssl
+import hashlib
+import secrets
+import base64
+import certifi
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -22,11 +26,20 @@ try:
 except ImportError:
     pass
 
-try:
-    import bcrypt
-except ImportError:
-    print("Error: bcrypt not installed. Run: pip install bcrypt", file=sys.stderr)
-    sys.exit(1)
+
+# Password hashing using PBKDF2 (stdlib, no external deps)
+def _hash_password(password: str) -> str:
+    """Hash password with PBKDF2-HMAC-SHA256. Returns 'pbkdf2$salt$hash'."""
+    salt = secrets.token_hex(16)
+    hash_bytes = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    hash_b64 = base64.b64encode(hash_bytes).decode()
+    return f"pbkdf2${salt}${hash_b64}"
+
+
+# SSL context with certifi CA bundle (fixes macOS SSL verification)
+def _ssl_ctx() -> ssl.SSLContext:
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    return ctx
 
 
 def get_env(name: str, default: str = None) -> str:
@@ -46,10 +59,11 @@ def create_nwtn_key(name: str, credits: int, rpm: int) -> str:
 
     req = urllib.request.Request(url, data=payload, headers={
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {admin_token}"
+        "Authorization": f"Bearer {admin_token}",
+        "User-Agent": "Newton-iOS/2.0"
     }, method="POST")
 
-    ctx = ssl.create_default_context()
+    ctx = _ssl_ctx()
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
             data = json.loads(resp.read())
@@ -126,7 +140,7 @@ def main():
 
     nwtn_key_prefix = nwtn_key[5:17]  # 12 chars after "ntwn-"
 
-    pw_hash = bcrypt.hashpw(args.password.encode(), bcrypt.gensalt()).decode()
+    pw_hash = _hash_password(args.password)
     trial_ends_at = int(time.time()) + args.trial_days * 86400 if args.trial_days > 0 else None
     now = int(time.time())
 

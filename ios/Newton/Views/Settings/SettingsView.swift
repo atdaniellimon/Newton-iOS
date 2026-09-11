@@ -330,6 +330,8 @@ struct AppearanceCardsSelector: View {
 
 // 1. Profile
 struct ProfileSubView: View {
+    @ObservedObject var auth = AuthManager.shared
+
     var body: some View {
         Form {
             Section(header: Text("USER PROFILE")) {
@@ -337,56 +339,132 @@ struct ProfileSubView: View {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 44))
                         .foregroundColor(NewtonTheme.sand)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Daniel Limón")
+                        Text(auth.username.isEmpty ? "Signed Out" : auth.username)
                             .font(.system(size: 17, weight: .semibold))
-                        Text("Developer & Entrepreneur")
+                        Text("Newton Singularity")
                             .font(.system(size: 13))
                             .foregroundColor(Color(UIColor.secondaryLabel))
                     }
                 }
                 .padding(.vertical, 6)
             }
-            
+
             Section(header: Text("STATUS & TIER")) {
                 HStack {
                     Text("Singularity Tier")
                     Spacer()
-                    Text("Unlimited (Self-Hosted)")
+                    Text(trialStatusText)
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(NewtonTheme.forestGreen)
+                        .foregroundColor(trialStatusColor)
                 }
             }
         }
         .navigationTitle("Profile")
+        .onAppear {
+            Task { await auth.refreshUserInfo() }
+        }
+    }
+
+    private var trialStatusText: String {
+        guard let end = auth.trialEndsAt else { return "Active" }
+        if end < Date() { return "Trial Ended" }
+        return "Trial — \(end, formatter: Self.shortDate)"
+    }
+
+    static let shortDate: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, yyyy"
+        return f
+    }()
+
+    private var trialStatusColor: Color {
+        guard let end = auth.trialEndsAt else { return NewtonTheme.forestGreen }
+        return end < Date() ? NewtonTheme.coralRed : NewtonTheme.sand
     }
 }
 
 // 2. Billing
 struct BillingSubView: View {
+    @ObservedObject var auth = AuthManager.shared
+
     var body: some View {
         Form {
             Section(header: Text("SUBSCRIPTION & TOKENS")) {
                 HStack {
                     Text("Plan")
                     Spacer()
-                    Text("Lifetime Private License")
+                    Text("Newton Singularity")
                         .foregroundColor(NewtonTheme.sand)
                 }
                 HStack {
                     Text("Monthly Cost")
                     Spacer()
-                    Text("$0.00 (Self-Hosted)")
+                    Text("$100.00 MXN / month")
                         .foregroundColor(Color(UIColor.secondaryLabel))
                 }
+                HStack {
+                    Text("Credits Left")
+                    Spacer()
+                    Text(creditsLeft.formatted())
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(NewtonTheme.forestGreen)
+                }
             }
-            
-            Section(footer: Text("Newton runs with your private Cloudflare Tunnel without third-party API metering.")) {
+
+            Section(header: Text("USAGE — 5 HOURS")) {
+                HStack {
+                    Text("Requests")
+                    Spacer()
+                    Text("\(auth.req5hUsed) / \(auth.req5hLimit)")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(NewtonTheme.sand)
+                }
+            }
+
+            Section(header: Text("USAGE — THIS WEEK")) {
+                HStack {
+                    Text("Messages")
+                    Spacer()
+                    Text("\(auth.msgsWeekUsed) / \(auth.msgsWeekLimit)")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(NewtonTheme.sand)
+                }
+                HStack {
+                    Text("Tokens")
+                    Spacer()
+                    Text("\(tokenShort) / \(tokenLimitShort)")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(NewtonTheme.sand)
+                }
+            }
+
+            Section(footer: Text("Quota resets every 5 hours (rolling) and weekly on Monday 00:00.")) {
                 EmptyView()
             }
         }
         .navigationTitle("Billing")
+        .onAppear {
+            Task { await auth.refreshUserInfo() }
+        }
+    }
+
+    private var creditsLeft: Int {
+        max(0, auth.creditsTotal - auth.creditsUsed)
+    }
+
+    private var tokenShort: String {
+        Self.abbrev(auth.tokensWeekUsed)
+    }
+    private var tokenLimitShort: String {
+        Self.abbrev(auth.tokensWeekLimit)
+    }
+
+    static func abbrev(_ n: Int) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
+        return "\(n)"
     }
 }
 
