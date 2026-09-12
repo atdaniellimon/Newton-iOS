@@ -19,6 +19,7 @@ __pycache__/
 # Newton backend database (contains user data — never commit)
 backend/users.db
 backend/.env
+backend/
 
 # iOS & Xcode
 build/
@@ -46,3 +47,10 @@ android/gradle/wrapper/gradle-wrapper.jar
 *.apk
 *.aab
 *.ap_
+.gitignore
+training/
+scripts/
+.github/
+.claude/
+live-server.json
+*.zip

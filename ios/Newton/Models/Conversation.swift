@@ -19,7 +19,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
 
     // Forward-compat shims so callers that reference these don't hard-fail
     public var provider: String { "nwtn" }
-    public var modelId: String  { "Singularity" }
+    public var modelId: String
 
     public init(
         id: String = UUID().uuidString,
@@ -27,6 +27,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         messages: [Message] = [],
         isPinned: Bool = false,
         isGhost: Bool = false,
+        modelId: String = SettingsManager.shared.currentModelId,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -35,13 +36,13 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         self.messages  = messages
         self.isPinned  = isPinned
         self.isGhost   = isGhost
+        self.modelId   = modelId
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, messages, isPinned, isGhost, createdAt, updatedAt
-        // provider, modelId intentionally omitted — decode gracefully below
+        case id, title, messages, isPinned, isGhost, modelId, createdAt, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -51,6 +52,7 @@ public struct Conversation: Identifiable, Codable, Equatable, Hashable {
         messages  = try c.decodeIfPresent([Message].self, forKey: .messages)  ?? []
         isPinned  = try c.decodeIfPresent(Bool.self,      forKey: .isPinned)  ?? false
         isGhost   = try c.decodeIfPresent(Bool.self,      forKey: .isGhost)   ?? false
+        modelId   = try c.decodeIfPresent(String.self,    forKey: .modelId)   ?? "Singularity"
         createdAt = try c.decodeIfPresent(Date.self,      forKey: .createdAt) ?? Date()
         updatedAt = try c.decodeIfPresent(Date.self,      forKey: .updatedAt) ?? Date()
     }

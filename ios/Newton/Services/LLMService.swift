@@ -57,7 +57,7 @@ public final class LLMService {
                                       userInfo: [NSLocalizedDescriptionKey: "Not authenticated. Please log in."])
                     }
 
-                    let endpoint = SettingsManager.nwtnBaseURL + "/chat"
+                    let endpoint = SettingsManager.nwtnBaseURL + "/chat?stream=true"
                     guard let url = URL(string: endpoint) else {
                         throw NSError(domain: "LLMService", code: -1,
                                       userInfo: [NSLocalizedDescriptionKey: "Invalid NWTN endpoint: \(endpoint)"])
@@ -114,10 +114,13 @@ public final class LLMService {
                     }
 
                     // Build payload
+                    let targetModel = modelId ?? SettingsManager.shared.currentModelId
                     var payload: [String: Any] = [
                         "prompt":  prompt,
+                        "model":   targetModel,
                         "history": history,
-                        "stream":  true
+                        "stream":  true,
+                        "task":    "chat"
                     ]
                     if !allAttachments.isEmpty {
                         payload["attachments"] = allAttachments
@@ -127,7 +130,8 @@ public final class LLMService {
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("Bearer \(nwtnKey)", forHTTPHeaderField: "Authorization")
-                    request.setValue("Newton-iOS/2.0", forHTTPHeaderField: "User-Agent")
+                    request.setValue(nwtnKey, forHTTPHeaderField: "x-api-key")
+                    request.setValue("Newton-iOS/2.2.0", forHTTPHeaderField: "User-Agent")
                     request.timeoutInterval = 300
                     request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
@@ -138,19 +142,54 @@ public final class LLMService {
                                       userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])
                     }
 
+                    // Check response headers for billing & image quotas
+                    if let creditsHdr = http.value(forHTTPHeaderField: "X-Credits-Left"), let cred = Int(creditsHdr) {
+                        DispatchQueue.main.async {
+                            AuthManager.shared.updateCreditsFromStream(cred)
+                        }
+                    }
+                    if let imgUsedHdr = http.value(forHTTPHeaderField: "X-Daily-Images-Used"), let used = Int(imgUsedHdr) {
+                        DispatchQueue.main.async {
+                            AuthManager.shared.tier.dailyImagesUsed = used
+                        }
+                    }
+                    if let imgLimitHdr = http.value(forHTTPHeaderField: "X-Daily-Images-Limit") {
+                        DispatchQueue.main.async {
+                            AuthManager.shared.tier.dailyImagesLimit = imgLimitHdr
+                        }
+                    }
+
                     guard (200...299).contains(http.statusCode) else {
                         var body = ""
                         for try await line in bytes.lines { body += line }
-                        // Try to extract NWTN error message
+                        // Try to extract structured NWTN error
                         if let data = body.data(using: .utf8),
-                           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let err = json["error"] as? [String: Any],
-                           let msg = err["message"] as? String {
-                            throw NSError(domain: "LLMService", code: http.statusCode,
-                                          userInfo: [NSLocalizedDescriptionKey: msg])
+                           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            if let err = json["error"] as? [String: Any],
+                               let msg = err["message"] as? String {
+                                throw NSError(domain: "LLMService", code: http.statusCode,
+                                              userInfo: [NSLocalizedDescriptionKey: msg])
+                            }
+                            if let detail = json["detail"] as? String {
+                                throw NSError(domain: "LLMService", code: http.statusCode,
+                                              userInfo: [NSLocalizedDescriptionKey: detail])
+                            }
                         }
+                        
+                        // Fallback error mapping per API specification
+                        let fallbackMsg: String
+                        switch http.statusCode {
+                        case 400: fallbackMsg = "Field 'prompt' cannot be empty or invalid."
+                        case 401: fallbackMsg = "Invalid or missing API key."
+                        case 402: fallbackMsg = "Token allowance exhausted. Upgrade tier or replenish credits."
+                        case 403: fallbackMsg = "Model '\(targetModel)' requires Newton Pro or Matrix tier."
+                        case 429: fallbackMsg = "Rate limit or daily image quota exceeded."
+                        case 500: fallbackMsg = "Downstream inference engine failure."
+                        default:  fallbackMsg = "HTTP \(http.statusCode): \(body)"
+                        }
+                        
                         throw NSError(domain: "LLMService", code: http.statusCode,
-                                      userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"])
+                                      userInfo: [NSLocalizedDescriptionKey: fallbackMsg])
                     }
 
                     // Parse NWTN SSE stream
@@ -183,7 +222,14 @@ public final class LLMService {
                         }
 
                         // NWTN done event — final reply already streamed token by token
-                        if let done = json["done"] as? Bool, done { break }
+                        if let done = json["done"] as? Bool, done {
+                            if let credits = json["credits_left"] as? Int {
+                                DispatchQueue.main.async {
+                                    AuthManager.shared.updateCreditsFromStream(credits)
+                                }
+                            }
+                            break
+                        }
                     }
 
                     continuation.finish()
@@ -200,6 +246,7 @@ public final class LLMService {
     // MARK: - Non-streaming helper (title generation etc.)
     public func complete(
         prompt: String,
+        modelId: String? = nil,
         task: String = "title",
         apiKey: String? = nil
     ) async throws -> String {
@@ -209,16 +256,37 @@ public final class LLMService {
         let endpoint = SettingsManager.nwtnBaseURL + "/chat"
         guard let url = URL(string: endpoint) else { throw NSError(domain: "LLMService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Bad URL"]) }
 
-        let payload: [String: Any] = ["prompt": prompt, "task": task, "stream": false]
+        let targetModel = modelId ?? SettingsManager.shared.currentModelId
+        let payload: [String: Any] = [
+            "prompt": prompt,
+            "model": targetModel,
+            "task": task,
+            "stream": false
+        ]
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(nwtnKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(nwtnKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("Newton-iOS/2.2.0", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 30
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse,
+           let creditsHdr = http.value(forHTTPHeaderField: "X-Credits-Left"),
+           let c = Int(creditsHdr) {
+            DispatchQueue.main.async {
+                AuthManager.shared.updateCreditsFromStream(c)
+            }
+        }
+
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        if let cred = json["credits_left"] as? Int {
+            DispatchQueue.main.async {
+                AuthManager.shared.updateCreditsFromStream(cred)
+            }
+        }
         return json["reply"] as? String ?? ""
     }
 }

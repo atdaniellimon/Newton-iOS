@@ -343,9 +343,20 @@ struct ProfileSubView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(auth.username.isEmpty ? "Signed Out" : auth.username)
                             .font(.system(size: 17, weight: .semibold))
-                        Text("Newton Singularity")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(UIColor.secondaryLabel))
+                            .foregroundColor(NewtonTheme.textPrimary)
+                        
+                        if !auth.email.isEmpty {
+                            HStack(spacing: 4) {
+                                Text(auth.email)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(NewtonTheme.textSecondary)
+                                if auth.emailVerified {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(NewtonTheme.forestGreen)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.vertical, 6)
@@ -355,9 +366,25 @@ struct ProfileSubView: View {
                 HStack {
                     Text("Newton Tier")
                     Spacer()
-                    Text(trialStatusText)
+                    Text(auth.tier.name)
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(trialStatusColor)
+                        .foregroundColor(NewtonTheme.sand)
+                }
+
+                HStack {
+                    Text("Rate Limit")
+                    Spacer()
+                    Text("\(auth.rpmLimit) RPM")
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Text(tierStatusText)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(tierStatusColor)
                 }
             }
         }
@@ -367,10 +394,10 @@ struct ProfileSubView: View {
         }
     }
 
-    private var trialStatusText: String {
-        guard let end = auth.trialEndsAt else { return "Active" }
-        if end < Date() { return "Trial Ended" }
-        return "Trial — \(Self.shortDate.string(from: end))"
+    private var tierStatusText: String {
+        guard let end = auth.trialEndsAt else { return "Activo" }
+        if end < Date() { return "Expirado" }
+        return "Activo — \(Self.shortDate.string(from: end))"
     }
 
     static let shortDate: DateFormatter = {
@@ -379,83 +406,246 @@ struct ProfileSubView: View {
         return f
     }()
 
-    private var trialStatusColor: Color {
+    private var tierStatusColor: Color {
         guard let end = auth.trialEndsAt else { return NewtonTheme.forestGreen }
-        return end < Date() ? NewtonTheme.coralRed : NewtonTheme.sand
+        return end < Date() ? NewtonTheme.coralRed : NewtonTheme.forestGreen
     }
 }
 
-// 2. Billing
+// 2. Billing & Subscription
 struct BillingSubView: View {
     @ObservedObject var auth = AuthManager.shared
+    @State private var showRotateConfirmation = false
+    @State private var showRotationSuccessAlert = false
 
     var body: some View {
         Form {
-            Section(header: Text("Subscription & Tokens")) {
-                HStack {
-                    Text("Plan")
-                    Spacer()
-                    Text("Newton Singularity")
-                        .foregroundColor(NewtonTheme.sand)
+            // Subscription Plan Card
+            Section(header: Text("Suscripción Activa")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text(auth.tier.name)
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(NewtonTheme.textPrimary)
+                                
+                                Text(auth.tier.badge.uppercased())
+                                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.bg)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(NewtonTheme.sand)
+                                    .clipShape(Capsule())
+                            }
+                            
+                            Text("$\(auth.tier.priceMXN).00 MXN / mes")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(NewtonTheme.sand)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(NewtonTheme.sand)
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("CARACTERÍSTICAS DEL PLAN")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(NewtonTheme.textMuted)
+
+                        ForEach(auth.tier.features, id: \.self) { feat in
+                            HStack(alignment: .top, spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(NewtonTheme.forestGreen)
+                                    .padding(.top, 2)
+                                Text(feat)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(NewtonTheme.textSecondary)
+                            }
+                        }
+                    }
                 }
-                HStack {
-                    Text("Monthly Cost")
-                    Spacer()
-                    Text("$100.00 MXN / month")
-                        .foregroundColor(Color(UIColor.secondaryLabel))
+                .padding(.vertical, 6)
+            }
+
+            // Quotas & Limits
+            Section(header: Text("Límites y Cuotas (Rolling Windows)")) {
+                // 5-Hour limit
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Ventana 5 Horas")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Text("\(auth.quotaReq5h.used) / \(auth.quotaReq5h.limit) reqs")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(NewtonTheme.sand)
+                    }
+                    ProgressView(value: auth.quotaReq5h.percent)
+                        .tint(quotaColor(for: auth.quotaReq5h.percent))
                 }
+                .padding(.vertical, 2)
+
+                // Weekly Messages
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Mensajes Semanales")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Text("\(auth.quotaMsgsWeek.used) / \(auth.quotaMsgsWeek.limit)")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(NewtonTheme.sand)
+                    }
+                    ProgressView(value: auth.quotaMsgsWeek.percent)
+                        .tint(quotaColor(for: auth.quotaMsgsWeek.percent))
+                }
+                .padding(.vertical, 2)
+
+                // Weekly Tokens
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Tokens Semanales")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Text("\(Self.abbrev(auth.quotaTokensWeek.used)) / \(Self.abbrev(auth.quotaTokensWeek.limit))")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(NewtonTheme.sand)
+                    }
+                    ProgressView(value: auth.quotaTokensWeek.percent)
+                        .tint(quotaColor(for: auth.quotaTokensWeek.percent))
+                }
+                .padding(.vertical, 2)
+
+                // Daily Images
                 HStack {
-                    Text("Credits Left")
+                    Text("Imágenes Diarias")
+                        .font(.system(size: 13, weight: .medium))
                     Spacer()
-                    Text(creditsLeft.formatted())
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    Text("\(auth.tier.dailyImagesUsed) / \(auth.tier.dailyImagesLimit)")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundColor(NewtonTheme.forestGreen)
                 }
             }
 
-            Section(header: Text("Usage")) {
+            // Credits Balance
+            Section(header: Text("Balance de Créditos")) {
                 HStack {
-                    Text("Requests")
+                    Text("Créditos Restantes")
                     Spacer()
-                    Text("\(auth.req5hUsed) / \(auth.req5hLimit)")
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(NewtonTheme.sand)
+                    Text(auth.creditsRemaining.formatted())
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(NewtonTheme.forestGreen)
                 }
+
                 HStack {
-                    Text("Messages")
+                    Text("Créditos Usados")
                     Spacer()
-                    Text("\(auth.msgsWeekUsed) / \(auth.msgsWeekLimit)")
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(NewtonTheme.sand)
-                }
-                HStack {
-                    Text("Tokens (Weekly)")
-                    Spacer()
-                    Text("\(tokenShort) / \(tokenLimitShort)")
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(NewtonTheme.sand)
+                    Text(auth.creditsUsed.formatted())
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(NewtonTheme.textSecondary)
                 }
             }
 
-            Section(footer: Text("Quota resets every 5 hours (rolling) and weekly on Monday 00:00.")) {
-                EmptyView()
+            // API Key & Security
+            Section(header: Text("Seguridad y Clave API"), footer: Text("La rotación de clave invalida la clave actual y genera una nueva sin perder créditos.")) {
+                HStack {
+                    Text("API Key")
+                    Spacer()
+                    Text(maskedKey(auth.nwtnKey))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+
+                Button(role: .destructive) {
+                    showRotateConfirmation = true
+                } label: {
+                    HStack {
+                        if auth.isRotatingKey {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                        Text("Rotar API Key")
+                    }
+                    .foregroundColor(NewtonTheme.sand)
+                }
+                .disabled(auth.isRotatingKey)
+            }
+
+            // Recent Usage Audit
+            if !auth.recentUsageRecords.isEmpty {
+                Section(header: Text("Auditoría de Uso Reciente (/nwtn/usage/history)")) {
+                    ForEach(auth.recentUsageRecords.prefix(5)) { record in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(record.endpoint)
+                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.textPrimary)
+                                Text(Self.auditDate.string(from: record.date))
+                                    .font(.system(size: 10))
+                                    .foregroundColor(NewtonTheme.textMuted)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("\(record.tokens) tok")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.sand)
+                                Text("HTTP \(record.status)")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(NewtonTheme.forestGreen)
+                            }
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("Billing")
+        .alert("¿Rotar API Key?", isPresented: $showRotateConfirmation) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Rotar Clave", role: .destructive) {
+                Task {
+                    let res = await auth.rotateApiKey()
+                    if res.success {
+                        showRotationSuccessAlert = true
+                    }
+                }
+            }
+        } message: {
+            Text("Esto generará una nueva clave Bearer ntwn-... y revocará la anterior de inmediato.")
+        }
+        .alert("Clave Rotada con Éxito", isPresented: $showRotationSuccessAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(auth.lastKeyRotationMessage ?? "Tu nueva clave ha sido guardada en el Keychain de forma segura.")
+        }
         .onAppear {
-            Task { await auth.refreshUserInfo() }
+            Task {
+                await auth.refreshUserInfo()
+                await auth.fetchUsageHistory()
+            }
+        }
+        .refreshable {
+            await auth.refreshUserInfo()
+            await auth.fetchUsageHistory()
         }
     }
 
-    private var creditsLeft: Int {
-        max(0, auth.creditsTotal - auth.creditsUsed)
+    private func maskedKey(_ key: String) -> String {
+        guard key.count > 10 else { return "••••••••" }
+        let prefix = key.prefix(9)
+        return "\(prefix)••••••••"
     }
 
-    private var tokenShort: String {
-        Self.abbrev(auth.tokensWeekUsed)
-    }
-    private var tokenLimitShort: String {
-        Self.abbrev(auth.tokensWeekLimit)
+    private func quotaColor(for percent: Double) -> Color {
+        if percent > 0.9 { return NewtonTheme.coralRed }
+        if percent > 0.75 { return NewtonTheme.sand }
+        return NewtonTheme.forestGreen
     }
 
     static func abbrev(_ n: Int) -> String {
@@ -463,6 +653,12 @@ struct BillingSubView: View {
         if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
         return "\(n)"
     }
+
+    static let auditDate: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM, HH:mm"
+        return f
+    }()
 }
 
 // 3. Notifications
@@ -643,13 +839,39 @@ struct PrivacySubView: View {
 struct CapabilitiesSubView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var endpointSync = EndpointSyncService.shared
+    @State private var showModelPicker = false
     
     var body: some View {
         Form {
-            Section(header: Text("AI Model")) {
-                Text("Newton Singularity")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(NewtonTheme.textPrimary)
+            Section(header: Text("AI Model"), footer: Text("Modelos provistos dinámicamente por la API de Newton Gateway (/nwtn/models).")) {
+                Button {
+                    showModelPicker = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: settings.currentModel.iconName)
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(NewtonTheme.sand)
+                            .frame(width: 32, height: 32)
+                            .background(NewtonTheme.sand.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(settings.currentModelDisplayName)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                            Text(settings.currentModelId)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(NewtonTheme.textMuted)
+                    }
+                    .padding(.vertical, 4)
+                }
             }
 
             Section(header: Text("Streaming")) {
@@ -658,6 +880,9 @@ struct CapabilitiesSubView: View {
             }
         }
         .navigationTitle("Capabilities")
+        .sheet(isPresented: $showModelPicker) {
+            ModelPickerSheet(selectedModelId: $settings.currentModelId)
+        }
     }
 }
 

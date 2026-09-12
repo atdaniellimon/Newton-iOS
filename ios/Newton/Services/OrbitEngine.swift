@@ -304,6 +304,8 @@ public final class OrbitEngine {
         request.timeoutInterval = 60
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(nwtnKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(nwtnKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("Newton-iOS/2.2.0", forHTTPHeaderField: "User-Agent")
 
         let payload: [String: Any] = ["prompt": cleanPrompt, "n": 1]
 
@@ -311,16 +313,39 @@ public final class OrbitEngine {
         request.httpBody = bodyData
 
         if let (data, response) = try? await URLSession.shared.data(for: request),
-           let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let images = json["images"] as? [[String: Any]],
-           let first = images.first {
-            // NWTN returns { "images": [{ "url": "https://..." }] }
-            if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
-                return imgUrl
+           let httpResp = response as? HTTPURLResponse {
+            if let credHdr = httpResp.value(forHTTPHeaderField: "X-Credits-Left"), let cred = Int(credHdr) {
+                DispatchQueue.main.async {
+                    AuthManager.shared.updateCreditsFromStream(cred)
+                }
             }
-            if let b64 = first["b64_json"] as? String, !b64.isEmpty {
-                return "data:image/png;base64,\(b64)"
+            if let imgUsedHdr = httpResp.value(forHTTPHeaderField: "X-Daily-Images-Used"), let used = Int(imgUsedHdr) {
+                DispatchQueue.main.async {
+                    AuthManager.shared.tier.dailyImagesUsed = used
+                }
+            }
+            if let imgLimitHdr = httpResp.value(forHTTPHeaderField: "X-Daily-Images-Limit") {
+                DispatchQueue.main.async {
+                    AuthManager.shared.tier.dailyImagesLimit = imgLimitHdr
+                }
+            }
+
+            if (200...299).contains(httpResp.statusCode),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let cred = json["credits_left"] as? Int {
+                    DispatchQueue.main.async {
+                        AuthManager.shared.updateCreditsFromStream(cred)
+                    }
+                }
+                if let images = json["images"] as? [[String: Any]],
+                   let first = images.first {
+                    if let imgUrl = first["url"] as? String, !imgUrl.isEmpty {
+                        return imgUrl
+                    }
+                    if let b64 = first["b64_json"] as? String, !b64.isEmpty {
+                        return "data:image/png;base64,\(b64)"
+                    }
+                }
             }
         }
 

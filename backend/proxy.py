@@ -20,6 +20,7 @@ import ssl
 from pathlib import Path
 from dotenv import load_dotenv
 import certifi
+import requests
 
 load_dotenv()
 
@@ -181,31 +182,45 @@ def set_credits_left(user_id, amount):
         with get_db() as conn:
             conn.execute("UPDATE users SET credits_left=? WHERE id=?", (int(amount), user_id))
 
-def apply_billing(user, cr_used, credits_left_header):
+def apply_billing(user_id: int, cr_used: int, credits_left_header: str = None):
     """
-    Reconcile consumed credits from the best available upstream signal.
+    Reconcile consumed credits from the latest DB snapshot and upstream signals.
+    """
+    with _db_lock:
+        with get_db() as conn:
+            current = conn.execute("SELECT credits_left, credits_total, credits_used FROM users WHERE id=?", (user_id,)).fetchone()
+            if not current:
+                return
 
-    NWTN sets `X-Credits-Left` on responses; when present, the delta between our
-    last recorded snapshot and this one is the authoritative spend (this fixes the
-    case where the SSE `done` event carries no `credits_used`/`used_tokens`).
-    Falls back to the in-band `credits_used`/token-count when the header is absent.
-    """
-    if credits_left_header:
-        try:
-            new_left = int(credits_left_header)
-        except (TypeError, ValueError):
             new_left = None
-        if new_left is not None:
-            prev = user["credits_left"]
-            if prev is None:
-                prev = max(0, (user["credits_total"] or 0) - (user["credits_used"] or 0))
-            spent = prev - new_left
-            if spent > 0:
-                increment_credits(user["id"], spent)
-            set_credits_left(user["id"], new_left)
-            return
-    if cr_used and cr_used > 0:
-        increment_credits(user["id"], cr_used)
+            if credits_left_header:
+                try:
+                    new_left = int(credits_left_header)
+                except (TypeError, ValueError):
+                    new_left = None
+
+            if new_left is not None:
+                prev = current["credits_left"]
+                if prev is None:
+                    prev = max(0, (current["credits_total"] or 0) - (current["credits_used"] or 0))
+                spent = prev - new_left
+                if spent > 0:
+                    conn.execute("UPDATE users SET credits_used = credits_used + ?, credits_left = ? WHERE id = ?",
+                                 (spent, new_left, user_id))
+                else:
+                    conn.execute("UPDATE users SET credits_left = ? WHERE id = ?", (new_left, user_id))
+                return
+
+            if cr_used and cr_used > 0:
+                conn.execute("""
+                    UPDATE users 
+                    SET credits_used = credits_used + ?,
+                        credits_left = CASE 
+                            WHEN credits_left IS NOT NULL THEN MAX(0, credits_left - ?)
+                            ELSE credits_left 
+                        END
+                    WHERE id = ?
+                """, (int(cr_used), int(cr_used), user_id))
 
 def call_nwtn_admin_revoke(key_prefix: str) -> bool:
     """Revoke a key on the NWTN admin API. Returns True on success (False on any error)."""
@@ -821,7 +836,7 @@ class NWTNHandler(BaseHTTPRequestHandler):
                 log_usage(user["id"], endpoint, req_tok, resp_tok, tot_tok, cr_used, status,
                           self.client_address[0])
                 if status < 400:
-                    apply_billing(user, cr_used, credits_left)
+                    apply_billing(user["id"], cr_used, credits_left)
 
                 extra = {"X-Credits-Left": credits_left} if credits_left else {}
                 self._send_json(status, data, extra)
@@ -842,21 +857,21 @@ class NWTNHandler(BaseHTTPRequestHandler):
         """Forward SSE streaming response, log usage from final done event."""
         try:
             with urllib.request.urlopen(req, context=ctx, timeout=300) as resp:
-                credits_left = resp.headers.get("X-Credits-Left", "")
-                # Send SSE headers
+                initial_credits_left = resp.headers.get("X-Credits-Left", "")
+                final_credits_left = initial_credits_left
+
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("Transfer-Encoding", "chunked")
                 self._cors()
-                if credits_left:
-                    self.send_header("X-Credits-Left", credits_left)
+                if initial_credits_left:
+                    self.send_header("X-Credits-Left", initial_credits_left)
                 self.end_headers()
 
                 req_tok = resp_tok = tot_tok = cr_used = 0
                 status = 200
 
-                # Read line by line, forward to client
                 buf = b""
                 while True:
                     chunk = resp.read(1)
@@ -874,12 +889,21 @@ class NWTNHandler(BaseHTTPRequestHandler):
                                 break
                             try:
                                 evt = json.loads(payload)
-                                if evt.get("done"):
-                                    used = evt.get("used_tokens", {})
-                                    req_tok  = used.get("input", 0)
-                                    resp_tok = used.get("output", 0)
-                                    tot_tok  = used.get("total", 0)
-                                    cr_used  = evt.get("credits_used", 0) or tot_tok
+                                # Capturar tokens si vienen en 'used_tokens' o en el formato estándar 'usage'
+                                usage = evt.get("used_tokens") or evt.get("usage") or {}
+                                if usage:
+                                    req_tok = usage.get("input") or usage.get("prompt_tokens") or req_tok
+                                    resp_tok = usage.get("output") or usage.get("completion_tokens") or resp_tok
+                                    tot_tok = usage.get("total") or usage.get("total_tokens") or (req_tok + resp_tok)
+
+                                if evt.get("credits_used") is not None:
+                                    cr_used = evt.get("credits_used")
+                                elif tot_tok and not cr_used:
+                                    cr_used = tot_tok
+
+                                # Capturar credits_left si el evento final lo envía
+                                if evt.get("credits_left") is not None:
+                                    final_credits_left = str(evt.get("credits_left"))
                             except Exception:
                                 pass
                             out = f"data: {payload}\n\n".encode()
@@ -891,8 +915,9 @@ class NWTNHandler(BaseHTTPRequestHandler):
 
                 log_usage(user["id"], endpoint, req_tok, resp_tok, tot_tok, cr_used, status,
                           self.client_address[0])
+            
             if status < 400:
-                apply_billing(user, cr_used, credits_left)
+                apply_billing(user["id"], cr_used, final_credits_left)
 
         except urllib.error.HTTPError as e:
             raw = e.read()
@@ -901,7 +926,6 @@ class NWTNHandler(BaseHTTPRequestHandler):
             except Exception:
                 err_data = {"error": {"code": "http_error", "message": raw.decode(errors="replace")}}
             log_usage(user["id"], endpoint, 0, 0, 0, 0, e.code, self.client_address[0])
-            # Can't SSE error after headers sent in happy path, but here we haven't sent headers yet
             self._send_json(e.code, err_data)
         except Exception as e:
             log_usage(user["id"], endpoint, 0, 0, 0, 0, 502, self.client_address[0])
@@ -916,13 +940,12 @@ class NWTNHandler(BaseHTTPRequestHandler):
 # Server Runner
 # ──────────────────────────────────────────────
 def run_server(port: int = BACKEND_PORT, verbose: bool = False):
-    print("🗄  Initializing database...")
     ensure_schema()
 
     server = HTTPServer(("0.0.0.0", port), NWTNHandler)
     server.verbose = verbose
 
-    print(f"\n⚡ Newton Proxy running on http://localhost:{port}")
+    print(f"\n Newton Proxy running on http://localhost:{port}")
     print(f"   NWTN upstream: {NWTN_UPSTREAM}")
     print(f"   DB: {DB_PATH}")
     print(f"")
@@ -939,6 +962,8 @@ def run_server(port: int = BACKEND_PORT, verbose: bool = False):
     print(f"   GET  /health         — Health check")
     print(f"")
     print(f"   Press Ctrl+C to stop.\n")
+
+
 
     try:
         server.serve_forever()

@@ -16,6 +16,7 @@ private enum ActiveModalSheet: Identifiable {
     case photoLibrary
     case settings
     case workspaces
+    case modelPicker
 
     var id: String {
         switch self {
@@ -23,6 +24,7 @@ private enum ActiveModalSheet: Identifiable {
         case .photoLibrary: return "photoLibrary"
         case .settings:     return "settings"
         case .workspaces:   return "workspaces"
+        case .modelPicker:  return "modelPicker"
         }
     }
 }
@@ -258,6 +260,51 @@ public struct ChatView: View {
                 }
             }
             
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    ForEach(settings.availableModels) { model in
+                        Button {
+                            Haptics.selection()
+                            conversation.modelId = model.id
+                            settings.currentModelId = model.id
+                            storage.updateConversation(conversation)
+                        } label: {
+                            HStack {
+                                Text(model.name)
+                                if conversation.modelId == model.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        activeSheet = .modelPicker
+                    } label: {
+                        Label("Configurar Modelos...", systemImage: "slider.horizontal.3")
+                    }
+                } label: {
+                    VStack(spacing: 1) {
+                        Text(conversation.title)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(NewtonTheme.textPrimary)
+                            .lineLimit(1)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: conversation.modelId == "Singularity-Matrix" ? "chevron.left.forwardslash.chevron.right" : "atom")
+                                .font(.system(size: 8, weight: .semibold))
+                            Text(settings.availableModels.first(where: { $0.id == conversation.modelId })?.name ?? conversation.modelId)
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 7, weight: .bold))
+                        }
+                        .foregroundColor(NewtonTheme.sand)
+                    }
+                }
+            }
+            
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 // Ghost Mode Toggle
                 Button {
@@ -334,6 +381,15 @@ public struct ChatView: View {
                 SettingsView()
             case .workspaces:
                 WorkspaceListView()
+            case .modelPicker:
+                ModelPickerSheet(selectedModelId: Binding(
+                    get: { conversation.modelId },
+                    set: { newId in
+                        conversation.modelId = newId
+                        settings.currentModelId = newId
+                        storage.updateConversation(conversation)
+                    }
+                ))
             }
         }
         .fileImporter(
@@ -486,6 +542,7 @@ public struct ChatView: View {
             do {
                 let stream = LLMService.shared.streamCompletion(
                     messages: messagesToSend,
+                    modelId: conversation.modelId,
                     systemPrompt: systemPrompt
                 )
                 
@@ -546,12 +603,7 @@ public struct ChatView: View {
                     }
                     }
                     
-                    await MainActor.run {
-                        if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                            conversation.messages[index].content = fullResponse
-                            conversation.messages[index].thinkingContent = currentThinking.isEmpty ? nil : currentThinking
-                        }
-                    }
+                    await updateLiveStreamingMessage(id: assistantMessageId, content: fullResponse, thinking: currentThinking)
                 }
                 
                 // Process tool calling (image generation, web search, calculator) + chain of thought
@@ -562,27 +614,14 @@ public struct ChatView: View {
                     apiKey: settings.currentApiKey
                 )
 
-                await MainActor.run {
-                    if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                        conversation.messages[index].content = finalContent
-                        conversation.messages[index].imageUrl = detectedImgUrl
-                        conversation.messages[index].orbitResults = orbitResults
-                        let liveTrim = currentThinking.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let engTrim = (thinkingContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        let mergedThinking: String
-                        if liveTrim.isEmpty { mergedThinking = engTrim }
-                        else if engTrim.isEmpty { mergedThinking = liveTrim }
-                        else if engTrim.contains(liveTrim) { mergedThinking = engTrim }
-                        else if liveTrim.contains(engTrim) { mergedThinking = liveTrim }
-                        else { mergedThinking = liveTrim + "\n\n---\n\n" + engTrim }
-                        conversation.messages[index].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
-                        conversation.messages[index].isStreaming = false
-                    }
-                    
-                    storage.updateConversation(conversation)
-                    Haptics.success()
-                    LiveActivityManager.shared.updateActivity(status: "Thought Complete", progress: 1.0, isComplete: true)
-                }
+                await finalizeStreamingMessage(
+                    id: assistantMessageId,
+                    finalContent: finalContent,
+                    imageUrl: detectedImgUrl,
+                    orbitResults: orbitResults,
+                    currentThinking: currentThinking,
+                    thinkingContent: thinkingContent
+                )
                 
                 // Trigger background AI title generation if first message
                 if isFirstMessage && !userPrompt.isEmpty {
@@ -597,17 +636,7 @@ public struct ChatView: View {
                 }
                 
             } catch {
-                await MainActor.run {
-                    if let index = conversation.messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                        if fullResponse.isEmpty {
-                            conversation.messages.remove(at: index)
-                        } else {
-                            conversation.messages[index].isStreaming = false
-                        }
-                    }
-                    errorMessage = error.localizedDescription
-                    Haptics.error()
-                }
+                await handleStreamFailure(id: assistantMessageId, error: error, fullResponse: fullResponse)
             }
             
             await MainActor.run {
@@ -616,35 +645,86 @@ public struct ChatView: View {
         }
     }
     
-    private func generateAITitle(forPrompt prompt: String, response: String) async {
-        let titlePrompt = [
-            Message(role: .user, content: "Create a concise, descriptive 2-4 word title in the language of this query: \"\(prompt)\". Output ONLY the title, no quotes or punctuation.")
-        ]
+    @MainActor
+    private func updateLiveStreamingMessage(id: String, content: String, thinking: String) {
+        guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else { return }
+        var msgs = conversation.messages
+        msgs[index].content = content
+        msgs[index].thinkingContent = thinking.isEmpty ? nil : thinking
+        conversation.messages = msgs
+    }
+
+    @MainActor
+    private func finalizeStreamingMessage(
+        id: String,
+        finalContent: String,
+        imageUrl: String?,
+        orbitResults: [OrbitExecutionResult],
+        currentThinking: String,
+        thinkingContent: String?
+    ) {
+        if let index = conversation.messages.firstIndex(where: { $0.id == id }) {
+            var msgs = conversation.messages
+            msgs[index].content = finalContent
+            msgs[index].imageUrl = imageUrl
+            msgs[index].orbitResults = orbitResults
+            let liveTrim = currentThinking.trimmingCharacters(in: .whitespacesAndNewlines)
+            let engTrim = (thinkingContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let mergedThinking: String
+            if liveTrim.isEmpty { mergedThinking = engTrim }
+            else if engTrim.isEmpty { mergedThinking = liveTrim }
+            else if engTrim.contains(liveTrim) { mergedThinking = engTrim }
+            else if liveTrim.contains(engTrim) { mergedThinking = liveTrim }
+            else { mergedThinking = liveTrim + "\n\n---\n\n" + engTrim }
+            msgs[index].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
+            msgs[index].isStreaming = false
+            conversation.messages = msgs
+        }
         
-        do {
-            let stream = LLMService.shared.streamCompletion(
-                messages: titlePrompt,
-                systemPrompt: "You are a concise title generator. Reply ONLY with a 2-4 word title."
-            )
-            
-            var generatedTitle = ""
-            for try await token in stream {
-                generatedTitle += token
+        storage.updateConversation(conversation)
+        Haptics.success()
+        LiveActivityManager.shared.updateActivity(status: "Thought Complete", progress: 1.0, isComplete: true)
+    }
+
+    @MainActor
+    private func handleStreamFailure(id: String, error: Error, fullResponse: String) {
+        if let index = conversation.messages.firstIndex(where: { $0.id == id }) {
+            var msgs = conversation.messages
+            if fullResponse.isEmpty {
+                msgs.remove(at: index)
+            } else {
+                msgs[index].isStreaming = false
             }
-            
-            let cleanTitle = generatedTitle
+            conversation.messages = msgs
+        }
+        errorMessage = error.localizedDescription
+        Haptics.error()
+    }
+    
+    @MainActor
+    private func updateConversationTitle(_ title: String) {
+        conversation.title = title
+        storage.updateConversation(conversation)
+    }
+    
+    private func generateAITitle(forPrompt prompt: String, response: String) async {
+        do {
+            let title = try await LLMService.shared.complete(prompt: prompt, task: "title")
+            let cleanTitle = title
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: "\"", with: "")
                 .replacingOccurrences(of: "\n", with: " ")
             
             if !cleanTitle.isEmpty {
-                await MainActor.run {
-                    conversation.title = cleanTitle
-                    storage.updateConversation(conversation)
-                }
+                await updateConversationTitle(cleanTitle)
             }
         } catch {
             // Fallback
+            let fallbackWords = prompt.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            if !fallbackWords.isEmpty {
+                let fallbackTitle = fallbackWords.prefix(4).joined(separator: " ")
+                await updateConversationTitle(fallbackTitle)
+            }
         }
     }
     
@@ -715,9 +795,9 @@ public struct NewtonHeroWelcomeView: View {
         ),
         CardItem(
             icon: "sparkles",
-            title: "Analyze & Compare",
-            subtitle: "Newton Singularity vs Opus 4.8",
-            prompt: "Compare the reasoning capabilities, architecture, and tradeoffs of Newotn Singularity vs Claude Opus 4.8"
+            title: "Analyze & Reason",
+            subtitle: "Deep architectural inquiry",
+            prompt: "Analyze the mathematical foundations, reasoning capabilities, and architecture of modern neural attention models."
         )
     ]
     

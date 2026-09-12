@@ -3,7 +3,7 @@
 //  Newton
 //
 //  Created for Newton iOS.
-//  Matching Claude iOS sidebar layout with Chat Pinning, Art Gallery and bottom Settings gear.
+//  Native Newton iOS sidebar layout with Chat Pinning, Art Gallery and bottom Settings gear.
 //
 
 import SwiftUI

@@ -52,25 +52,8 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         self.currentlySpeakingMessageId = messageId
         self.isSpeaking = true
         
-        // TTS: use system AVSpeechSynthesizer (NWTN doesn't expose a TTS endpoint)
-        let settings = SettingsManager.shared
-        let apiKey = settings.currentApiKey
-        let baseUrl = settings.customBaseUrl
-        
-        if !baseUrl.isEmpty && (baseUrl.contains("openai.com") || baseUrl.contains("openrouter") || baseUrl.contains("8765") || baseUrl.contains("8000")) {
-            Task {
-                if let audioData = await fetchNeuralTTS(text: cleanText, baseUrl: baseUrl, apiKey: apiKey) {
-                    await playAudioData(audioData)
-                    return
-                } else {
-                    await MainActor.run {
-                        self.playAppleEnhancedTTS(cleanText: cleanText)
-                    }
-                }
-            }
-        } else {
-            playAppleEnhancedTTS(cleanText: cleanText)
-        }
+        // TTS: use system AVSpeechSynthesizer (Newton native Enhanced Neural voice)
+        playAppleEnhancedTTS(cleanText: cleanText)
     }
     
     private func playAppleEnhancedTTS(cleanText: String) {
@@ -103,55 +86,6 @@ public final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesize
         }
         
         synthesizer.speak(utterance)
-    }
-    
-    private func fetchNeuralTTS(text: String, baseUrl: String, apiKey: String) async -> Data? {
-        let cleanBase = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let ttsEndpoint = cleanBase.hasSuffix("/v1") ? "\(cleanBase)/audio/speech" : "\(cleanBase)/v1/audio/speech"
-        
-        guard let url = URL(string: ttsEndpoint) else { return nil }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 8
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !apiKey.isEmpty {
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let payload: [String: Any] = [
-            "model": "tts-1",
-            "input": text.prefix(1000),
-            "voice": "nova"
-        ]
-        
-        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
-        request.httpBody = body
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, http.statusCode == 200, !data.isEmpty {
-                return data
-            }
-        } catch {
-            return nil
-        }
-        return nil
-    }
-    
-    @MainActor
-    private func playAudioData(_ data: Data) {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
-            try AVAudioSession.sharedInstance().setActive(true)
-            audioPlayer = try AVAudioPlayer(data: data)
-            audioPlayer?.delegate = self
-            audioPlayer?.prepareToPlay()
-            audioPlayer?.play()
-            self.isSpeaking = true
-        } catch {
-            playAppleEnhancedTTS(cleanText: "")
-        }
     }
     
     public func stopSpeaking() {

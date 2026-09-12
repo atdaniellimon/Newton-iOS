@@ -184,98 +184,14 @@ public struct WebSearchSourcesCardView: View {
     public var body: some View {
         let parsed = sources
         VStack(alignment: .leading, spacing: 8) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "globe.americas.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(NewtonTheme.sand)
-                    
-                    Text(parsed.isEmpty ? "Web Search" : "\(parsed.count) Sources Consulted")
-                        .font(.system(size: 12.5, weight: .semibold, design: .serif))
-                        .foregroundColor(NewtonTheme.textPrimary)
-                    
-                    Spacer()
-                    
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(NewtonTheme.textSecondary)
-                }
-            }
-            .buttonStyle(.plain)
+            headerButton(sourceCount: parsed.count)
             
-            // Horizontal scrolling source chips when collapsed
             if !isExpanded && !parsed.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(parsed.prefix(4).enumerated()), id: \.element.id) { index, item in
-                            Button(action: {
-                                selectedSafariUrl = item.url
-                            }) {
-                                HStack(spacing: 5) {
-                                    Text("\(index + 1)")
-                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                        .foregroundColor(NewtonTheme.sand)
-                                    
-                                    Text(item.domain)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundColor(NewtonTheme.textPrimary)
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(NewtonTheme.surface)
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(NewtonTheme.border, lineWidth: 0.6)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+                collapsedChips(items: Array(parsed.prefix(4)))
             }
             
-            // Expanded full list of sources
             if isExpanded {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(parsed.enumerated()), id: \.element.id) { index, item in
-                        Button(action: {
-                            selectedSafariUrl = item.url
-                        }) {
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("[\(index + 1)]")
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                    .foregroundColor(NewtonTheme.sand)
-                                    .frame(width: 24, alignment: .leading)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.title)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(NewtonTheme.textPrimary)
-                                        .lineLimit(1)
-                                    
-                                    Text(item.domain)
-                                        .font(.system(size: 10.5))
-                                        .foregroundColor(NewtonTheme.textSecondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: "arrow.up.right")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(NewtonTheme.textSecondary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.top, 4)
+                expandedList(items: parsed)
             }
         }
         .padding(12)
@@ -291,6 +207,103 @@ public struct WebSearchSourcesCardView: View {
         )) { item in
             SafariView(url: item.url)
         }
+    }
+    
+    @ViewBuilder
+    private func headerButton(sourceCount: Int) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "globe.americas.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(NewtonTheme.sand)
+                
+                Text(sourceCount == 0 ? "Web Search" : "\(sourceCount) Sources Consulted")
+                    .font(.system(size: 12.5, weight: .semibold, design: .serif))
+                    .foregroundColor(NewtonTheme.textPrimary)
+                
+                Spacer()
+                
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(NewtonTheme.textSecondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private func collapsedChips(items: [WebSearchSourceItem]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    Button(action: {
+                        selectedSafariUrl = item.url
+                    }) {
+                        HStack(spacing: 5) {
+                            Text("\(index + 1)")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(NewtonTheme.sand)
+                            
+                            Text(item.domain)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(NewtonTheme.surface)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(NewtonTheme.border, lineWidth: 0.6)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func expandedList(items: [WebSearchSourceItem]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                Button(action: {
+                    selectedSafariUrl = item.url
+                }) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("[\(index + 1)]")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(NewtonTheme.sand)
+                            .frame(width: 24, alignment: .leading)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                                .lineLimit(1)
+                            
+                            Text(item.domain)
+                                .font(.system(size: 10.5))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 9))
+                            .foregroundColor(NewtonTheme.textSecondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 4)
     }
 }
 

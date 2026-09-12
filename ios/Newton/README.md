@@ -7,15 +7,11 @@ Una aplicación 100% nativa para iOS construida con **Swift 5/6** y **SwiftUI**,
 ## 🌟 Características Principales
 
 - **Streaming en tiempo real**: Visualización palabra por palabra token a token mediante `URLSession` con Server-Sent Events (SSE) y `AsyncThrowingStream`.
-- **Multi-Proveedor & BYOK**:
-  - OpenRouter
-  - OpenAI (GPT-4o, o3-mini, etc.)
-  - Anthropic (Claude 3.7 Sonnet, Claude 3.5 Sonnet, Haiku, Opus)
-  - OpenAI Compatible (LM Studio, vLLM, Ollama o proxies en tu red local)
-  - Anthropic Compatible (proxies o gateways de Anthropic)
-  - Google Gemini, Groq, DeepSeek, Ollama.
-- **Almacenamiento Seguro en Enclave Hardware (Keychain)**: Tus API keys se guardan cifradas en el **iOS Keychain** del dispositivo (Zero-Knowledge).
-- **Razonamiento Visible (`<think>`)**: Bloques de razonamiento colapsables para modelos como DeepSeek-R1 y Claude 3.7.
+- **Arquitectura Newton Singularity**:
+  - Modelo nativo Newton Singularity vía `https://api.newton.daniellimon.uk/nwtn`.
+  - Inferencia directa, streaming nativo, memoria de largo plazo y soporte de herramientas (Orbits).
+- **Almacenamiento Seguro en Enclave Hardware (Keychain)**: Tus API keys (`nwtn-...`) se guardan cifradas en el **iOS Keychain** del dispositivo (Zero-Knowledge).
+- **Razonamiento Visible (`<think>`)**: Bloques de razonamiento colapsables para introspección y cadena de pensamiento.
 - **Motor de Orbits**: Detección y ejecución de herramientas locales (búsqueda web, calculadora, hora).
 - **Diseño Adaptativo**: `NavigationSplitView` optimizado tanto para **iPhone** como para **iPad**.
 - **Respuesta Háptica**: Integración con el Taptic Engine de Apple (`UIImpactFeedbackGenerator`).
