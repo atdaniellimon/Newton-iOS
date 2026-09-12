@@ -13,6 +13,7 @@ public struct ModelPickerSheet: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var endpointSync = EndpointSyncService.shared
     @ObservedObject var auth = AuthManager.shared
+    @ObservedObject var loc = LocalizationManager.shared
     @State private var isRefreshing = false
     @State private var showTierAlert = false
     @State private var restrictedModelName = ""
@@ -59,7 +60,7 @@ public struct ModelPickerSheet: View {
                     await refreshModels()
                 }
             }
-            .navigationTitle("Modelos Newton")
+            .navigationTitle(L10n.tr("Newton Models", es: "Modelos Newton"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -79,7 +80,7 @@ public struct ModelPickerSheet: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Listo") {
+                    Button(L10n.tr("Done", es: "Listo")) {
                         dismiss()
                     }
                     .font(.system(size: 15, weight: .bold))
@@ -87,10 +88,10 @@ public struct ModelPickerSheet: View {
                 }
             }
         }
-        .alert("Mejora de Plan Requerida", isPresented: $showTierAlert) {
-            Button("Entendido", role: .cancel) {}
+        .alert(L10n.tr("Plan Upgrade Required", es: "Mejora de Plan Requerida"), isPresented: $showTierAlert) {
+            Button(L10n.tr("Got it", es: "Entendido"), role: .cancel) {}
         } message: {
-            Text("El modelo '\(restrictedModelName)' requiere el plan Newton Pro o Matrix. Consulta los detalles de suscripción en Billing.")
+            Text(L10n.tr("The model '\(restrictedModelName)' requires Newton Pro or Matrix. Check your subscription details in Billing.", es: "El modelo '\(restrictedModelName)' requiere el plan Newton Pro o Matrix. Consulta los detalles de suscripción en Billing."))
         }
         .task {
             if endpointSync.models.isEmpty {
@@ -108,13 +109,16 @@ public struct ModelPickerSheet: View {
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(endpointSync.isServerOnline ? "Newton Gateway Conectado" : "Gateway Desconectado")
+                Text(endpointSync.isServerOnline
+                     ? L10n.tr("Newton Gateway Connected", es: "Newton Gateway Conectado")
+                     : L10n.tr("Gateway Disconnected", es: "Gateway Desconectado"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(NewtonTheme.textPrimary)
 
                 Text(endpointSync.isServerOnline
-                     ? "\(activeModels.count) modelos disponibles · \(endpointSync.serverLatencyMs.map { "\($0) ms" } ?? "en línea")"
-                     : "Usando modelos en caché local")
+                     ? L10n.tr("\(activeModels.count) models available · \(endpointSync.serverLatencyMs.map { "\($0) ms" } ?? "online")",
+                               es: "\(activeModels.count) modelos disponibles · \(endpointSync.serverLatencyMs.map { "\($0) ms" } ?? "en línea")")
+                     : L10n.tr("Using locally cached models", es: "Usando modelos en caché local"))
                     .font(.system(size: 11))
                     .foregroundColor(NewtonTheme.textSecondary)
             }
@@ -172,7 +176,7 @@ public struct ModelPickerSheet: View {
                                 .foregroundColor(NewtonTheme.textPrimary)
 
                             if isSelected {
-                                Text("ACTIVO")
+                                Text(L10n.tr("ACTIVE", es: "ACTIVO"))
                                     .font(.system(size: 9, weight: .heavy, design: .monospaced))
                                     .foregroundColor(NewtonTheme.bg)
                                     .padding(.horizontal, 6)
@@ -180,7 +184,7 @@ public struct ModelPickerSheet: View {
                                     .background(NewtonTheme.sand)
                                     .clipShape(Capsule())
                             } else if !isAllowed {
-                                Text("REQUIERE PRO")
+                                Text(L10n.tr("REQUIRES PRO", es: "REQUIERE PRO"))
                                     .font(.system(size: 9, weight: .heavy, design: .monospaced))
                                     .foregroundColor(NewtonTheme.coralRed)
                                     .padding(.horizontal, 6)

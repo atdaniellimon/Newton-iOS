@@ -61,6 +61,8 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 		A10056 /* ShareableCardGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10056 /* ShareableCardGenerator.swift */; };
 		A10057 /* WorkspaceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10057 /* WorkspaceListView.swift */; };
 			A10059 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10059 /* AuthView.swift */; };
+		A10060 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10060 /* LocalizationManager.swift */; };
+		A10061 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10061 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +122,9 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 		B10057 /* WorkspaceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceListView.swift; sourceTree = "<group>"; };
 			B10058 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 			B10059 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		B10060 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
+		B10062 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B10063 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -147,6 +152,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 				B10001 /* NewtonApp.swift */,
 				B10027 /* Assets.xcassets */,
 				B10024 /* Info.plist */,
+				B10061 /* Localizable.strings */,
 				E10004 /* Models */,
 				E10005 /* Services */,
 				E10006 /* Utilities */,
@@ -205,6 +211,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 			children = (
 				B10011 /* Theme.swift */,
 				B10012 /* Haptics.swift */,
+				B10060 /* LocalizationManager.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -292,6 +299,18 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 		};
 /* End PBXGroup section */
 
+/* Begin PBXVariantGroup section */
+		B10061 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B10062 /* en */,
+				B10063 /* es */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin PBXNativeTarget section */
 		F10001 /* Newton */ = {
 			isa = PBXNativeTarget;
@@ -332,6 +351,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 			knownRegions = (
 				en,
 				Base,
+				es,
 			);
 			mainGroup = E10001;
 			productRefGroup = E10003 /* Products */;
@@ -349,6 +369,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 			buildActionMask = 2147483647;
 			files = (
 				A10026 /* Assets.xcassets in Resources */,
+				A10061 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -412,6 +433,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 				A10055 /* InteractiveChartView.swift in Sources */,
 				A10056 /* ShareableCardGenerator.swift in Sources */,
 				A10057 /* WorkspaceListView.swift in Sources */,
+				A10060 /* LocalizationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

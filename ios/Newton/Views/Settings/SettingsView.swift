@@ -15,9 +15,11 @@ public struct SettingsView: View {
     @ObservedObject var syncService = iCloudSyncService.shared
     @ObservedObject var memoryManager = MemoryManager.shared
     @ObservedObject var endpointSync = EndpointSyncService.shared
+    @ObservedObject var loc = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
     
     @State private var showingInfoSheet: Bool = false
+    @State private var showLogoutAlert: Bool = false
     
     public init() {}
     
@@ -32,34 +34,34 @@ public struct SettingsView: View {
                         
                         // MARK: - Account Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Account")
+                            Text(L10n.tr("Account", es: "Cuenta"))
                                 .font(.system(size: 13, weight: .regular))
                                 .foregroundColor(Color(UIColor.secondaryLabel))
                                 .padding(.horizontal, 20)
                             
                             VStack(spacing: 0) {
                                 NavigationLink(destination: ProfileSubView()) {
-                                    settingsRow(icon: "person.crop.circle", title: "Profile")
+                                    settingsRow(icon: "person.crop.circle", title: L10n.tr("Profile", es: "Perfil"))
                                 }
                                 internalDivider
                                 
                                 NavigationLink(destination: BillingSubView()) {
-                                    settingsRow(icon: "dollarsign.circle", title: "Billing")
+                                    settingsRow(icon: "dollarsign.circle", title: L10n.tr("Billing", es: "Facturación"))
                                 }
                                 internalDivider
                                 
                                 NavigationLink(destination: NotificationsSubView()) {
-                                    settingsRow(icon: "bell", title: "Notifications")
+                                    settingsRow(icon: "bell", title: L10n.tr("Notifications", es: "Notificaciones"))
                                 }
                                 internalDivider
                                 
                                 NavigationLink(destination: TimeAndFocusSubView()) {
-                                    settingsRow(icon: "moon.stars", title: "Memories", badge: "\(memoryManager.memories.count)")
+                                    settingsRow(icon: "moon.stars", title: L10n.tr("Memories", es: "Memorias"), badge: "\(memoryManager.memories.count)")
                                 }
                                 internalDivider
                                 
                                 NavigationLink(destination: PrivacySubView()) {
-                                    settingsRow(icon: "shield", title: "Privacy")
+                                    settingsRow(icon: "shield", title: L10n.tr("Privacy", es: "Privacidad"))
                                 }
                             }
                             .background(Color(UIColor.secondarySystemGroupedBackground))
@@ -69,25 +71,50 @@ public struct SettingsView: View {
                         
                         // MARK: - App Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("App")
+                            Text(L10n.tr("App", es: "Aplicación"))
                                 .font(.system(size: 13, weight: .regular))
                                 .foregroundColor(Color(UIColor.secondaryLabel))
                                 .padding(.horizontal, 20)
                             
                             VStack(spacing: 0) {
                                 NavigationLink(destination: CapabilitiesSubView()) {
-                                    settingsRow(icon: "slider.horizontal.3", title: "Capabilities")
+                                    settingsRow(icon: "slider.horizontal.3", title: L10n.tr("Capabilities", es: "Capacidades"))
                                 }
                                 internalDivider
                                 
                                 NavigationLink(destination: PermissionsSubView()) {
-                                    settingsRow(icon: "switch.2", title: "Permissions")
+                                    settingsRow(icon: "switch.2", title: L10n.tr("Permissions", es: "Permisos"))
                                 }
                                 internalDivider
                                 
                                 NavigationLink(destination: VoiceSubView()) {
-                                    settingsRow(icon: "waveform", title: "Voice")
+                                    settingsRow(icon: "waveform", title: L10n.tr("Voice", es: "Voz"))
                                 }
+                                internalDivider
+
+                                // Language Selector row
+                                HStack(spacing: 14) {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(Color(UIColor.label))
+                                        .frame(width: 24)
+                                    
+                                    Text(L10n.tr("Language", es: "Idioma"))
+                                        .font(.system(size: 16, weight: .regular))
+                                        .foregroundColor(Color(UIColor.label))
+                                    
+                                    Spacer()
+                                    
+                                    Picker("", selection: $loc.language) {
+                                        ForEach(AppLanguage.allCases) { lang in
+                                            Text(lang.displayName).tag(lang)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .tint(NewtonTheme.sand)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
                                 internalDivider
                                 
                                 // Haptic Feedback direct toggle
@@ -97,7 +124,7 @@ public struct SettingsView: View {
                                         .foregroundColor(Color(UIColor.label))
                                         .frame(width: 24)
                                     
-                                    Text("Haptic feedback")
+                                    Text(L10n.tr("Haptic feedback", es: "Respuesta háptica"))
                                         .font(.system(size: 16, weight: .regular))
                                         .foregroundColor(Color(UIColor.label))
                                     
@@ -117,13 +144,49 @@ public struct SettingsView: View {
                         
                         // MARK: - Appearance Section
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Appearance")
+                            Text(L10n.tr("Appearance", es: "Apariencia"))
                                 .font(.system(size: 13, weight: .regular))
                                 .foregroundColor(Color(UIColor.secondaryLabel))
                                 .padding(.horizontal, 20)
                             
                             AppearanceCardsSelector()
                                 .padding(.horizontal, 16)
+                        }
+                        
+                        // MARK: - Session Section
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(L10n.tr("Session", es: "Sesión"))
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundColor(Color(UIColor.secondaryLabel))
+                                .padding(.horizontal, 20)
+                            
+                            Button(action: {
+                                showLogoutAlert = true
+                            }) {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(NewtonTheme.coralRed)
+                                        .frame(width: 24)
+                                    
+                                    Text(L10n.tr("Log Out", es: "Cerrar Sesión"))
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(NewtonTheme.coralRed)
+                                    
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 13)
+                                .background(Color(UIColor.secondarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            }
+                            .padding(.horizontal, 16)
+                            
+                            Text(L10n.tr("Logging out will securely remove all your chats, memories, and local data from this device.",
+                                         es: "Al cerrar sesión se eliminarán todos tus chats, memorias y datos locales de este dispositivo."))
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(UIColor.secondaryLabel))
+                                .padding(.horizontal, 20)
                         }
                         
                         Spacer(minLength: 24)
@@ -134,7 +197,7 @@ public struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Settings")
+                    Text(L10n.tr("Settings", es: "Ajustes"))
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(Color(UIColor.label))
                 }
@@ -167,6 +230,16 @@ public struct SettingsView: View {
             }
             .sheet(isPresented: $showingInfoSheet) {
                 InfoSubView()
+            }
+            .alert(L10n.tr("Are you sure you want to log out?", es: "¿Cerrar Sesión?"), isPresented: $showLogoutAlert) {
+                Button(L10n.tr("Cancel", es: "Cancelar"), role: .cancel) {}
+                Button(L10n.tr("Log Out and Delete All", es: "Cerrar Sesión y Borrar Todo"), role: .destructive) {
+                    dismiss()
+                    AuthManager.shared.logout()
+                }
+            } message: {
+                Text(L10n.tr("Logging out will remove all conversations, AI memories, and local data from this device.",
+                             es: "Se eliminarán tus conversaciones, memorias de IA y datos locales de Newton en este dispositivo."))
             }
         }
         .preferredColorScheme(settings.appTheme.colorScheme)
@@ -213,7 +286,7 @@ struct AppearanceCardsSelector: View {
     var body: some View {
         HStack(spacing: 12) {
             // Light Card
-            themeCard(mode: .light, title: "Light") {
+            themeCard(mode: .light, title: L10n.tr("Light", es: "Claro")) {
                 ZStack {
                     Color(UIColor(red: 0.96, green: 0.96, blue: 0.98, alpha: 1.0))
                     VStack(alignment: .leading, spacing: 6) {
@@ -236,7 +309,7 @@ struct AppearanceCardsSelector: View {
             }
             
             // Dark Card
-            themeCard(mode: .dark, title: "Dark") {
+            themeCard(mode: .dark, title: L10n.tr("Dark", es: "Oscuro")) {
                 ZStack {
                     Color(UIColor(red: 0.12, green: 0.12, blue: 0.14, alpha: 1.0))
                     VStack(alignment: .leading, spacing: 6) {
@@ -259,7 +332,7 @@ struct AppearanceCardsSelector: View {
             }
             
             // System Card
-            themeCard(mode: .system, title: "System") {
+            themeCard(mode: .system, title: L10n.tr("System", es: "Sistema")) {
                 ZStack {
                     GeometryReader { geo in
                         Path { path in
@@ -331,17 +404,20 @@ struct AppearanceCardsSelector: View {
 // 1. Profile
 struct ProfileSubView: View {
     @ObservedObject var auth = AuthManager.shared
+    @ObservedObject var loc = LocalizationManager.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var showLogoutAlert: Bool = false
 
     var body: some View {
         Form {
-            Section(header: Text("User profile")) {
+            Section(header: Text(L10n.tr("User Profile", es: "Perfil de Usuario"))) {
                 HStack(spacing: 14) {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 44))
                         .foregroundColor(NewtonTheme.sand)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(auth.username.isEmpty ? "Signed Out" : auth.username)
+                        Text(auth.username.isEmpty ? L10n.tr("Signed Out", es: "Sesión no iniciada") : auth.username)
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(NewtonTheme.textPrimary)
                         
@@ -362,9 +438,9 @@ struct ProfileSubView: View {
                 .padding(.vertical, 6)
             }
 
-            Section(header: Text("Status & tier")) {
+            Section(header: Text(L10n.tr("Status & Tier", es: "Estado y Plan"))) {
                 HStack {
-                    Text("Newton Tier")
+                    Text(L10n.tr("Newton Tier", es: "Plan Newton"))
                     Spacer()
                     Text(auth.tier.name)
                         .font(.system(size: 13, weight: .bold))
@@ -372,7 +448,7 @@ struct ProfileSubView: View {
                 }
 
                 HStack {
-                    Text("Rate Limit")
+                    Text(L10n.tr("Rate Limit", es: "Límite de Velocidad"))
                     Spacer()
                     Text("\(auth.rpmLimit) RPM")
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -380,24 +456,54 @@ struct ProfileSubView: View {
                 }
 
                 HStack {
-                    Text("Status")
+                    Text(L10n.tr("Status", es: "Estado"))
                     Spacer()
                     Text(tierStatusText)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(tierStatusColor)
                 }
             }
+
+            Section {
+                Button(role: .destructive, action: {
+                    showLogoutAlert = true
+                }) {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Text(L10n.tr("Log Out", es: "Cerrar Sesión"))
+                            .fontWeight(.medium)
+                        Spacer()
+                    }
+                    .foregroundColor(NewtonTheme.coralRed)
+                }
+            } footer: {
+                Text(L10n.tr("Logging out will securely remove all your chats, memories, and local data from this device.",
+                             es: "Al cerrar sesión se eliminarán todos tus chats, memorias y datos locales de este dispositivo."))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(UIColor.secondaryLabel))
+            }
         }
-        .navigationTitle("Profile")
+        .navigationTitle(L10n.tr("Profile", es: "Perfil"))
         .onAppear {
             Task { await auth.refreshUserInfo() }
+        }
+        .alert(L10n.tr("Are you sure you want to log out?", es: "¿Cerrar Sesión?"), isPresented: $showLogoutAlert) {
+            Button(L10n.tr("Cancel", es: "Cancelar"), role: .cancel) {}
+            Button(L10n.tr("Log Out and Delete All", es: "Cerrar Sesión y Borrar Todo"), role: .destructive) {
+                dismiss()
+                auth.logout()
+            }
+        } message: {
+            Text(L10n.tr("Logging out will remove all conversations, AI memories, and local data from this device.",
+                         es: "Se eliminarán tus conversaciones, memorias de IA y datos locales de Newton en este dispositivo."))
         }
     }
 
     private var tierStatusText: String {
-        guard let end = auth.trialEndsAt else { return "Activo" }
-        if end < Date() { return "Expirado" }
-        return "Activo — \(Self.shortDate.string(from: end))"
+        guard let end = auth.trialEndsAt else { return L10n.tr("Active", es: "Activo") }
+        if end < Date() { return L10n.tr("Expired", es: "Expirado") }
+        return "\(L10n.tr("Active", es: "Activo")) — \(Self.shortDate.string(from: end))"
     }
 
     static let shortDate: DateFormatter = {
@@ -415,13 +521,14 @@ struct ProfileSubView: View {
 // 2. Billing & Subscription
 struct BillingSubView: View {
     @ObservedObject var auth = AuthManager.shared
+    @ObservedObject var loc = LocalizationManager.shared
     @State private var showRotateConfirmation = false
     @State private var showRotationSuccessAlert = false
 
     var body: some View {
         Form {
             // Subscription Plan Card
-            Section(header: Text("Suscripción Activa")) {
+            Section(header: Text(L10n.tr("Active Subscription", es: "Suscripción Activa"))) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
@@ -439,7 +546,7 @@ struct BillingSubView: View {
                                     .clipShape(Capsule())
                             }
                             
-                            Text("$\(auth.tier.priceMXN).00 MXN / mes")
+                            Text(L10n.tr("$\(auth.tier.priceMXN).00 MXN / month", es: "$\(auth.tier.priceMXN).00 MXN / mes"))
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(NewtonTheme.sand)
                         }
@@ -454,11 +561,11 @@ struct BillingSubView: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("CARACTERÍSTICAS DEL PLAN")
+                        Text(L10n.tr("PLAN FEATURES", es: "CARACTERÍSTICAS DEL PLAN"))
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundColor(NewtonTheme.textMuted)
 
-                        ForEach(auth.tier.features, id: \.self) { feat in
+                        ForEach(auth.tier.localizedFeatures, id: \.self) { feat in
                             HStack(alignment: .top, spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12))
@@ -475,11 +582,11 @@ struct BillingSubView: View {
             }
 
             // Quotas & Limits
-            Section(header: Text("Límites y Cuotas (Rolling Windows)")) {
+            Section(header: Text(L10n.tr("Limits & Quotas (Rolling Windows)", es: "Límites y Cuotas (Rolling Windows)"))) {
                 // 5-Hour limit
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Ventana 5 Horas")
+                        Text(L10n.tr("5-Hour Window", es: "Ventana 5 Horas"))
                             .font(.system(size: 13, weight: .medium))
                         Spacer()
                         Text("\(auth.quotaReq5h.used) / \(auth.quotaReq5h.limit) reqs")
@@ -494,7 +601,7 @@ struct BillingSubView: View {
                 // Weekly Messages
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Mensajes Semanales")
+                        Text(L10n.tr("Weekly Messages", es: "Mensajes Semanales"))
                             .font(.system(size: 13, weight: .medium))
                         Spacer()
                         Text("\(auth.quotaMsgsWeek.used) / \(auth.quotaMsgsWeek.limit)")
@@ -509,7 +616,7 @@ struct BillingSubView: View {
                 // Weekly Tokens
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Tokens Semanales")
+                        Text(L10n.tr("Weekly Tokens", es: "Tokens Semanales"))
                             .font(.system(size: 13, weight: .medium))
                         Spacer()
                         Text("\(Self.abbrev(auth.quotaTokensWeek.used)) / \(Self.abbrev(auth.quotaTokensWeek.limit))")
@@ -523,7 +630,7 @@ struct BillingSubView: View {
 
                 // Daily Images
                 HStack {
-                    Text("Imágenes Diarias")
+                    Text(L10n.tr("Daily Images", es: "Imágenes Diarias"))
                         .font(.system(size: 13, weight: .medium))
                     Spacer()
                     Text("\(auth.tier.dailyImagesUsed) / \(auth.tier.dailyImagesLimit)")
@@ -533,9 +640,9 @@ struct BillingSubView: View {
             }
 
             // Credits Balance
-            Section(header: Text("Balance de Créditos")) {
+            Section(header: Text(L10n.tr("Credits Balance", es: "Balance de Créditos"))) {
                 HStack {
-                    Text("Créditos Restantes")
+                    Text(L10n.tr("Remaining Credits", es: "Créditos Restantes"))
                     Spacer()
                     Text(auth.creditsRemaining.formatted())
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
@@ -543,7 +650,7 @@ struct BillingSubView: View {
                 }
 
                 HStack {
-                    Text("Créditos Usados")
+                    Text(L10n.tr("Used Credits", es: "Créditos Usados"))
                     Spacer()
                     Text(auth.creditsUsed.formatted())
                         .font(.system(size: 13, design: .monospaced))
@@ -552,7 +659,9 @@ struct BillingSubView: View {
             }
 
             // API Key & Security
-            Section(header: Text("Seguridad y Clave API"), footer: Text("La rotación de clave invalida la clave actual y genera una nueva sin perder créditos.")) {
+            Section(header: Text(L10n.tr("Security & API Key", es: "Seguridad y Clave API")),
+                    footer: Text(L10n.tr("Rotating your API key invalidates the current key and generates a new one without losing credits.",
+                                         es: "La rotación de clave invalida la clave actual y genera una nueva sin perder créditos."))) {
                 HStack {
                     Text("API Key")
                     Spacer()
@@ -571,7 +680,7 @@ struct BillingSubView: View {
                         } else {
                             Image(systemName: "arrow.triangle.2.circlepath")
                         }
-                        Text("Rotar API Key")
+                        Text(L10n.tr("Rotate API Key", es: "Rotar API Key"))
                     }
                     .foregroundColor(NewtonTheme.sand)
                 }
@@ -580,7 +689,7 @@ struct BillingSubView: View {
 
             // Recent Usage Audit
             if !auth.recentUsageRecords.isEmpty {
-                Section(header: Text("Auditoría de Uso Reciente (/nwtn/usage/history)")) {
+                Section(header: Text(L10n.tr("Recent Usage Audit (/nwtn/usage/history)", es: "Auditoría de Uso Reciente (/nwtn/usage/history)"))) {
                     ForEach(auth.recentUsageRecords.prefix(5)) { record in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
@@ -605,10 +714,10 @@ struct BillingSubView: View {
                 }
             }
         }
-        .navigationTitle("Billing")
-        .alert("¿Rotar API Key?", isPresented: $showRotateConfirmation) {
-            Button("Cancelar", role: .cancel) {}
-            Button("Rotar Clave", role: .destructive) {
+        .navigationTitle(L10n.tr("Billing", es: "Facturación"))
+        .alert(L10n.tr("Rotate API Key?", es: "¿Rotar API Key?"), isPresented: $showRotateConfirmation) {
+            Button(L10n.tr("Cancel", es: "Cancelar"), role: .cancel) {}
+            Button(L10n.tr("Rotate Key", es: "Rotar Clave"), role: .destructive) {
                 Task {
                     let res = await auth.rotateApiKey()
                     if res.success {
@@ -617,12 +726,14 @@ struct BillingSubView: View {
                 }
             }
         } message: {
-            Text("Esto generará una nueva clave Bearer ntwn-... y revocará la anterior de inmediato.")
+            Text(L10n.tr("This will generate a new Bearer ntwn-... key and immediately revoke the previous one.",
+                         es: "Esto generará una nueva clave Bearer ntwn-... y revocará la anterior de inmediato."))
         }
-        .alert("Clave Rotada con Éxito", isPresented: $showRotationSuccessAlert) {
+        .alert(L10n.tr("API Key Rotated Successfully", es: "Clave Rotada con Éxito"), isPresented: $showRotationSuccessAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(auth.lastKeyRotationMessage ?? "Tu nueva clave ha sido guardada en el Keychain de forma segura.")
+            Text(auth.lastKeyRotationMessage ?? L10n.tr("Your new key has been securely stored in Keychain.",
+                                                         es: "Tu nueva clave ha sido guardada en el Keychain de forma segura."))
         }
         .onAppear {
             Task {
@@ -843,7 +954,9 @@ struct CapabilitiesSubView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("AI Model"), footer: Text("Modelos provistos dinámicamente por la API de Newton Gateway (/nwtn/models).")) {
+            Section(header: Text(L10n.tr("AI Model", es: "Modelo de IA")),
+                    footer: Text(L10n.tr("Models dynamically provided by Newton Gateway API (/nwtn/models).",
+                                         es: "Modelos provistos dinámicamente por la API de Newton Gateway (/nwtn/models)."))) {
                 Button {
                     showModelPicker = true
                 } label: {

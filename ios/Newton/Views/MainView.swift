@@ -51,6 +51,12 @@ public struct MainView: View {
         .onAppear {
             syncService.triggerManualSync()
         }
+        .onChange(of: auth.isLoggedIn) { loggedIn in
+            if !loggedIn {
+                navigationPath = NavigationPath()
+                selectedConversationId = nil
+            }
+        }
         } // end auth.isLoggedIn
     }
 

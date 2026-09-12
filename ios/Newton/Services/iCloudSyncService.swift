@@ -110,4 +110,14 @@ public final class iCloudSyncService: ObservableObject {
         UserDefaults.standard.set(self.lastSyncDate, forKey: self.lastSyncTimestampKey)
         self.syncStatusText = "Synced"
     }
+    
+    public func clearCloudData() {
+        NSUbiquitousKeyValueStore.default.removeObject(forKey: iCloudKey)
+        NSUbiquitousKeyValueStore.default.synchronize()
+        UserDefaults.standard.removeObject(forKey: lastSyncTimestampKey)
+        DispatchQueue.main.async {
+            self.lastSyncDate = nil
+            self.syncStatusText = "iCloud Ready"
+        }
+    }
 }

@@ -34,12 +34,12 @@ public struct SubscriptionTierInfo: Codable, Equatable {
         dailyImagesLimit: "20",
         allowedModels: ["Singularity"],
         features: [
-            "Acceso a Newton Singularity",
-            "10,000,000 tokens mensuales",
-            "Límite de velocidad de 60 RPM",
-            "20 generaciones de imágenes al día",
-            "200 solicitudes / ventana de 5 horas",
-            "1,500 mensajes semanales"
+            "Access to Newton Singularity",
+            "10,000,000 monthly tokens",
+            "60 RPM rate limit",
+            "20 daily image generations",
+            "200 requests / 5-hour window",
+            "1,500 weekly messages"
         ],
         expiresAt: nil
     )
@@ -54,12 +54,12 @@ public struct SubscriptionTierInfo: Codable, Equatable {
         dailyImagesLimit: "100",
         allowedModels: ["Singularity", "Singularity-Matrix"],
         features: [
-            "Acceso a Singularity y Singularity-Matrix",
-            "50,000,000 tokens mensuales",
-            "Límite de velocidad de 180 RPM",
-            "100 generaciones de imágenes al día",
-            "600 solicitudes / ventana de 5 horas",
-            "7,500 mensajes semanales"
+            "Access to Singularity and Singularity-Matrix",
+            "50,000,000 monthly tokens",
+            "180 RPM rate limit",
+            "100 daily image generations",
+            "600 requests / 5-hour window",
+            "7,500 weekly messages"
         ],
         expiresAt: nil
     )
@@ -74,15 +74,50 @@ public struct SubscriptionTierInfo: Codable, Equatable {
         dailyImagesLimit: "unlimited",
         allowedModels: ["*"],
         features: [
-            "Acceso ilimitado a todos los modelos (Singularity + Singularity-Matrix)",
-            "Ultra rendimiento: 600 RPM de tasa de procesamiento",
-            "250,000,000 tokens mensuales (25x Base / 5x Pro)",
-            "Generación ilimitada de imágenes diarias",
-            "Máxima prioridad en servidor y cola cero",
-            "Acceso anticipado a Orbits y herramientas experimentales"
+            "Unlimited access to all models (Singularity + Singularity-Matrix)",
+            "Ultra performance: 600 RPM throughput",
+            "250,000,000 monthly tokens (25x Base / 5x Pro)",
+            "Unlimited daily image generations",
+            "Highest server priority and zero queue",
+            "Early access to Orbits and experimental tools"
         ],
         expiresAt: nil
     )
+
+    public var localizedFeatures: [String] {
+        if LocalizationManager.shared.isSpanish {
+            switch id.lowercased() {
+            case "pro":
+                return [
+                    "Acceso a Singularity y Singularity-Matrix",
+                    "50,000,000 tokens mensuales",
+                    "Límite de velocidad de 180 RPM",
+                    "100 generaciones de imágenes al día",
+                    "600 solicitudes / ventana de 5 horas",
+                    "7,500 mensajes semanales"
+                ]
+            case "matrix":
+                return [
+                    "Acceso ilimitado a todos los modelos (Singularity + Singularity-Matrix)",
+                    "Ultra rendimiento: 600 RPM de tasa de procesamiento",
+                    "250,000,000 tokens mensuales (25x Base / 5x Pro)",
+                    "Generación ilimitada de imágenes diarias",
+                    "Máxima prioridad en servidor y cola cero",
+                    "Acceso anticipado a Orbits y herramientas experimentales"
+                ]
+            default:
+                return [
+                    "Acceso a Newton Singularity",
+                    "10,000,000 tokens mensuales",
+                    "Límite de velocidad de 60 RPM",
+                    "20 generaciones de imágenes al día",
+                    "200 solicitudes / ventana de 5 horas",
+                    "1,500 mensajes semanales"
+                ]
+            }
+        }
+        return features
+    }
 
     public func canUseModel(_ modelId: String) -> Bool {
         if allowedModels.contains("*") { return true }
@@ -383,6 +418,7 @@ public final class AuthManager: ObservableObject {
         self.creditsRemaining = newCreditsRemaining
     }
 
+    @MainActor
     public func logout() {
         let key = nwtnKey
         if !key.isEmpty, let url = URL(string: Self.apiBaseURL + "/auth/logout") {
@@ -392,19 +428,36 @@ public final class AuthManager: ObservableObject {
             URLSession.shared.dataTask(with: req).resume()
         }
 
+        // 1. Wipe Keychain Credentials
         keychainDelete(account: keychainKeyAccount)
         keychainDelete(account: keychainUserAccount)
-        DispatchQueue.main.async {
-            self.isLoggedIn = false
-            self.username = ""
-            self.email = ""
-            self.creditsTotal = 0
-            self.creditsUsed = 0
-            self.creditsRemaining = 0
-            self.trialEndsAt = nil
-            self.tier = .base
-            self.recentUsageRecords = []
-        }
+
+        // 2. Wipe Local & iCloud Chats & Conversations
+        StorageManager.shared.clearAllConversations()
+
+        // 3. Wipe Long-Term Learned Memories
+        MemoryManager.shared.clearAllMemories()
+
+        // 4. Wipe Custom Workspaces
+        WorkspaceManager.shared.clearAllWorkspaces()
+
+        // 5. End Any Active Live Activity / Dynamic Island
+        LiveActivityManager.shared.endCurrentActivity()
+
+        // 6. Reset in-memory session and quota state
+        self.isLoggedIn = false
+        self.username = ""
+        self.email = ""
+        self.creditsTotal = 0
+        self.creditsUsed = 0
+        self.creditsRemaining = 0
+        self.trialEndsAt = nil
+        self.tier = .base
+        self.quotaReq5h = QuotaWindow(used: 0, limit: 200, resetAt: nil)
+        self.quotaMsgsWeek = QuotaWindow(used: 0, limit: 1500, resetAt: nil)
+        self.quotaTokensWeek = QuotaWindow(used: 0, limit: 10_000_000, resetAt: nil)
+        self.recentUsageRecords = []
+        self.lastError = nil
     }
 
     // MARK: - Private Helpers
@@ -423,7 +476,7 @@ public final class AuthManager: ObservableObject {
         defer { isLoading = false }
 
         guard let url = URL(string: Self.apiBaseURL + endpoint) else {
-            lastError = "URL inválida"
+            lastError = L10n.tr("Invalid URL", es: "URL inválida")
             return false
         }
 
@@ -440,12 +493,12 @@ public final class AuthManager: ObservableObject {
             let json: [String: Any]
             do {
                 guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    lastError = "Respuesta inválida del servidor"
+                    lastError = L10n.tr("Invalid server response", es: "Respuesta inválida del servidor")
                     return false
                 }
                 json = parsed
             } catch {
-                lastError = "El servidor devolvió una respuesta inválida"
+                lastError = L10n.tr("The server returned an invalid response", es: "El servidor devolvió una respuesta inválida")
                 return false
             }
 
@@ -484,11 +537,11 @@ public final class AuthManager: ObservableObject {
                 Task { await self.refreshUserInfo() }
                 return true
             } else {
-                lastError = "Error del servidor (\(http?.statusCode ?? 0))"
+                lastError = L10n.tr("Server error", es: "Error del servidor") + " (\(http?.statusCode ?? 0))"
                 return false
             }
         } catch {
-            lastError = "Error de conexión: \(error.localizedDescription)"
+            lastError = L10n.tr("Connection error", es: "Error de conexión") + ": \(error.localizedDescription)"
             return false
         }
     }

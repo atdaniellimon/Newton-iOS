@@ -10,6 +10,7 @@ import SwiftUI
 
 public struct AuthView: View {
     @StateObject private var auth = AuthManager.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @State private var mode: Mode = .login
     @State private var username: String = ""
     @State private var password: String = ""
@@ -79,12 +80,12 @@ public struct AuthView: View {
                 VStack(spacing: 24) {
                     // Mode Toggle
                     HStack(spacing: 0) {
-                        modeButton("Iniciar sesión", selected: mode == .login) {
+                        modeButton(L10n.tr("Sign In", es: "Iniciar sesión"), selected: mode == .login) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 mode = .login
                             }
                         }
-                        modeButton("Crear cuenta", selected: mode == .register) {
+                        modeButton(L10n.tr("Create Account", es: "Crear cuenta"), selected: mode == .register) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 mode = .register
                             }
@@ -98,7 +99,7 @@ public struct AuthView: View {
                     VStack(spacing: 16) {
                         // Username
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Usuario")
+                            Text(L10n.tr("Username", es: "Usuario"))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.6))
                             HStack(spacing: 12) {
@@ -120,7 +121,7 @@ public struct AuthView: View {
 
                         // Password
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Contraseña")
+                            Text(L10n.tr("Password", es: "Contraseña"))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.6))
                             HStack(spacing: 12) {
@@ -154,7 +155,7 @@ public struct AuthView: View {
                         // Confirm Password (register only)
                         if mode == .register {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Confirmar contraseña")
+                                Text(L10n.tr("Confirm Password", es: "Confirmar contraseña"))
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.6))
                                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -204,7 +205,7 @@ public struct AuthView: View {
                                     .tint(.black)
                                     .frame(height: 22)
                             } else {
-                                Text(mode == .login ? "Iniciar sesión" : "Crear cuenta")
+                                Text(mode == .login ? L10n.tr("Sign In", es: "Iniciar sesión") : L10n.tr("Create Account", es: "Crear cuenta"))
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(.black)
                             }
@@ -226,10 +227,10 @@ public struct AuthView: View {
                     // Trial info
                     if mode == .register {
                         VStack(spacing: 4) {
-                            Text("30 días gratis")
+                            Text(L10n.tr("30 days free trial", es: "30 días gratis"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(NewtonTheme.sand)
-                            Text("$100 MXN/mes después")
+                            Text(L10n.tr("$100 MXN/month thereafter", es: "$100 MXN/mes después"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white.opacity(0.4))
                         }
@@ -268,14 +269,14 @@ public struct AuthView: View {
         if mode == .register {
             guard password == passwordConfirm else {
                 await MainActor.run {
-                    AuthManager.shared.lastError = "Las contraseñas no coinciden"
+                    AuthManager.shared.lastError = L10n.tr("Passwords do not match", es: "Las contraseñas no coinciden")
                 }
                 triggerShake()
                 return
             }
             guard password.count >= 8 else {
                 await MainActor.run {
-                    AuthManager.shared.lastError = "Mínimo 8 caracteres"
+                    AuthManager.shared.lastError = L10n.tr("Minimum 8 characters", es: "Mínimo 8 caracteres")
                 }
                 triggerShake()
                 return

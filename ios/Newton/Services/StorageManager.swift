@@ -58,7 +58,8 @@ public final class StorageManager: ObservableObject {
     
     public func clearAllConversations() {
         conversations.removeAll()
-        saveConversations()
+        try? FileManager.default.removeItem(at: fileURL)
+        iCloudSyncService.shared.clearCloudData()
     }
     
     public func purgeGhostConversations() {

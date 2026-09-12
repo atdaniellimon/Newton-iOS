@@ -72,4 +72,11 @@ public final class WorkspaceManager: ObservableObject {
             saveWorkspaces()
         }
     }
+    
+    public func clearAllWorkspaces() {
+        workspaces.removeAll()
+        activeWorkspaceId = "default"
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        UserDefaults.standard.removeObject(forKey: "activeWorkspaceId")
+    }
 }

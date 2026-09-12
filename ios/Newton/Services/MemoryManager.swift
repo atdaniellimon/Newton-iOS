@@ -67,6 +67,7 @@ public final class MemoryManager: ObservableObject {
     
     public func clearAllMemories() {
         memories.removeAll()
+        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
     }
     
     public func formattedMemoryPrompt() -> String {
