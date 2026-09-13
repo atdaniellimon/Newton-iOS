@@ -32,16 +32,7 @@ public struct MainView: View {
                 }
             )
             .navigationDestination(for: String.self) { convoId in
-                if let index = storage.conversations.firstIndex(where: { $0.id == convoId }) {
-                    ChatView(conversation: $storage.conversations[index])
-                } else {
-                    ZStack {
-                        NewtonTheme.bgDark
-                            .ignoresSafeArea()
-                        Text("Conversation not found")
-                            .foregroundColor(NewtonTheme.textSecondary)
-                    }
-                }
+                ChatWrapperView(initialId: convoId)
             }
         }
         .accentColor(NewtonTheme.sand)
@@ -91,6 +82,43 @@ public struct MainView: View {
             navigationPath = NavigationPath()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 navigationPath.append(newConvo.id)
+            }
+        }
+    }
+}
+
+public struct ChatWrapperView: View {
+    @ObservedObject var storage = StorageManager.shared
+    public let initialId: String
+    @State private var currentId: String
+    
+    public init(initialId: String) {
+        self.initialId = initialId
+        self._currentId = State(initialValue: initialId)
+    }
+    
+    public var body: some View {
+        Group {
+            if let index = storage.conversations.firstIndex(where: { $0.id == currentId }) {
+                ChatView(conversation: $storage.conversations[index])
+            } else if let firstMatch = storage.conversations.first {
+                // If ID was replaced asynchronously during cloud creation
+                ChatView(conversation: $storage.conversations[0])
+                    .onAppear {
+                        currentId = firstMatch.id
+                    }
+            } else {
+                ZStack {
+                    NewtonTheme.bgDark
+                        .ignoresSafeArea()
+                    Text(L10n.tr("Loading conversation...", es: "Cargando conversación..."))
+                        .foregroundColor(NewtonTheme.textSecondary)
+                }
+            }
+        }
+        .onReceive(storage.$conversations) { convos in
+            if !convos.contains(where: { $0.id == currentId }), let first = convos.first {
+                currentId = first.id
             }
         }
     }
