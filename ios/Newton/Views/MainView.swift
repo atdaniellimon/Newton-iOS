@@ -50,11 +50,22 @@ public struct MainView: View {
         }
         .onAppear {
             syncService.triggerManualSync()
+            if auth.isLoggedIn {
+                Task {
+                    await storage.syncWithRemoteServer()
+                }
+                storage.reconnectSyncListenerIfNeeded()
+            }
         }
         .onChange(of: auth.isLoggedIn) { loggedIn in
             if !loggedIn {
                 navigationPath = NavigationPath()
                 selectedConversationId = nil
+            } else {
+                Task {
+                    await storage.syncWithRemoteServer()
+                }
+                storage.reconnectSyncListenerIfNeeded()
             }
         }
         } // end auth.isLoggedIn

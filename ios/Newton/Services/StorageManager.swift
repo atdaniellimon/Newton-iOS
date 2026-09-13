@@ -58,11 +58,15 @@ public final class StorageManager: ObservableObject {
             .store(in: &cancellables)
     }
     
-    private func setupGlobalSyncListener() {
+    public func reconnectSyncListenerIfNeeded() {
         CloudChatService.shared.startGlobalSyncListener { [weak self] event in
             guard let self = self else { return }
             self.handleRemoteSyncEvent(event)
         }
+    }
+    
+    private func setupGlobalSyncListener() {
+        reconnectSyncListenerIfNeeded()
     }
     
     // MARK: - Server Synchronization
@@ -151,14 +155,31 @@ public final class StorageManager: ObservableObject {
         sortConversations()
         saveConversations()
         
-        // Asynchronously persist to remote cloud chat API
         if AuthManager.shared.isLoggedIn {
-            Task {
+            Task { @MainActor in
                 do {
-                    _ = try await CloudChatService.shared.createChat(
+                    let remote = try await CloudChatService.shared.createChat(
                         title: title,
                         model: newConvo.modelId
                     )
+                    // Update local placeholder ID to server ID
+                    if let idx = self.conversations.firstIndex(where: { $0.id == newConvo.id }) {
+                        var updated = self.conversations[idx]
+                        self.conversations.remove(at: idx)
+                        let synced = Conversation(
+                            id: remote.id,
+                            title: updated.title,
+                            messages: updated.messages,
+                            isPinned: updated.isPinned,
+                            isGhost: false,
+                            modelId: updated.modelId,
+                            createdAt: updated.createdAt,
+                            updatedAt: remote.updatedAt
+                        )
+                        self.conversations.insert(synced, at: 0)
+                        self.sortConversations()
+                        self.saveConversations()
+                    }
                 } catch {
                     print("Failed to sync new chat to cloud API: \(error.localizedDescription)")
                 }

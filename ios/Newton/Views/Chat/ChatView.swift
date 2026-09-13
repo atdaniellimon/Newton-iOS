@@ -636,12 +636,43 @@ public struct ChatView: View {
             do {
                 let stream: AsyncThrowingStream<String, Error>
                 if !conversation.isGhost && AuthManager.shared.isLoggedIn {
+                    var targetChatId = conversation.id
+                    // If the chat ID is a local UUID (not yet chat_... or from server), ensure it is created first
+                    if !targetChatId.hasPrefix("chat_") {
+                        do {
+                            let remote = try await CloudChatService.shared.createChat(
+                                title: conversation.title,
+                                model: conversation.modelId
+                            )
+                            targetChatId = remote.id
+                            await MainActor.run {
+                                let oldId = conversation.id
+                                conversation = Conversation(
+                                    id: remote.id,
+                                    title: conversation.title,
+                                    messages: conversation.messages,
+                                    isPinned: conversation.isPinned,
+                                    isGhost: false,
+                                    modelId: conversation.modelId,
+                                    createdAt: conversation.createdAt,
+                                    updatedAt: remote.updatedAt
+                                )
+                                storage.deleteConversation(id: oldId)
+                                storage.conversations.insert(conversation, at: 0)
+                                storage.sortConversations()
+                                storage.saveConversations()
+                            }
+                        } catch {
+                            print("Pre-creation of cloud chat failed: \(error)")
+                        }
+                    }
+
                     var nwtnAttachments: [NWTNAttachment] = []
                     if let img = imgBase64DataUrl {
                         nwtnAttachments.append(NWTNAttachment(type: "image", data: img, name: "image.jpg"))
                     }
                     stream = CloudChatService.shared.streamChatMessage(
-                        chatId: conversation.id,
+                        chatId: targetChatId,
                         prompt: backendPayloadPrompt,
                         model: conversation.modelId,
                         attachments: nwtnAttachments
