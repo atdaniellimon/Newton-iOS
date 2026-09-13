@@ -64,6 +64,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 		A10060 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10060 /* LocalizationManager.swift */; };
 		A10061 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10061 /* Localizable.strings */; };
 		A10064 /* CloudChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10064 /* CloudChatService.swift */; };
+		A10065 /* DesktopRemoteControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10065 /* DesktopRemoteControlView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -127,6 +128,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 		B10062 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B10063 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B10064 /* CloudChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudChatService.swift; sourceTree = "<group>"; };
+		B10065 /* DesktopRemoteControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopRemoteControlView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -288,10 +290,11 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 			isa = PBXGroup;
 			children = (
 				B10057 /* WorkspaceListView.swift */,
+				B10065 /* DesktopRemoteControlView.swift */,
 			);
 			path = Workspaces;
 			sourceTree = "<group>";
-			};
+		};
 			E10014 /* Auth */ = {
 				isa = PBXGroup;
 				children = (
@@ -438,6 +441,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 				A10057 /* WorkspaceListView.swift in Sources */,
 				A10060 /* LocalizationManager.swift in Sources */,
 				A10064 /* CloudChatService.swift in Sources */,
+				A10065 /* DesktopRemoteControlView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

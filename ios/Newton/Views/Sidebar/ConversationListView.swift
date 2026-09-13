@@ -20,6 +20,7 @@ public struct ConversationListView: View {
     @State private var showSettings: Bool = false
     @State private var showArtGallery: Bool = false
     @State private var showWorkspaces: Bool = false
+    @State private var showDesktopRemote: Bool = false
     
     public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
@@ -60,7 +61,7 @@ public struct ConversationListView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 16)
                 
-                // Studio Section Navigation Items (Chats, Ghost, Workspaces, Art gallery)
+                // Studio Section Navigation Items (Chats, Ghost, Workspaces, Art gallery, Mac Remote)
                 VStack(spacing: 4) {
                     SidebarItemRow(icon: "bubble.left.and.bubble.right", title: L10n.tr("Chats", es: "Chats"), isSelected: true)
                     
@@ -71,6 +72,13 @@ public struct ConversationListView: View {
                         onSelectConversation?(ghost.id)
                     } label: {
                         SidebarItemRow(icon: "ghost", title: L10n.tr("Ghost Session", es: "Sesión Fantasma"), isSelected: false)
+                    }
+                    
+                    Button {
+                        Haptics.light()
+                        showDesktopRemote = true
+                    } label: {
+                        SidebarItemRow(icon: "macbook.and.iphone", title: L10n.tr("Mac Remote Studio", es: "Control Remoto Mac"), isSelected: false)
                     }
                     
                     Button {
@@ -223,6 +231,9 @@ public struct ConversationListView: View {
         }
         .sheet(isPresented: $showWorkspaces) {
             WorkspaceListView()
+        }
+        .sheet(isPresented: $showDesktopRemote) {
+            DesktopRemoteControlView()
         }
     }
     

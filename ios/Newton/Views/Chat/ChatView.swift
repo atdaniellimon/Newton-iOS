@@ -651,12 +651,7 @@ public struct ChatView: View {
                                 let oldId = conversation.id
                                 conversation.id = remote.id
                                 conversation.updatedAt = remote.updatedAt
-                                storage.deleteConversation(id: oldId)
-                                if !storage.conversations.contains(where: { $0.id == remote.id }) {
-                                    storage.conversations.insert(conversation, at: 0)
-                                }
-                                storage.sortConversations()
-                                storage.saveConversations()
+                                storage.updateConversationId(from: oldId, to: remote.id, updated: conversation)
                             }
                         } catch {
                             print("Pre-creation of cloud chat failed: \(error)")

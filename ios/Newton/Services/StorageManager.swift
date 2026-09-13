@@ -210,6 +210,18 @@ public final class StorageManager: ObservableObject {
         conversations.removeAll(where: { $0.isGhost })
     }
     
+    public func updateConversationId(from oldId: String, to newId: String, updated: Conversation) {
+        if let index = conversations.firstIndex(where: { $0.id == oldId }) {
+            conversations[index] = updated
+            sortConversations()
+            if !updated.isGhost {
+                saveConversations()
+            }
+        } else {
+            updateConversation(updated)
+        }
+    }
+    
     public func updateConversation(_ convo: Conversation) {
         if let index = conversations.firstIndex(where: { $0.id == convo.id }) {
             var updated = convo

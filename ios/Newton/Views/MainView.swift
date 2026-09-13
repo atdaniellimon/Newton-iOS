@@ -101,11 +101,10 @@ public struct ChatWrapperView: View {
         Group {
             if let index = storage.conversations.firstIndex(where: { $0.id == currentId }) {
                 ChatView(conversation: $storage.conversations[index])
-            } else if let firstMatch = storage.conversations.first {
-                // If ID was replaced asynchronously during cloud creation
-                ChatView(conversation: $storage.conversations[0])
+            } else if let index = storage.conversations.firstIndex(where: { $0.id == initialId }) {
+                ChatView(conversation: $storage.conversations[index])
                     .onAppear {
-                        currentId = firstMatch.id
+                        currentId = initialId
                     }
             } else {
                 ZStack {
@@ -114,11 +113,6 @@ public struct ChatWrapperView: View {
                     Text(L10n.tr("Loading conversation...", es: "Cargando conversación..."))
                         .foregroundColor(NewtonTheme.textSecondary)
                 }
-            }
-        }
-        .onReceive(storage.$conversations) { convos in
-            if !convos.contains(where: { $0.id == currentId }), let first = convos.first {
-                currentId = first.id
             }
         }
     }

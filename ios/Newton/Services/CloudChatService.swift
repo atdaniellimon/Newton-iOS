@@ -315,9 +315,21 @@ public final class CloudChatService: ObservableObject {
                     }
                     
                     var buffer = ""
+                    var utf8Decoder = Unicode.UTF8()
+                    var utf8Buffer: [UInt8] = []
+                    
                     for try await byte in bytes {
                         guard !Task.isCancelled else { break }
-                        buffer.append(Character(UnicodeScalar(byte)))
+                        utf8Buffer.append(byte)
+                        
+                        if let decodedString = String(bytes: utf8Buffer, encoding: .utf8) {
+                            buffer.append(decodedString)
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        } else if utf8Buffer.count > 16 {
+                            // If invalid sequence after several bytes, force decode and clear
+                            buffer.append(String(decoding: utf8Buffer, as: UTF8.self))
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        }
                         
                         while let lineEnd = buffer.range(of: "\n") {
                             let line = String(buffer[..<lineEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -391,10 +403,18 @@ public final class CloudChatService: ObservableObject {
                     
                     var currentEventType: String? = nil
                     var buffer = ""
+                    var utf8Buffer: [UInt8] = []
                     
                     for try await byte in bytes {
                         guard !Task.isCancelled else { break }
-                        buffer.append(Character(UnicodeScalar(byte)))
+                        utf8Buffer.append(byte)
+                        if let decodedString = String(bytes: utf8Buffer, encoding: .utf8) {
+                            buffer.append(decodedString)
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        } else if utf8Buffer.count > 16 {
+                            buffer.append(String(decoding: utf8Buffer, as: UTF8.self))
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        }
                         
                         while let lineEnd = buffer.range(of: "\n") {
                             let line = String(buffer[..<lineEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -473,10 +493,18 @@ public final class CloudChatService: ObservableObject {
                     
                     var currentEventType: String? = nil
                     var buffer = ""
+                    var utf8Buffer: [UInt8] = []
                     
                     for try await byte in bytes {
                         guard !Task.isCancelled else { break }
-                        buffer.append(Character(UnicodeScalar(byte)))
+                        utf8Buffer.append(byte)
+                        if let decodedString = String(bytes: utf8Buffer, encoding: .utf8) {
+                            buffer.append(decodedString)
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        } else if utf8Buffer.count > 16 {
+                            buffer.append(String(decoding: utf8Buffer, as: UTF8.self))
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        }
                         
                         while let lineEnd = buffer.range(of: "\n") {
                             let line = String(buffer[..<lineEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -526,4 +554,151 @@ public final class CloudChatService: ObservableObject {
             }
         }
     }
+    
+    // MARK: - 9. Desktop Remote Control API (Mac ⟷ iPhone Bridge)
+    
+    public struct RemoteDesktopStatus: Codable {
+        public let online: Bool
+        public let workspaces_count: Int
+        public let last_seen: Double?
+        public let active_workspace: String?
+    }
+    
+    public struct RemoteWorkspaceItem: Codable, Identifiable {
+        public var id: String { path }
+        public let name: String
+        public let path: String
+        public let hasGit: Bool?
+        public let branch: String?
+    }
+    
+    public struct RemoteWorkspacesResponse: Codable {
+        public let workspaces: [RemoteWorkspaceItem]?
+        public let last_updated: Double?
+    }
+    
+    public struct RemoteDispatchResponse: Codable {
+        public let success: Bool
+        public let sessionId: String?
+        public let status: String?
+        public let message: String?
+    }
+    
+    public struct RemoteStepEvent {
+        public let stepType: String
+        public let toolName: String?
+        public let message: String?
+        public let stdout: String?
+        public let stderr: String?
+        public let timestamp: Date
+    }
+    
+    public func fetchDesktopStatus() async throws -> RemoteDesktopStatus {
+        let req = try makeRequest(endpoint: "/nwtn/desktop/status")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "CloudChatService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get desktop status"])
+        }
+        return try JSONDecoder().decode(RemoteDesktopStatus.self, from: data)
+    }
+    
+    public func fetchDesktopWorkspaces() async throws -> [RemoteWorkspaceItem] {
+        let req = try makeRequest(endpoint: "/nwtn/desktop/workspaces")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "CloudChatService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch desktop workspaces"])
+        }
+        let decoded = try JSONDecoder().decode(RemoteWorkspacesResponse.self, from: data)
+        return decoded.workspaces ?? []
+    }
+    
+    public func dispatchDesktopCommand(workspacePath: String, task: String, model: String = "Singularity-Matrix") async throws -> RemoteDispatchResponse {
+        let body: [String: Any] = [
+            "workspacePath": workspacePath,
+            "task": task,
+            "model": model
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        let req = try makeRequest(endpoint: "/nwtn/desktop/dispatch", method: "POST", body: bodyData)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard statusCode == 200 else {
+            let errStr = String(data: data, encoding: .utf8) ?? ""
+            throw NSError(domain: "CloudChatService", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Dispatch failed: \(errStr)"])
+        }
+        return try JSONDecoder().decode(RemoteDispatchResponse.self, from: data)
+    }
+    
+    public func cancelDesktopCommand(sessionId: String? = nil) async throws {
+        var endpoint = "/nwtn/desktop/cancel"
+        if let s = sessionId { endpoint += "?sessionId=\(s)" }
+        let req = try makeRequest(endpoint: endpoint, method: "POST")
+        _ = try await URLSession.shared.data(for: req)
+    }
+    
+    public func streamDesktopSession() -> AsyncStream<RemoteStepEvent> {
+        AsyncStream { continuation in
+            let task = Task {
+                do {
+                    var req = try self.makeRequest(endpoint: "/nwtn/desktop/session/stream")
+                    req.timeoutInterval = 86400
+                    
+                    let (bytes, response) = try await URLSession.shared.bytes(for: req)
+                    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                        continuation.finish()
+                        return
+                    }
+                    
+                    var currentEventType: String? = nil
+                    var buffer = ""
+                    var utf8Buffer: [UInt8] = []
+                    
+                    for try await byte in bytes {
+                        guard !Task.isCancelled else { break }
+                        utf8Buffer.append(byte)
+                        if let decodedString = String(bytes: utf8Buffer, encoding: .utf8) {
+                            buffer.append(decodedString)
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        } else if utf8Buffer.count > 16 {
+                            buffer.append(String(decoding: utf8Buffer, as: UTF8.self))
+                            utf8Buffer.removeAll(keepingCapacity: true)
+                        }
+                        
+                        while let lineEnd = buffer.range(of: "\n") {
+                            let line = String(buffer[..<lineEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            buffer = String(buffer[lineEnd.upperBound...])
+                            
+                            if line.hasPrefix("event: ") {
+                                currentEventType = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                            } else if line.hasPrefix("data: ") {
+                                let dataStr = String(line.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
+                                if let data = dataStr.data(using: .utf8),
+                                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                    
+                                    let step = RemoteStepEvent(
+                                        stepType: json["stepType"] as? String ?? currentEventType ?? "step",
+                                        toolName: json["toolName"] as? String,
+                                        message: json["message"] as? String,
+                                        stdout: json["stdout"] as? String,
+                                        stderr: json["stderr"] as? String,
+                                        timestamp: Date()
+                                    )
+                                    continuation.yield(step)
+                                }
+                                currentEventType = nil
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish()
+                }
+            }
+            
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
+    }
 }
+
