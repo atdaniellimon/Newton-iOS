@@ -164,7 +164,7 @@ public final class StorageManager: ObservableObject {
                     )
                     // Update local placeholder ID to server ID
                     if let idx = self.conversations.firstIndex(where: { $0.id == newConvo.id }) {
-                        var updated = self.conversations[idx]
+                        let updated = self.conversations[idx]
                         self.conversations.remove(at: idx)
                         let synced = Conversation(
                             id: remote.id,

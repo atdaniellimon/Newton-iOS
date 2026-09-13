@@ -9,7 +9,7 @@
 import Foundation
 
 public struct Conversation: Identifiable, Codable, Equatable, Hashable {
-    public let id: String
+    public var id: String
     public var title: String
     public var messages: [Message]
     public var isPinned: Bool
