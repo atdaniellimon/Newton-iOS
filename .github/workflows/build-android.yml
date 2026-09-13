@@ -36,6 +36,9 @@ jobs:
           unzip -q /tmp/gradle.zip -d /tmp
           echo "/tmp/gradle-8.7/bin" >> "$GITHUB_PATH"
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Run shared tests
         working-directory: android
         run: gradle :shared:test --console=plain

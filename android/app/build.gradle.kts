@@ -57,4 +57,6 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.datastore)
     implementation(libs.security.crypto)
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
 }

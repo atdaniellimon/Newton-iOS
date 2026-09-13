@@ -3,84 +3,131 @@ package ai.newton.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import ai.newton.android.chat.ChatViewModel
+import ai.newton.android.data.ConversationStore
+import ai.newton.android.data.SettingsRepository
 import ai.newton.android.theme.NewtonTheme
+import ai.newton.android.ui.chat.ChatScreen
+import ai.newton.android.ui.drawer.NewtonDrawerContent
+import ai.newton.android.ui.remote.DesktopRemoteControlScreen
+import ai.newton.android.ui.remote.RemoteControlViewModel
+import ai.newton.android.ui.settings.SettingsScreen
+import kotlinx.coroutines.launch
 
-/**
- * Entry point. Deep links mirror iOS (`newton://new`, `newton://ghost`,
- * `newton://voice`); full NavGraph + chat UI arrive in the chat milestone.
- */
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val deepLinkHost = intent?.data?.host
+
+        val store = ConversationStore(applicationContext)
+        val settings = SettingsRepository(applicationContext)
+
         setContent {
             NewtonTheme(darkTheme = true) {
-                NewtonScaffoldScreen(deepLinkHost = deepLinkHost)
-            }
-        }
-    }
-}
-
-@Composable
-fun NewtonScaffoldScreen(deepLinkHost: String? = null) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "Newton",
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Android scaffold listo — el chat llega en el siguiente milestone.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (deepLinkHost != null) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Deep link: newton://$deepLinkHost",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                NewtonApp(
+                    store = store,
+                    settings = settings,
+                    deepLinkHost = deepLinkHost,
                 )
             }
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = "Ya cableado: modelos, SSE, OrbitEngine, tema Everforest & Sand.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-private fun NewtonScaffoldPreview() {
-    NewtonTheme(darkTheme = true) {
-        NewtonScaffoldScreen(deepLinkHost = "new")
+fun NewtonApp(
+    store: ConversationStore,
+    settings: SettingsRepository,
+    deepLinkHost: String? = null,
+) {
+    val navController = rememberNavController()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    val chatViewModel = remember { ChatViewModel(store, settings) }
+    val remoteViewModel = remember { RemoteControlViewModel(settings) }
+
+    val chatUiState by chatViewModel.ui.collectAsState()
+
+    LaunchedEffect(deepLinkHost) {
+        when (deepLinkHost) {
+            "new" -> chatViewModel.newConversation()
+            "remote" -> navController.navigate("remote")
+            "settings" -> navController.navigate("settings")
+        }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            NewtonDrawerContent(
+                store = store,
+                currentConversationId = chatUiState.conversation?.id,
+                onSelectConversation = { id ->
+                    chatViewModel.open(id)
+                    scope.launch { drawerState.close() }
+                    navController.navigate("chat") {
+                        popUpTo("chat") { inclusive = true }
+                    }
+                },
+                onNewConversation = {
+                    chatViewModel.newConversation()
+                    scope.launch { drawerState.close() }
+                    navController.navigate("chat") {
+                        popUpTo("chat") { inclusive = true }
+                    }
+                },
+                onOpenRemoteStudio = {
+                    scope.launch { drawerState.close() }
+                    navController.navigate("remote")
+                },
+                onOpenSettings = {
+                    scope.launch { drawerState.close() }
+                    navController.navigate("settings")
+                },
+            )
+        },
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = "chat",
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            composable("chat") {
+                ChatScreen(
+                    viewModel = chatViewModel,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                )
+            }
+
+            composable("remote") {
+                DesktopRemoteControlScreen(
+                    viewModel = remoteViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable("settings") {
+                SettingsScreen(
+                    settings = settings,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
     }
 }
