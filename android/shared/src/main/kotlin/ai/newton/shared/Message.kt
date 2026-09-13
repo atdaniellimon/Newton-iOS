@@ -27,7 +27,20 @@ data class OrbitExecutionResult(
     val params: String = "",
     val result: String = "",
     val isSuccess: Boolean = true,
-)
+) {
+    constructor(
+        orbitName: String,
+        params: String,
+        result: String,
+        isSuccess: Boolean = true,
+    ) : this(
+        id = UUID.randomUUID().toString(),
+        orbitName = orbitName,
+        params = params,
+        result = result,
+        isSuccess = isSuccess,
+    )
+}
 
 /**
  * Mirrors Swift `Message`.
