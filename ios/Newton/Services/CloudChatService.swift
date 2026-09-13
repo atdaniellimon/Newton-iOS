@@ -345,6 +345,9 @@ public final class CloudChatService: ObservableObject {
                                     }
                                     
                                     if let done = json["done"] as? Bool, done {
+                                        if let reply = json["reply"] as? String, !reply.isEmpty {
+                                            continuation.yield(reply)
+                                        }
                                         continuation.finish()
                                         return
                                     }

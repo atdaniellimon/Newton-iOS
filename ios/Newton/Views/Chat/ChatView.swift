@@ -464,6 +464,9 @@ public struct ChatView: View {
     
     @MainActor
     private func handlePeerEvent(_ ev: ChatPeerEvent) {
+        // If this client is actively streaming a response, ignore peer events for the same chat to avoid race conditions
+        guard !isStreaming else { return }
+        
         switch ev.event {
         case .messageNew:
             if let msgId = ev.messageId, !conversation.messages.contains(where: { $0.id == msgId }) {
@@ -637,7 +640,6 @@ public struct ChatView: View {
                 let stream: AsyncThrowingStream<String, Error>
                 if !conversation.isGhost && AuthManager.shared.isLoggedIn {
                     var targetChatId = conversation.id
-                    // If the chat ID is a local UUID (not yet chat_... or from server), ensure it is created first
                     if !targetChatId.hasPrefix("chat_") {
                         do {
                             let remote = try await CloudChatService.shared.createChat(
@@ -647,18 +649,12 @@ public struct ChatView: View {
                             targetChatId = remote.id
                             await MainActor.run {
                                 let oldId = conversation.id
-                                conversation = Conversation(
-                                    id: remote.id,
-                                    title: conversation.title,
-                                    messages: conversation.messages,
-                                    isPinned: conversation.isPinned,
-                                    isGhost: false,
-                                    modelId: conversation.modelId,
-                                    createdAt: conversation.createdAt,
-                                    updatedAt: remote.updatedAt
-                                )
+                                conversation.id = remote.id
+                                conversation.updatedAt = remote.updatedAt
                                 storage.deleteConversation(id: oldId)
-                                storage.conversations.insert(conversation, at: 0)
+                                if !storage.conversations.contains(where: { $0.id == remote.id }) {
+                                    storage.conversations.insert(conversation, at: 0)
+                                }
                                 storage.sortConversations()
                                 storage.saveConversations()
                             }
@@ -786,10 +782,11 @@ public struct ChatView: View {
     
     @MainActor
     private func updateLiveStreamingMessage(id: String, content: String, thinking: String) {
-        guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else { return }
+        let index = conversation.messages.firstIndex(where: { $0.id == id }) ?? (conversation.messages.indices.last)
+        guard let idx = index else { return }
         var msgs = conversation.messages
-        msgs[index].content = content
-        msgs[index].thinkingContent = thinking.isEmpty ? nil : thinking
+        msgs[idx].content = content
+        msgs[idx].thinkingContent = thinking.isEmpty ? nil : thinking
         conversation.messages = msgs
     }
 
@@ -802,11 +799,12 @@ public struct ChatView: View {
         currentThinking: String,
         thinkingContent: String?
     ) {
-        if let index = conversation.messages.firstIndex(where: { $0.id == id }) {
+        let index = conversation.messages.firstIndex(where: { $0.id == id }) ?? (conversation.messages.indices.last)
+        if let idx = index {
             var msgs = conversation.messages
-            msgs[index].content = finalContent
-            msgs[index].imageUrl = imageUrl
-            msgs[index].orbitResults = orbitResults
+            msgs[idx].content = finalContent
+            msgs[idx].imageUrl = imageUrl
+            msgs[idx].orbitResults = orbitResults
             let liveTrim = currentThinking.trimmingCharacters(in: .whitespacesAndNewlines)
             let engTrim = (thinkingContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let mergedThinking: String
@@ -815,8 +813,8 @@ public struct ChatView: View {
             else if engTrim.contains(liveTrim) { mergedThinking = engTrim }
             else if liveTrim.contains(engTrim) { mergedThinking = liveTrim }
             else { mergedThinking = liveTrim + "\n\n---\n\n" + engTrim }
-            msgs[index].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
-            msgs[index].isStreaming = false
+            msgs[idx].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
+            msgs[idx].isStreaming = false
             conversation.messages = msgs
         }
         
