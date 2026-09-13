@@ -47,6 +47,7 @@ public struct ChatView: View {
     @State private var showFileImporter: Bool = false
     @State private var showVoiceCall: Bool = false
     @State private var exportFileUrl: URL? = nil
+    @State private var activeChatPeerTask: Task<Void, Never>? = nil
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
@@ -113,7 +114,7 @@ public struct ChatView: View {
                                 HStack(spacing: 12) {
                                     ThinkingOrbView(size: 32, style: .globe)
                                     
-                                    Text("Newton is reasoning...")
+                                    Text(L10n.tr("Newton is reasoning...", es: "Newton está razonando..."))
                                         .font(.system(size: 14, weight: .medium, design: .serif))
                                         .foregroundColor(NewtonTheme.sand)
                                     
@@ -199,7 +200,7 @@ public struct ChatView: View {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 13))
                             .foregroundColor(NewtonTheme.coralRed)
-                        Text("Session ended by Newton.")
+                        Text(L10n.tr("Session ended by Newton.", es: "Sesión finalizada por Newton."))
                             .font(.system(size: 13, weight: .semibold, design: .serif))
                             .foregroundColor(NewtonTheme.textSecondary)
                     }
@@ -415,6 +416,99 @@ public struct ChatView: View {
                 print("File import error: \(error)")
             }
         }
+        .onAppear {
+            loadCloudMessagesIfNeeded()
+            startListeningToPeerEvents()
+        }
+        .onDisappear {
+            stopListeningToPeerEvents()
+        }
+    }
+    
+    private func loadCloudMessagesIfNeeded() {
+        guard !conversation.isGhost, AuthManager.shared.isLoggedIn, conversation.messages.isEmpty else { return }
+        Task {
+            do {
+                let msgs = try await CloudChatService.shared.fetchMessages(chatId: conversation.id)
+                await MainActor.run {
+                    if conversation.messages.isEmpty && !msgs.isEmpty {
+                        conversation.messages = msgs
+                        storage.updateConversation(conversation)
+                    }
+                }
+            } catch {
+                print("Failed to fetch cloud messages: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func startListeningToPeerEvents() {
+        guard !conversation.isGhost, AuthManager.shared.isLoggedIn else { return }
+        stopListeningToPeerEvents()
+        
+        activeChatPeerTask = Task {
+            let stream = CloudChatService.shared.streamChatEvents(chatId: conversation.id)
+            for await ev in stream {
+                guard !Task.isCancelled else { break }
+                await MainActor.run {
+                    handlePeerEvent(ev)
+                }
+            }
+        }
+    }
+    
+    private func stopListeningToPeerEvents() {
+        activeChatPeerTask?.cancel()
+        activeChatPeerTask = nil
+    }
+    
+    @MainActor
+    private func handlePeerEvent(_ ev: ChatPeerEvent) {
+        switch ev.event {
+        case .messageNew:
+            if let msgId = ev.messageId, !conversation.messages.contains(where: { $0.id == msgId }) {
+                let role: MessageRole = (ev.role?.lowercased() == "user") ? .user : .assistant
+                let msg = Message(
+                    id: msgId,
+                    role: role,
+                    content: ev.content ?? "",
+                    createdAt: Date(),
+                    isStreaming: false
+                )
+                conversation.messages.append(msg)
+                storage.updateConversation(conversation)
+            }
+        case .aiStart:
+            if let msgId = ev.messageId, !conversation.messages.contains(where: { $0.id == msgId }) {
+                let placeholder = Message(
+                    id: msgId,
+                    role: .assistant,
+                    content: "",
+                    createdAt: Date(),
+                    isStreaming: true
+                )
+                conversation.messages.append(placeholder)
+            }
+        case .aiDelta:
+            if let msgId = ev.messageId, let delta = ev.delta {
+                if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
+                    conversation.messages[idx].content += delta
+                }
+            }
+        case .aiDone:
+            if let msgId = ev.messageId {
+                if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
+                    conversation.messages[idx].isStreaming = false
+                    storage.updateConversation(conversation)
+                }
+            }
+        case .chatUpdated:
+            break
+        case .chatDeleted:
+            break
+        case .unknown:
+            break
+        }
     }
     
     private var isTerminated: Bool {
@@ -540,11 +634,25 @@ public struct ChatView: View {
             }
 
             do {
-                let stream = LLMService.shared.streamCompletion(
-                    messages: messagesToSend,
-                    modelId: conversation.modelId,
-                    systemPrompt: systemPrompt
-                )
+                let stream: AsyncThrowingStream<String, Error>
+                if !conversation.isGhost && AuthManager.shared.isLoggedIn {
+                    var nwtnAttachments: [NWTNAttachment] = []
+                    if let img = imgBase64DataUrl {
+                        nwtnAttachments.append(NWTNAttachment(type: "image", data: img, name: "image.jpg"))
+                    }
+                    stream = CloudChatService.shared.streamChatMessage(
+                        chatId: conversation.id,
+                        prompt: backendPayloadPrompt,
+                        model: conversation.modelId,
+                        attachments: nwtnAttachments
+                    )
+                } else {
+                    stream = LLMService.shared.streamCompletion(
+                        messages: messagesToSend,
+                        modelId: conversation.modelId,
+                        systemPrompt: systemPrompt
+                    )
+                }
                 
                 for try await token in stream {
                     guard !Task.isCancelled else { break }

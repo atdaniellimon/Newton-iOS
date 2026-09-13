@@ -63,6 +63,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 			A10059 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10059 /* AuthView.swift */; };
 		A10060 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10060 /* LocalizationManager.swift */; };
 		A10061 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10061 /* Localizable.strings */; };
+		A10064 /* CloudChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10064 /* CloudChatService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -125,6 +126,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 		B10060 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
 		B10062 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B10063 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B10064 /* CloudChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudChatService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -202,6 +204,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 				B10044 /* MemoryManager.swift */,
 				B10045 /* EndpointSyncService.swift */,
 				B10052 /* WorkspaceManager.swift */,
+				B10064 /* CloudChatService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -434,6 +437,7 @@ A10058 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1005
 				A10056 /* ShareableCardGenerator.swift in Sources */,
 				A10057 /* WorkspaceListView.swift in Sources */,
 				A10060 /* LocalizationManager.swift in Sources */,
+				A10064 /* CloudChatService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

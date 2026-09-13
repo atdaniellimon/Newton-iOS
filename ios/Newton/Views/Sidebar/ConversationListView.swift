@@ -11,6 +11,7 @@ import SwiftUI
 public struct ConversationListView: View {
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var settings = SettingsManager.shared
+    @ObservedObject var loc = LocalizationManager.shared
     
     @Binding public var selectedConversationId: String?
     public var onSelectConversation: ((String) -> Void)? = nil
@@ -61,29 +62,29 @@ public struct ConversationListView: View {
                 
                 // Studio Section Navigation Items (Chats, Ghost, Workspaces, Art gallery)
                 VStack(spacing: 4) {
-                    SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
+                    SidebarItemRow(icon: "bubble.left.and.bubble.right", title: L10n.tr("Chats", es: "Chats"), isSelected: true)
                     
                     Button {
                         Haptics.medium()
-                        let ghost = storage.createGhostConversation()
+                        let ghost = storage.createGhostConversation(title: L10n.tr("Ghost Session", es: "Sesión Fantasma"))
                         selectedConversationId = ghost.id
                         onSelectConversation?(ghost.id)
                     } label: {
-                        SidebarItemRow(icon: "ghost", title: "Ghost Session", isSelected: false)
+                        SidebarItemRow(icon: "ghost", title: L10n.tr("Ghost Session", es: "Sesión Fantasma"), isSelected: false)
                     }
                     
                     Button {
                         Haptics.light()
                         showWorkspaces = true
                     } label: {
-                        SidebarItemRow(icon: "folder.fill", title: "Workspaces", isSelected: false)
+                        SidebarItemRow(icon: "folder.fill", title: L10n.tr("Workspaces", es: "Espacios de trabajo"), isSelected: false)
                     }
                     
                     Button {
                         Haptics.light()
                         showArtGallery = true
                     } label: {
-                        SidebarItemRow(icon: "cube.transparent", title: "Art gallery", isSelected: false)
+                        SidebarItemRow(icon: "cube.transparent", title: L10n.tr("Art gallery", es: "Galería de arte"), isSelected: false)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -91,7 +92,7 @@ public struct ConversationListView: View {
                 
                 // "Recents" Section Header
                 HStack {
-                    Text("Recents")
+                    Text(L10n.tr("Recents", es: "Recientes"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(NewtonTheme.textMuted)
                     Spacer()
@@ -134,40 +135,43 @@ public struct ConversationListView: View {
                         .listRowSeparator(.hidden)
                         .swipeActions(edge: .leading) {
                             Button {
-                                Haptics.light()
-                                storage.togglePin(id: convo.id)
+                                 Haptics.light()
+                                 storage.togglePin(id: convo.id)
                             } label: {
-                                Label(convo.isPinned ? "Unpin" : "Pin", systemImage: convo.isPinned ? "pin.slash.fill" : "pin.fill")
+                                 Label(convo.isPinned ? L10n.tr("Unpin", es: "Desfijar") : L10n.tr("Pin", es: "Fijar"), systemImage: convo.isPinned ? "pin.slash.fill" : "pin.fill")
                             }
                             .tint(NewtonTheme.sand)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                Haptics.medium()
-                                storage.deleteConversation(id: convo.id)
+                                 Haptics.medium()
+                                 storage.deleteConversation(id: convo.id)
                             } label: {
-                                Label("Delete", systemImage: "trash.fill")
+                                 Label(L10n.tr("Delete", es: "Eliminar"), systemImage: "trash.fill")
                             }
                         }
                         .contextMenu {
                             Button {
-                                Haptics.light()
-                                storage.togglePin(id: convo.id)
+                                 Haptics.light()
+                                 storage.togglePin(id: convo.id)
                             } label: {
-                                Label(convo.isPinned ? "Unpin Chat" : "Pin Chat", systemImage: convo.isPinned ? "pin.slash" : "pin")
+                                 Label(convo.isPinned ? L10n.tr("Unpin Chat", es: "Desfijar chat") : L10n.tr("Pin Chat", es: "Fijar chat"), systemImage: convo.isPinned ? "pin.slash" : "pin")
                             }
                             
                             Button(role: .destructive) {
-                                Haptics.medium()
-                                storage.deleteConversation(id: convo.id)
+                                 Haptics.medium()
+                                 storage.deleteConversation(id: convo.id)
                             } label: {
-                                Label("Delete Chat", systemImage: "trash")
+                                 Label(L10n.tr("Delete Chat", es: "Eliminar chat"), systemImage: "trash")
                             }
                         }
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .refreshable {
+                    await storage.syncWithRemoteServer()
+                }
                 
                 Divider()
                     .background(NewtonTheme.border)
@@ -195,7 +199,7 @@ public struct ConversationListView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 13, weight: .bold))
-                            Text("New chat")
+                            Text(L10n.tr("New chat", es: "Nuevo chat"))
                                 .font(.system(size: 14, weight: .semibold))
                         }
                         .foregroundColor(Color.white)
@@ -224,7 +228,7 @@ public struct ConversationListView: View {
     
     private func createNewChat() {
         Haptics.light()
-        let newConvo = storage.createConversation()
+        let newConvo = storage.createConversation(title: L10n.tr("New Conversation", es: "Nueva Conversación"))
         selectedConversationId = newConvo.id
         onSelectConversation?(newConvo.id)
     }

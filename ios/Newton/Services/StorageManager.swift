@@ -4,9 +4,11 @@
 //
 //  Created for Newton iOS.
 //  Local JSON & iCloud Ubiquitous Key-Value synchronization with Ephemeral Ghost Mode support.
+//  Fully integrated with Newton Labs Gateway v2.2.0 Cloud Chat API (/nwtn/chats & /nwtn/sync/events).
 //
 
 import Foundation
+import Combine
 
 public final class StorageManager: ObservableObject {
     public static let shared = StorageManager()
@@ -21,9 +23,13 @@ public final class StorageManager: ObservableObject {
         return docs.appendingPathComponent(conversationsFileName)
     }
     
+    private var cancellables = Set<AnyCancellable>()
+    
     private init() {
         loadConversations()
         setupCloudObserver()
+        setupAuthObserver()
+        setupGlobalSyncListener()
     }
     
     private func setupCloudObserver() {
@@ -37,11 +43,128 @@ public final class StorageManager: ObservableObject {
         NSUbiquitousKeyValueStore.default.synchronize()
     }
     
+    private func setupAuthObserver() {
+        // When user logs in, pull remote cloud chats
+        AuthManager.shared.$isLoggedIn
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] loggedIn in
+                guard let self = self else { return }
+                if loggedIn {
+                    Task { @MainActor [weak self] in
+                        await self?.syncWithRemoteServer()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupGlobalSyncListener() {
+        CloudChatService.shared.startGlobalSyncListener { [weak self] event in
+            guard let self = self else { return }
+            self.handleRemoteSyncEvent(event)
+        }
+    }
+    
+    // MARK: - Server Synchronization
+    
+    @MainActor
+    public func syncWithRemoteServer() async {
+        guard AuthManager.shared.isLoggedIn else { return }
+        do {
+            let remoteChats = try await CloudChatService.shared.fetchChats()
+            // Keep local ghosts
+            let ghosts = self.conversations.filter { $0.isGhost }
+            
+            // Merge remote chats with local messages if available
+            var merged: [Conversation] = []
+            for rChat in remoteChats {
+                if let existing = self.conversations.first(where: { $0.id == rChat.id }) {
+                    var updated = rChat
+                    // Preserve already loaded local messages
+                    if !existing.messages.isEmpty {
+                        updated.messages = existing.messages
+                    }
+                    merged.append(updated)
+                } else {
+                    merged.append(rChat)
+                }
+            }
+            
+            self.conversations = ghosts + merged
+            sortConversations()
+            saveConversations()
+        } catch {
+            print("Remote cloud sync failed: \(error.localizedDescription)")
+        }
+    }
+    
+    private func handleRemoteSyncEvent(_ event: CloudSyncEvent) {
+        guard let chatId = event.chatId else { return }
+        
+        switch event.event {
+        case .chatCreated:
+            if !conversations.contains(where: { $0.id == chatId }) {
+                let newConvo = Conversation(
+                    id: chatId,
+                    title: event.title ?? "New Conversation",
+                    messages: [],
+                    isPinned: event.isPinned ?? false,
+                    isGhost: false,
+                    modelId: event.model ?? SettingsManager.shared.currentModelId,
+                    createdAt: Date(),
+                    updatedAt: event.updatedAt ?? Date()
+                )
+                conversations.insert(newConvo, at: 0)
+                sortConversations()
+                saveConversations()
+            }
+        case .chatUpdated:
+            if let idx = conversations.firstIndex(where: { $0.id == chatId }) {
+                if let title = event.title {
+                    conversations[idx].title = title
+                }
+                if let isPinned = event.isPinned {
+                    conversations[idx].isPinned = isPinned
+                }
+                if let model = event.model {
+                    conversations[idx].modelId = model
+                }
+                if let updated = event.updatedAt {
+                    conversations[idx].updatedAt = updated
+                }
+                sortConversations()
+                saveConversations()
+            }
+        case .chatDeleted:
+            conversations.removeAll(where: { $0.id == chatId })
+            saveConversations()
+        case .unknown:
+            break
+        }
+    }
+    
+    // MARK: - Conversation Lifecycle
+    
     public func createConversation(title: String = "New Conversation") -> Conversation {
         let newConvo = Conversation(title: title, messages: [])
         conversations.insert(newConvo, at: 0)
         sortConversations()
         saveConversations()
+        
+        // Asynchronously persist to remote cloud chat API
+        if AuthManager.shared.isLoggedIn {
+            Task {
+                do {
+                    _ = try await CloudChatService.shared.createChat(
+                        title: title,
+                        model: newConvo.modelId
+                    )
+                } catch {
+                    print("Failed to sync new chat to cloud API: \(error.localizedDescription)")
+                }
+            }
+        }
+        
         return newConvo
     }
 
@@ -74,6 +197,16 @@ public final class StorageManager: ObservableObject {
             sortConversations()
             if !convo.isGhost {
                 saveConversations()
+                if AuthManager.shared.isLoggedIn {
+                    Task {
+                        try? await CloudChatService.shared.updateChat(
+                            id: convo.id,
+                            title: convo.title,
+                            isPinned: convo.isPinned,
+                            model: convo.modelId
+                        )
+                    }
+                }
             }
         }
     }
@@ -81,21 +214,47 @@ public final class StorageManager: ObservableObject {
     public func togglePin(id: String) {
         if let index = conversations.firstIndex(where: { $0.id == id }) {
             conversations[index].isPinned.toggle()
+            let isPinned = conversations[index].isPinned
+            let isGhost = conversations[index].isGhost
             sortConversations()
-            if !conversations[index].isGhost {
+            if !isGhost {
                 saveConversations()
+                if AuthManager.shared.isLoggedIn {
+                    Task {
+                        try? await CloudChatService.shared.updateChat(
+                            id: id,
+                            isPinned: isPinned
+                        )
+                    }
+                }
             }
         }
     }
     
     public func deleteConversation(at offsets: IndexSet) {
+        let idsToDelete = offsets.map { conversations[$0].id }
         conversations.remove(atOffsets: offsets)
         saveConversations()
+        
+        if AuthManager.shared.isLoggedIn {
+            for id in idsToDelete {
+                Task {
+                    try? await CloudChatService.shared.deleteChat(id: id)
+                }
+            }
+        }
     }
     
     public func deleteConversation(id: String) {
+        let wasGhost = conversations.first(where: { $0.id == id })?.isGhost ?? false
         conversations.removeAll(where: { $0.id == id })
         saveConversations()
+        
+        if !wasGhost && AuthManager.shared.isLoggedIn {
+            Task {
+                try? await CloudChatService.shared.deleteChat(id: id)
+            }
+        }
     }
     
     public func sortConversations() {
