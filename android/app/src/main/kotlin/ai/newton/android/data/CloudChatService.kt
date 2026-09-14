@@ -299,7 +299,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
         val source = response.body?.source() ?: return@flow
         val reader = BufferedReader(InputStreamReader(source.inputStream()))
 
-        var line: String?
+        var line: String? = null
         while (reader.readLine().also { line = it } != null) {
             val trimmed = line!!.trim()
             if (trimmed.startsWith("data: ")) {
@@ -350,7 +350,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
                     val reader = BufferedReader(InputStreamReader(source.inputStream()))
 
                     var currentEventType: String? = null
-                    var line: String?
+                    var line: String? = null
                     while (isActive && reader.readLine().also { line = it } != null) {
                         val trimmed = line!!.trim()
                         if (trimmed.startsWith("event: ")) {
@@ -405,7 +405,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
         val reader = BufferedReader(InputStreamReader(source.inputStream()))
 
         var currentEventType: String? = null
-        var line: String?
+        var line: String? = null
         while (reader.readLine().also { line = it } != null) {
             val trimmed = line!!.trim()
             if (trimmed.startsWith("event: ")) {
@@ -511,7 +511,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
         val reader = BufferedReader(InputStreamReader(source.inputStream()))
 
         var currentEventType: String? = null
-        var line: String?
+        var line: String? = null
         while (reader.readLine().also { line = it } != null) {
             val trimmed = line!!.trim()
             if (trimmed.startsWith("event: ")) {
