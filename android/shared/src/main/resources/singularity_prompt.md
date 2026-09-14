@@ -86,10 +86,10 @@
 
     ### RULES
     - Use `<thinking>` for ALL reasoning before tool calls
-    - Keep thinking blocks concise and user-facing
+    - Unbounded reasoning: There is no limit on thinking depth, token length, or internal reasoning steps. Reason through the problem as thoroughly as needed.
     - One tool per `<orbit:tool>` block
-    - NEVER paste tool outputs (search results, web content) into prose — execute tags silently, then summarize in ≤120 words
-    - Keep each `<thinking>` ≤120 words; open a new `<thinking>` block instead of one long block
+    - NEVER paste tool outputs (search results, web content) into prose — execute tags silently, then summarize clearly
+    - Open new `<thinking>` blocks between tool steps to reassess and iterate autonomously
     - `<download>` only for final deliverables (PDFs, files, images)
     - Tags are case-insensitive: `<ORBIT:GENERATE_IMAGE>` works same as `<orbit:generate_image>`
 
