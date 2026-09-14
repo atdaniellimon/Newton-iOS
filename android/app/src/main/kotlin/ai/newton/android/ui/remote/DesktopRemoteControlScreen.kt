@@ -82,11 +82,19 @@ import java.io.BufferedReader
 import java.util.concurrent.TimeUnit
 
 @Serializable
+data class RemoteWorkspaceChat(
+    val id: String,
+    val title: String,
+    val created_at: Long? = null,
+)
+
+@Serializable
 data class RemoteWorkspaceItem(
     val name: String,
     val path: String,
     val hasGit: Boolean? = null,
     val branch: String? = null,
+    val chats: List<RemoteWorkspaceChat> = emptyList(),
 )
 
 @Serializable
@@ -110,6 +118,7 @@ data class RemoteUiState(
     val status: RemoteDesktopStatus? = null,
     val workspaces: List<RemoteWorkspaceItem> = emptyList(),
     val selectedWorkspace: RemoteWorkspaceItem? = null,
+    val selectedChat: RemoteWorkspaceChat? = null,
     val isExecuting: Boolean = false,
     val steps: List<RemoteStepEvent> = emptyList(),
     val finalAnswer: String? = null,
@@ -137,7 +146,14 @@ class RemoteControlViewModel(
     }
 
     fun selectWorkspace(ws: RemoteWorkspaceItem) {
-        _ui.value = _ui.value.copy(selectedWorkspace = ws)
+        _ui.value = _ui.value.copy(
+            selectedWorkspace = ws,
+            selectedChat = ws.chats.firstOrNull(),
+        )
+    }
+
+    fun selectChat(chat: RemoteWorkspaceChat?) {
+        _ui.value = _ui.value.copy(selectedChat = chat)
     }
 
     fun refresh() {
@@ -195,13 +211,16 @@ class RemoteControlViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val baseUrl = settings.effectiveBaseUrl(AIProvider.OPENAI_COMPATIBLE)
-                val payload = json.encodeToString(
-                    mapOf(
-                        "workspacePath" to ws.path,
-                        "task" to task,
-                        "model" to "Singularity-Matrix",
-                    ),
+                val selectedChatId = _ui.value.selectedChat?.id
+                val payloadMap = mutableMapOf<String, String>(
+                    "workspacePath" to ws.path,
+                    "task" to task,
+                    "model" to "Singularity-Matrix",
                 )
+                if (selectedChatId != null) {
+                    payloadMap["chatId"] = selectedChatId
+                }
+                val payload = json.encodeToString(payloadMap)
                 val body = payload.toRequestBody("application/json".toMediaType())
                 val req = Request.Builder()
                     .url("$baseUrl/nwtn/desktop/dispatch")
@@ -519,6 +538,120 @@ fun DesktopRemoteControlScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Workspace Chats section
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "SESIONES DE CÓDIGO (CHATS)",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        ),
+                        color = NewtonColors.TextMutedDark,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .clickable { viewModel.selectChat(null) }
+                            .padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = if (uiState.selectedChat == null) NewtonColors.Sand else NewtonColors.TextMutedDark,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "Nueva tarea",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (uiState.selectedChat == null) NewtonColors.Sand else NewtonColors.TextMutedDark,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val currentChats = uiState.selectedWorkspace?.chats.orEmpty()
+                if (currentChats.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NewtonColors.CardDark)
+                            .border(1.dp, NewtonColors.BorderDark, RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                    ) {
+                        Text(
+                            text = "No hay tareas previas. Escribe tu primera orden abajo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NewtonColors.TextMutedDark,
+                        )
+                    }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item {
+                            val isNewSelected = uiState.selectedChat == null
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isNewSelected) NewtonColors.Sand.copy(alpha = 0.18f) else NewtonColors.CardDark)
+                                    .border(
+                                        1.dp,
+                                        if (isNewSelected) NewtonColors.Sand.copy(alpha = 0.6f) else NewtonColors.BorderDark,
+                                        RoundedCornerShape(8.dp),
+                                    )
+                                    .clickable { viewModel.selectChat(null) }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = if (isNewSelected) NewtonColors.Sand else NewtonColors.TextMutedDark,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Nueva sesión",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = if (isNewSelected) NewtonColors.Sand else NewtonColors.TextMutedDark,
+                                    )
+                                }
+                            }
+                        }
+
+                        items(currentChats) { chat ->
+                            val isChatSelected = uiState.selectedChat?.id == chat.id
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isChatSelected) NewtonColors.Sand.copy(alpha = 0.15f) else NewtonColors.CardDark)
+                                    .border(
+                                        1.dp,
+                                        if (isChatSelected) NewtonColors.Sand.copy(alpha = 0.5f) else NewtonColors.BorderDark,
+                                        RoundedCornerShape(8.dp),
+                                    )
+                                    .clickable { viewModel.selectChat(chat) }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                            ) {
+                                Text(
+                                    text = chat.title,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                    color = if (isChatSelected) NewtonColors.TextPrimaryDark else NewtonColors.TextMutedDark,
+                                    maxLines = 1,
+                                )
                             }
                         }
                     }

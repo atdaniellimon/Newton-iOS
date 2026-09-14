@@ -564,12 +564,20 @@ public final class CloudChatService: ObservableObject {
         public let active_workspace: String?
     }
     
+    public struct RemoteWorkspaceChat: Codable, Identifiable {
+        public let id: String
+        public let title: String
+        public let created_at: Double?
+        public let messages: [[String: String]]?
+    }
+    
     public struct RemoteWorkspaceItem: Codable, Identifiable {
         public var id: String { path }
         public let name: String
         public let path: String
         public let hasGit: Bool?
         public let branch: String?
+        public let chats: [RemoteWorkspaceChat]?
     }
     
     public struct RemoteWorkspacesResponse: Codable {
@@ -580,6 +588,7 @@ public final class CloudChatService: ObservableObject {
     public struct RemoteDispatchResponse: Codable {
         public let success: Bool
         public let sessionId: String?
+        public let chatId: String?
         public let status: String?
         public let message: String?
     }
@@ -612,12 +621,15 @@ public final class CloudChatService: ObservableObject {
         return decoded.workspaces ?? []
     }
     
-    public func dispatchDesktopCommand(workspacePath: String, task: String, model: String = "Singularity-Matrix") async throws -> RemoteDispatchResponse {
-        let body: [String: Any] = [
+    public func dispatchDesktopCommand(workspacePath: String, chatId: String? = nil, task: String, model: String = "Singularity-Matrix") async throws -> RemoteDispatchResponse {
+        var body: [String: Any] = [
             "workspacePath": workspacePath,
             "task": task,
             "model": model
         ]
+        if let cId = chatId {
+            body["chatId"] = cId
+        }
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         let req = try makeRequest(endpoint: "/nwtn/desktop/dispatch", method: "POST", body: bodyData)
         let (data, response) = try await URLSession.shared.data(for: req)

@@ -15,6 +15,7 @@ public struct DesktopRemoteControlView: View {
     @State private var status: CloudChatService.RemoteDesktopStatus? = nil
     @State private var workspaces: [CloudChatService.RemoteWorkspaceItem] = []
     @State private var selectedWorkspace: CloudChatService.RemoteWorkspaceItem? = nil
+    @State private var selectedChat: CloudChatService.RemoteWorkspaceChat? = nil
     @State private var taskPrompt: String = ""
     @State private var isExecuting: Bool = false
     @State private var activeSessionId: String? = nil
@@ -49,6 +50,9 @@ public struct DesktopRemoteControlView: View {
                             VStack(alignment: .leading, spacing: 18) {
                                 // Workspaces Picker Section
                                 workspacesSection
+                                
+                                // Workspace Chats Picker Section
+                                workspaceChatsSection
                                 
                                 // Quick Action Chips (if idle)
                                 if !isExecuting && steps.isEmpty {
@@ -209,6 +213,7 @@ public struct DesktopRemoteControlView: View {
                             Button {
                                 Haptics.selection()
                                 selectedWorkspace = ws
+                                selectedChat = ws.chats?.first
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 6) {
@@ -238,6 +243,100 @@ public struct DesktopRemoteControlView: View {
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
                                         .stroke(isSelected ? NewtonTheme.sand.opacity(0.5) : NewtonTheme.border, lineWidth: 1)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Workspace Chats Picker
+    private var workspaceChatsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("SESIONES DE CÓDIGO (CHATS)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(NewtonTheme.textMuted)
+                
+                Spacer()
+                
+                Button {
+                    Haptics.light()
+                    selectedChat = nil
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 12))
+                        Text("Nueva tarea")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(selectedChat == nil ? NewtonTheme.sand : NewtonTheme.textMuted)
+                }
+            }
+            
+            let chats = selectedWorkspace?.chats ?? []
+            if chats.isEmpty {
+                HStack {
+                    Image(systemName: "text.bubble")
+                        .foregroundColor(NewtonTheme.textMuted)
+                    Text("No hay tareas previas. Escribe tu primera orden abajo.")
+                        .font(.system(size: 12))
+                        .foregroundColor(NewtonTheme.textMuted)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NewtonTheme.card)
+                .cornerRadius(10)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // "Nueva Tarea" chip
+                        Button {
+                            Haptics.selection()
+                            selectedChat = nil
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Nueva sesión")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(selectedChat == nil ? NewtonTheme.sand.opacity(0.18) : NewtonTheme.card)
+                            .foregroundColor(selectedChat == nil ? NewtonTheme.sand : NewtonTheme.textMuted)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(selectedChat == nil ? NewtonTheme.sand.opacity(0.6) : NewtonTheme.border, lineWidth: 1)
+                            )
+                        }
+                        
+                        ForEach(chats) { chat in
+                            let isChatSelected = (selectedChat?.id == chat.id)
+                            Button {
+                                Haptics.selection()
+                                selectedChat = chat
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(isChatSelected ? NewtonTheme.sand : NewtonTheme.textMuted)
+                                    
+                                    Text(chat.title)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(isChatSelected ? NewtonTheme.textPrimary : NewtonTheme.textMuted)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(isChatSelected ? NewtonTheme.sand.opacity(0.15) : NewtonTheme.card)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(isChatSelected ? NewtonTheme.sand.opacity(0.5) : NewtonTheme.border, lineWidth: 1)
                                 )
                             }
                         }
@@ -493,6 +592,7 @@ public struct DesktopRemoteControlView: View {
         do {
             let res = try await CloudChatService.shared.dispatchDesktopCommand(
                 workspacePath: ws.path,
+                chatId: selectedChat?.id,
                 task: promptToSend,
                 model: "Singularity-Matrix"
             )
