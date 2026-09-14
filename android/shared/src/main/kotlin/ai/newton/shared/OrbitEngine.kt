@@ -169,9 +169,12 @@ class OrbitEngine(
         if (detectedImageUrl == null && !alreadyImage) {
             val lowerPrompt = userPrompt.lowercase()
             val keywords = listOf(
-                "genera una imagen", "generame una imagen", "crea una imagen",
-                "haz una imagen", "dibuja", "draw", "generate an image",
-                "create an image", "make an image", "generate a picture", "/imagine",
+                "genera una imagen", "generame una imagen", "genérame una imagen",
+                "crea una imagen", "creame una imagen", "créame una imagen",
+                "haz una imagen", "hazme una imagen",
+                "dibuja", "dibújame", "dibujame", "pinta", "píntame", "pintame",
+                "draw", "generate an image", "generate a picture", "create an image",
+                "make an image", "picture of", "image of", "/imagine",
             )
             if (keywords.any { lowerPrompt.contains(it) } || lowerPrompt.startsWith("imagine")) {
                 val cleanPrompt = userPrompt.replace("\"", " ").replace("\n", " ")

@@ -299,11 +299,12 @@ class ChatViewModel(
                 }
 
                 // Run Orbit post-processing (image generation, web citation, calculations)
+                val orbitApiKey = auth.nwtnKey.ifEmpty { settings.getApiKey(updatedConvo.provider) }
                 val processed = orbits.processOrbitsInText(
                     rawStream,
                     userPrompt = displayPrompt,
                     baseUrl = AuthManager.API_BASE_URL + "/nwtn",
-                    apiKey = auth.nwtnKey,
+                    apiKey = orbitApiKey,
                 )
                 val mergedThinking = mergeThinking(thinking, processed.thinkingContent.orEmpty())
 

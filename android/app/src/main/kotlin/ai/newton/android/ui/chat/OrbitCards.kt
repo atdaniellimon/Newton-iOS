@@ -124,7 +124,8 @@ fun OrbitCard(
 
         if (orbit.result.isNotBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
-            if (orbit.orbitName.lowercase() in listOf("generate_image", "image") && (orbit.result.startsWith("http") || orbit.result.startsWith("data:image/"))) {
+            val isImageOrbit = orbit.orbitName.lowercase() in listOf("generate_image", "image_gen", "image", "imagine", "draw")
+            if (isImageOrbit && (orbit.result.startsWith("http") || orbit.result.startsWith("data:image/"))) {
                 coil.compose.AsyncImage(
                     model = orbit.result,
                     contentDescription = "Generated Image",

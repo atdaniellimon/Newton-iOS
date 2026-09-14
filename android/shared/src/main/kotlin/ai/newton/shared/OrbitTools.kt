@@ -74,28 +74,68 @@ open class JvmOrbitTools(
         val clean = prompt.trim()
         if (clean.isEmpty()) return ""
         var activeBase = baseUrl.trim()
-        if (activeBase.isEmpty()) activeBase = "http://127.0.0.1:8765/v1"
-        val cleanBase = activeBase.trim('/')
+        if (activeBase.isEmpty()) activeBase = "https://api.newton.daniellimon.uk/nwtn"
+        val cleanBase = activeBase.trimEnd('/')
+        val isNewton = cleanBase.contains("newton", ignoreCase = true) || cleanBase.contains("/nwtn")
+
         val endpoint = when {
+            isNewton -> {
+                if (cleanBase.endsWith("/images")) cleanBase
+                else "$cleanBase/images"
+            }
             cleanBase.endsWith("/v1/images/generations") || cleanBase.endsWith("/images/generations") -> cleanBase
             cleanBase.endsWith("/v1") -> "$cleanBase/images/generations"
             else -> "$cleanBase/v1/images/generations"
         }
+
         return withContext(Dispatchers.IO) {
             try {
-                val body = """{"prompt":${jsonQuote(clean)},"n":1,"size":"1024x1024","model":"dall-e-3"}"""
-                    .toRequestBody("application/json; charset=utf-8".toMediaType())
+                val jsonPayload = if (isNewton) {
+                    """{"prompt":${jsonQuote(clean)},"n":1}"""
+                } else {
+                    """{"prompt":${jsonQuote(clean)},"n":1,"size":"1024x1024","model":"dall-e-3"}"""
+                }
+                val body = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaType())
                 val reqBuilder = Request.Builder().url(endpoint).post(body)
                     .header("Content-Type", "application/json")
-                if (apiKey.isNotEmpty()) reqBuilder.header("Authorization", "Bearer $apiKey")
+                    .header("User-Agent", "Newton-Android/2.2.0")
+
+                if (apiKey.isNotEmpty()) {
+                    reqBuilder.header("Authorization", "Bearer $apiKey")
+                    reqBuilder.header("x-api-key", apiKey)
+                }
+
                 client.newCall(reqBuilder.build()).execute().use { resp ->
                     if (!resp.isSuccessful) return@withContext ""
-                    val parsed = json.parseToJsonElement(resp.body?.string().orEmpty()).jsonObject
-                    val first = parsed["data"]?.jsonArray?.firstOrNull()?.jsonObject ?: return@withContext ""
-                    first["b64_json"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let {
-                        return@withContext "data:image/png;base64,$it"
+                    val responseStr = resp.body?.string().orEmpty()
+                    if (responseStr.isEmpty()) return@withContext ""
+                    val parsed = json.parseToJsonElement(responseStr).jsonObject
+
+                    // 1. Try Newton gateway format: {"images": [{"url": "..."}, {"b64_json": "..."}]}
+                    val newtonImages = parsed["images"]?.jsonArray
+                    val newtonFirst = newtonImages?.firstOrNull()?.jsonObject
+                    if (newtonFirst != null) {
+                        newtonFirst["url"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let {
+                            return@withContext it
+                        }
+                        newtonFirst["b64_json"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let {
+                            return@withContext "data:image/png;base64,$it"
+                        }
                     }
-                    first["url"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() } ?: ""
+
+                    // 2. Try standard OpenAI format: {"data": [{"url": "..."}, {"b64_json": "..."}]}
+                    val openAiData = parsed["data"]?.jsonArray
+                    val openAiFirst = openAiData?.firstOrNull()?.jsonObject
+                    if (openAiFirst != null) {
+                        openAiFirst["b64_json"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let {
+                            return@withContext "data:image/png;base64,$it"
+                        }
+                        openAiFirst["url"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }?.let {
+                            return@withContext it
+                        }
+                    }
+
+                    ""
                 }
             } catch (_: Exception) {
                 ""
