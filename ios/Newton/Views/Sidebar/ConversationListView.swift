@@ -349,150 +349,10 @@ public struct ConversationListView: View {
     private var remoteStudioProjectsView: some View {
         List {
             if remoteWorkspaces.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "macbook.and.iphone")
-                        .font(.system(size: 32))
-                        .foregroundColor(NewtonTheme.textMuted)
-                    
-                    Text(remoteStatus?.online == true
-                         ? L10n.tr("No workspaces open on host.", es: "No hay proyectos abiertos en el host.")
-                         : L10n.tr("Host is offline.", es: "El host está desconectado."))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(NewtonTheme.textSecondary)
-                    
-                    Text(L10n.tr("Open Newton on your Mac Desktop to sync your workspaces and project chats.",
-                                 es: "Abre Newton en tu Mac para sincronizar tus proyectos y chats de código."))
-                        .font(.system(size: 12))
-                        .foregroundColor(NewtonTheme.textMuted)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 16)
-                    
-                    Button {
-                        Haptics.light()
-                        loadRemoteStudioData()
-                    } label: {
-                        Text(L10n.tr("Check Connection", es: "Comprobar Conexión"))
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(NewtonTheme.sand)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(NewtonTheme.card)
-                            .clipShape(Capsule())
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                remoteEmptyView
             } else {
                 ForEach(remoteWorkspaces) { ws in
-                    let isExpanded = expandedWorkspacePaths.contains(ws.path)
-                    
-                    Section {
-                        // Project Workspace Header Row
-                        Button {
-                            Haptics.light()
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                if isExpanded {
-                                    expandedWorkspacePaths.remove(ws.path)
-                                } else {
-                                    expandedWorkspacePaths.insert(ws.path)
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: isExpanded ? "folder.fill" : "folder")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(NewtonTheme.sand)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(ws.name)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundColor(NewtonTheme.textPrimary)
-                                    
-                                    if let b = ws.branch, !b.isEmpty {
-                                        Text(b)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(NewtonTheme.textMuted)
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(NewtonTheme.textMuted)
-                            }
-                            .padding(.vertical, 6)
-                            .contentShape(Rectangle())
-                        }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        
-                        // Workspace Chats (when expanded)
-                        if isExpanded {
-                            // "Add chat to project" button
-                            Button {
-                                Haptics.light()
-                                openRemoteSession(workspace: ws, chat: nil)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "plus.bubble")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(NewtonTheme.sand)
-                                    
-                                    Text(L10n.tr("New chat in project", es: "Nuevo chat en proyecto"))
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundColor(NewtonTheme.sand)
-                                    
-                                    Spacer()
-                                }
-                                .padding(.leading, 24)
-                                .padding(.vertical, 6)
-                                .contentShape(Rectangle())
-                            }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            
-                            // Existing chats inside this workspace
-                            if let chats = ws.chats, !chats.isEmpty {
-                                ForEach(chats) { chat in
-                                    Button {
-                                        Haptics.selection()
-                                        openRemoteSession(workspace: ws, chat: chat)
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "bubble.left")
-                                                .font(.system(size: 12))
-                                                .foregroundColor(NewtonTheme.textMuted)
-                                            
-                                            Text(chat.title)
-                                                .font(.system(size: 14))
-                                                .foregroundColor(NewtonTheme.textPrimary)
-                                                .lineLimit(1)
-                                            
-                                            Spacer()
-                                            
-                                            if let count = chat.messages?.count, count > 0 {
-                                                Text("\(count)")
-                                                    .font(.system(size: 10, weight: .semibold))
-                                                    .foregroundColor(NewtonTheme.textMuted)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(NewtonTheme.card)
-                                                    .clipShape(Capsule())
-                                            }
-                                        }
-                                        .padding(.leading, 24)
-                                        .padding(.vertical, 6)
-                                        .contentShape(Rectangle())
-                                    }
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
-                                }
-                            }
-                        }
-                    }
+                    workspaceSectionView(ws: ws)
                 }
             }
         }
@@ -503,7 +363,167 @@ public struct ConversationListView: View {
         }
     }
     
+    private var remoteEmptyView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "macbook.and.iphone")
+                .font(.system(size: 32))
+                .foregroundColor(NewtonTheme.textMuted)
+            
+            Text(remoteStatus?.online == true
+                 ? L10n.tr("No workspaces open on host.", es: "No hay proyectos abiertos en el host.")
+                 : L10n.tr("Host is offline.", es: "El host está desconectado."))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(NewtonTheme.textSecondary)
+            
+            Text(L10n.tr("Open Newton on your Mac Desktop to sync your workspaces and project chats.",
+                         es: "Abre Newton en tu Mac para sincronizar tus proyectos y chats de código."))
+                .font(.system(size: 12))
+                .foregroundColor(NewtonTheme.textMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+            
+            Button {
+                Haptics.light()
+                loadRemoteStudioData()
+            } label: {
+                Text(L10n.tr("Check Connection", es: "Comprobar Conexión"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(NewtonTheme.sand)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(NewtonTheme.card)
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+    
+    @ViewBuilder
+    private func workspaceSectionView(ws: CloudChatService.RemoteWorkspaceItem) -> some View {
+        let isExpanded = expandedWorkspacePaths.contains(ws.path)
+        
+        Section {
+            // Project Workspace Header Row
+            Button {
+                Haptics.light()
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if isExpanded {
+                        expandedWorkspacePaths.remove(ws.path)
+                    } else {
+                        expandedWorkspacePaths.insert(ws.path)
+                    }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isExpanded ? "folder.fill" : "folder")
+                        .font(.system(size: 15))
+                        .foregroundColor(NewtonTheme.sand)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ws.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(NewtonTheme.textPrimary)
+                        
+                        if let b = ws.branch, !b.isEmpty {
+                            Text(b)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(NewtonTheme.textMuted)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(NewtonTheme.textMuted)
+                }
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            
+            // Workspace Chats (when expanded)
+            if isExpanded {
+                // "Add chat to project" button
+                Button {
+                    Haptics.light()
+                    openRemoteSession(workspace: ws, chat: nil)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.bubble")
+                            .font(.system(size: 13))
+                            .foregroundColor(NewtonTheme.sand)
+                        
+                        Text(L10n.tr("New chat in project", es: "Nuevo chat en proyecto"))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(NewtonTheme.sand)
+                        
+                        Spacer()
+                    }
+                    .padding(.leading, 24)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                
+                // Existing chats inside this workspace
+                if let chats = ws.chats, !chats.isEmpty {
+                    ForEach(chats) { chat in
+                        workspaceChatRowView(ws: ws, chat: chat)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func workspaceChatRowView(ws: CloudChatService.RemoteWorkspaceItem, chat: CloudChatService.RemoteWorkspaceChat) -> some View {
+        Button {
+            Haptics.selection()
+            openRemoteSession(workspace: ws, chat: chat)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 12))
+                    .foregroundColor(NewtonTheme.textMuted)
+                
+                Text(chat.title)
+                    .font(.system(size: 14))
+                    .foregroundColor(NewtonTheme.textPrimary)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                if let count = chat.messages?.count, count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(NewtonTheme.textMuted)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(NewtonTheme.card)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.leading, 24)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+    
     // MARK: - Actions & Data Loading
+    
+    private func createNewChat() {
+        Haptics.light()
+        let newConvo = storage.createConversation(title: L10n.tr("New Conversation", es: "Nueva Conversación"))
+        selectedConversationId = newConvo.id
+        onSelectConversation?(newConvo.id)
+    }
     
     private func openRemoteSession(workspace: CloudChatService.RemoteWorkspaceItem?, chat: CloudChatService.RemoteWorkspaceChat?) {
         activeRemoteWorkspace = workspace
