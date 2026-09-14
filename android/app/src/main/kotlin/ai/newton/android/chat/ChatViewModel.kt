@@ -424,3 +424,41 @@ class ChatViewModel(
         }
     }
 }
+
+/** Live streaming parse — same tag rules as Swift `ChatView.sendMessage`. */
+object LiveParse {
+    data class Result(val visible: String, val thinking: String, val insideThinking: Boolean)
+
+    private val closed = Regex("""<think(?:ing)?>([\s\S]*?)</think(?:ing)?>""", RegexOption.IGNORE_CASE)
+    private val strayClose = Regex("""</think(?:ing)?>""", RegexOption.IGNORE_CASE)
+    private val orbitTag = Regex("""<orbit:[^>]*>[\s\S]*?(?:</orbit:[^>]*>|$)""", RegexOption.IGNORE_CASE)
+    private val downloadTag = Regex("""<download>[\s\S]*?(?:</download>|$)""", RegexOption.IGNORE_CASE)
+
+    fun parse(rawStream: String): Result {
+        var display = rawStream
+        var think = ""
+        closed.findAll(display).toList().reversed().forEach { m ->
+            val inner = m.groups[1]?.value.orEmpty()
+            think = if (think.isEmpty()) inner else "$inner\n\n---\n\n$think"
+            display = display.replace(m.value, "")
+        }
+        var inside = false
+        val openIdx = display.indexOf("<think", ignoreCase = true)
+        if (openIdx >= 0) {
+            val tail = display.substring(openIdx)
+            if (!tail.contains("</think", ignoreCase = true)) {
+                val tagEnd = tail.indexOf('>')
+                val thoughtTail = if (tagEnd >= 0) tail.substring(tagEnd + 1) else ""
+                if (thoughtTail.trim().isNotEmpty()) {
+                    think += (if (think.isEmpty()) "" else "\n\n---\n\n") + thoughtTail
+                }
+                display = display.substring(0, openIdx)
+                inside = true
+            }
+        }
+        display = strayClose.replace(display, "")
+        display = orbitTag.replace(display, "")
+        display = downloadTag.replace(display, "")
+        return Result(display, think, inside)
+    }
+}
