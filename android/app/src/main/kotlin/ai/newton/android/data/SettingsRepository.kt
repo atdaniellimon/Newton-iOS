@@ -61,26 +61,37 @@ class SettingsRepository(private val appContext: Context) {
     suspend fun effectiveBaseUrl(provider: AIProvider): String =
         LLMService.effectiveBaseUrl(provider, baseUrl.first())
 
-    //region API keys (EncryptedSharedPreferences = Android Keychain)
+    //region API keys (EncryptedSharedPreferences = Android Keychain, with fallback)
 
-    private val encryptedPrefs by lazy {
-        val masterKey = MasterKey.Builder(appContext)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            appContext,
-            "newton_secrets",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+    private val securePrefs: android.content.SharedPreferences by lazy {
+        try {
+            val masterKey = MasterKey.Builder(appContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                appContext,
+                "newton_secrets",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        } catch (_: Exception) {
+            // Fallback for OEM Android 12 KeyStore issues (Samsung/Xiaomi/Motorola)
+            appContext.getSharedPreferences("newton_secrets_fallback", Context.MODE_PRIVATE)
+        }
     }
 
     fun getApiKey(provider: AIProvider): String =
-        encryptedPrefs.getString("key_${provider.wireValue}", "").orEmpty()
+        try {
+            securePrefs.getString("key_${provider.wireValue}", "").orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
 
     fun setApiKey(provider: AIProvider, key: String) {
-        encryptedPrefs.edit().putString("key_${provider.wireValue}", key).apply()
+        try {
+            securePrefs.edit().putString("key_${provider.wireValue}", key).apply()
+        } catch (_: Exception) {}
     }
 
     //endregion

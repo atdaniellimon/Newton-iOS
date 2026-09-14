@@ -26,6 +26,7 @@ import ai.newton.android.ui.drawer.NewtonDrawerContent
 import ai.newton.android.ui.remote.DesktopRemoteControlScreen
 import ai.newton.android.ui.remote.RemoteControlViewModel
 import ai.newton.android.ui.settings.SettingsScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -59,8 +60,22 @@ fun NewtonApp(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val chatViewModel = remember { ChatViewModel(store, settings) }
-    val remoteViewModel = remember { RemoteControlViewModel(settings) }
+    val chatViewModel: ChatViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return ChatViewModel(store, settings) as T
+            }
+        }
+    )
+    val remoteViewModel: RemoteControlViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return RemoteControlViewModel(settings) as T
+            }
+        }
+    )
 
     val chatUiState by chatViewModel.ui.collectAsState()
 

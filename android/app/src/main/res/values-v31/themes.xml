@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Newton" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF1F2528</item>
+        <item name="android:statusBarColor">#FF1F2528</item>
+        <item name="android:navigationBarColor">#FF1F2528</item>
+        <item name="android:windowSplashScreenBackground">#FF1F2528</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>
