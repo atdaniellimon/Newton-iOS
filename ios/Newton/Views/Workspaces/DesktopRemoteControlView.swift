@@ -17,6 +17,10 @@ public struct DesktopRemoteControlView: View {
     @State private var selectedWorkspace: CloudChatService.RemoteWorkspaceItem? = nil
     @State private var selectedChat: CloudChatService.RemoteWorkspaceChat? = nil
     
+    // Initial optional selections passed from caller
+    private let initialWorkspace: CloudChatService.RemoteWorkspaceItem?
+    private let initialChat: CloudChatService.RemoteWorkspaceChat?
+    
     // Conversation State
     @State private var messages: [Message] = []
     @State private var inputText: String = ""
@@ -28,7 +32,15 @@ public struct DesktopRemoteControlView: View {
     @State private var streamTask: Task<Void, Never>? = nil
     @State private var showWorkspaceSheet: Bool = false
     
-    public init() {}
+    public init(
+        initialWorkspace: CloudChatService.RemoteWorkspaceItem? = nil,
+        initialChat: CloudChatService.RemoteWorkspaceChat? = nil
+    ) {
+        self.initialWorkspace = initialWorkspace
+        self.initialChat = initialChat
+        self._selectedWorkspace = State(initialValue: initialWorkspace)
+        self._selectedChat = State(initialValue: initialChat)
+    }
     
     public var body: some View {
         NavigationView {
@@ -102,7 +114,7 @@ public struct DesktopRemoteControlView: View {
                     bottomInputBar
                 }
             }
-            .navigationTitle(selectedWorkspace?.name ?? "Mac Code Studio")
+            .navigationTitle(selectedWorkspace?.name ?? L10n.tr("Remote Studio", es: "Remote Studio"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -141,6 +153,9 @@ public struct DesktopRemoteControlView: View {
                 workspacePickerSheet
             }
             .onAppear {
+                if let initChat = initialChat {
+                    loadChatSession(initChat)
+                }
                 Task {
                     await refreshStatusAndWorkspaces()
                     startListeningToRemoteStream()
@@ -159,7 +174,9 @@ public struct DesktopRemoteControlView: View {
                 .fill(status?.online == true ? Color.green : Color.red)
                 .frame(width: 8, height: 8)
             
-            Text(status?.online == true ? "Mac Conectada" : "Mac Desconectada")
+            Text(status?.online == true 
+                 ? L10n.tr("Connected to host", es: "Conectado al host") 
+                 : L10n.tr("Disconnected from host", es: "Desconectado del host"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(NewtonTheme.textSecondary)
             
@@ -174,7 +191,7 @@ public struct DesktopRemoteControlView: View {
                         .font(.system(size: 11))
                         .foregroundColor(NewtonTheme.sand)
                     
-                    Text(selectedWorkspace?.name ?? "Seleccionar carpeta")
+                    Text(selectedWorkspace?.name ?? L10n.tr("Select folder", es: "Seleccionar carpeta"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(NewtonTheme.textPrimary)
                     
@@ -199,7 +216,7 @@ public struct DesktopRemoteControlView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "stop.fill")
                             .font(.system(size: 9))
-                        Text("Detener")
+                        Text(L10n.tr("Stop", es: "Detener"))
                             .font(.system(size: 11, weight: .bold))
                     }
                     .padding(.horizontal, 8)
@@ -234,13 +251,14 @@ public struct DesktopRemoteControlView: View {
             }
             
             VStack(spacing: 6) {
-                Text(selectedWorkspace != nil ? selectedWorkspace!.name : "Newton Code Studio")
+                Text(selectedWorkspace != nil ? selectedWorkspace!.name : L10n.tr("Remote Studio", es: "Remote Studio"))
                     .font(.system(size: 20, weight: .bold, design: .serif))
                     .foregroundColor(NewtonTheme.textPrimary)
                 
                 Text(selectedWorkspace != nil
-                     ? "Control remoto activo en \(selectedWorkspace!.path).\nCualquier orden que envíes se ejecutará en tu Mac."
-                     : "Conectando con tu Mac Desktop...")
+                     ? L10n.tr("Remote control active at \(selectedWorkspace!.path).\nAny command sent will execute on the host.",
+                               es: "Control remoto activo en \(selectedWorkspace!.path).\nCualquier orden que envíes se ejecutará en el host.")
+                     : L10n.tr("Connecting to host...", es: "Conectando al host..."))
                     .font(.system(size: 13))
                     .foregroundColor(NewtonTheme.textMuted)
                     .multilineTextAlignment(.center)
@@ -250,9 +268,9 @@ public struct DesktopRemoteControlView: View {
             // Quick prompt suggestion pills
             VStack(spacing: 8) {
                 ForEach([
-                    "Revisa los cambios recientes con git status",
-                    "Lista la estructura de carpetas y archivos",
-                    "Ejecuta los tests del proyecto en la terminal"
+                    L10n.tr("Check recent changes with git status", es: "Revisa los cambios recientes con git status"),
+                    L10n.tr("List folder structure and files", es: "Lista la estructura de carpetas y archivos"),
+                    L10n.tr("Run project tests in the terminal", es: "Ejecuta los tests del proyecto en la terminal")
                 ], id: \.self) { prompt in
                     Button {
                         Haptics.light()
@@ -292,7 +310,9 @@ public struct DesktopRemoteControlView: View {
             
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Text(activeToolName != nil ? "Ejecutando herramienta: \(activeToolName!)" : "Matrix está razonando en tu Mac...")
+                    Text(activeToolName != nil 
+                         ? "\(L10n.tr("Executing tool", es: "Ejecutando herramienta")): \(activeToolName!)" 
+                         : L10n.tr("Matrix is reasoning on host...", es: "Matrix está razonando en el host..."))
                         .font(.system(size: 13, weight: .medium, design: .serif))
                         .foregroundColor(NewtonTheme.sand)
                     
@@ -318,7 +338,7 @@ public struct DesktopRemoteControlView: View {
                         }
                         .padding(.top, 4)
                     } label: {
-                        Text("\(currentStepLogs.count) acciones en terminal / archivos")
+                        Text("\(currentStepLogs.count) \(L10n.tr("actions in terminal / files", es: "acciones en terminal / archivos"))")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(NewtonTheme.textSecondary)
                     }
@@ -346,7 +366,7 @@ public struct DesktopRemoteControlView: View {
             
             HStack(spacing: 10) {
                 // Text Input
-                TextField("Escribe una instrucción para tu Mac...", text: $inputText, axis: .vertical)
+                TextField(L10n.tr("Write an instruction for the host...", es: "Escribe una instrucción para el host..."), text: $inputText, axis: .vertical)
                     .font(.system(size: 15))
                     .foregroundColor(NewtonTheme.textPrimary)
                     .lineLimit(1...5)
@@ -395,9 +415,9 @@ public struct DesktopRemoteControlView: View {
                 NewtonTheme.bg.ignoresSafeArea()
                 
                 List {
-                    Section(header: Text("WORKSPACES EN TU MAC").foregroundColor(NewtonTheme.textMuted)) {
+                    Section(header: Text(L10n.tr("WORKSPACES ON HOST", es: "WORKSPACES EN EL HOST")).foregroundColor(NewtonTheme.textMuted)) {
                         if workspaces.isEmpty {
-                            Text("No hay workspaces reportados por tu Mac.")
+                            Text(L10n.tr("No workspaces reported by host.", es: "No hay workspaces reportados por el host."))
                                 .font(.system(size: 13))
                                 .foregroundColor(NewtonTheme.textMuted)
                         } else {
@@ -437,7 +457,7 @@ public struct DesktopRemoteControlView: View {
                     }
                     
                     if let ws = selectedWorkspace, let chats = ws.chats, !chats.isEmpty {
-                        Section(header: Text("CHATS EN \(ws.name)").foregroundColor(NewtonTheme.textMuted)) {
+                        Section(header: Text(L10n.tr("CHATS IN \(ws.name)", es: "CHATS EN \(ws.name)")).foregroundColor(NewtonTheme.textMuted)) {
                             ForEach(chats) { chat in
                                 let isChatSelected = selectedChat?.id == chat.id
                                 Button {
@@ -453,7 +473,7 @@ public struct DesktopRemoteControlView: View {
                                                 .lineLimit(1)
                                             
                                             if let msgCount = chat.messages?.count, msgCount > 0 {
-                                                Text("\(msgCount) mensajes")
+                                                Text("\(msgCount) \(L10n.tr("messages", es: "mensajes"))")
                                                     .font(.system(size: 11))
                                                     .foregroundColor(NewtonTheme.textMuted)
                                             }
@@ -473,11 +493,11 @@ public struct DesktopRemoteControlView: View {
                 }
                 .listStyle(.insetGrouped)
             }
-            .navigationTitle("Seleccionar Workspace")
+            .navigationTitle(L10n.tr("Select Workspace", es: "Seleccionar Workspace"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cerrar") {
+                    Button(L10n.tr("Close", es: "Cerrar")) {
                         showWorkspaceSheet = false
                     }
                     .foregroundColor(NewtonTheme.sand)
@@ -564,7 +584,7 @@ public struct DesktopRemoteControlView: View {
                 }
             } catch {
                 self.isExecuting = false
-                self.errorMessage = "Error al enviar a tu Mac: \(error.localizedDescription)"
+                self.errorMessage = "\(L10n.tr("Error sending to host", es: "Error al enviar al host")): \(error.localizedDescription)"
             }
         }
     }
@@ -592,7 +612,7 @@ public struct DesktopRemoteControlView: View {
             }
         } catch {
             DispatchQueue.main.async {
-                self.errorMessage = "No se pudo sincronizar con la Mac: \(error.localizedDescription)"
+                self.errorMessage = "\(L10n.tr("Could not sync with host", es: "No se pudo sincronizar con el host")): \(error.localizedDescription)"
             }
         }
     }
