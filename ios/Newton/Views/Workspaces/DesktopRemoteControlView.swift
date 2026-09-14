@@ -16,20 +16,17 @@ public struct DesktopRemoteControlView: View {
     @State private var workspaces: [CloudChatService.RemoteWorkspaceItem] = []
     @State private var selectedWorkspace: CloudChatService.RemoteWorkspaceItem? = nil
     @State private var selectedChat: CloudChatService.RemoteWorkspaceChat? = nil
-    @State private var taskPrompt: String = ""
+    
+    // Conversation State
+    @State private var messages: [Message] = []
+    @State private var inputText: String = ""
     @State private var isExecuting: Bool = false
     @State private var activeSessionId: String? = nil
-    @State private var steps: [CloudChatService.RemoteStepEvent] = []
-    @State private var finalAnswer: String? = nil
+    @State private var currentStepLogs: [CloudChatService.RemoteStepEvent] = []
+    @State private var activeToolName: String? = nil
     @State private var errorMessage: String? = nil
     @State private var streamTask: Task<Void, Never>? = nil
-    
-    private let quickPrompts = [
-        "Revisa los archivos con git status",
-        "Ejecuta los tests del proyecto",
-        "Busca cuellos de botella y optimiza",
-        "Lista los archivos del proyecto"
-    ]
+    @State private var showWorkspaceSheet: Bool = false
     
     public init() {}
     
@@ -39,56 +36,73 @@ public struct DesktopRemoteControlView: View {
                 NewtonTheme.bg.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Top Mac Connection Header
-                    connectionHeader
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
+                    // Minimal Workspace & Host Bar
+                    workspaceHeaderBar
                     
+                    // Main Chat Timeline
                     ScrollViewReader { proxy in
                         ScrollView {
-                            VStack(alignment: .leading, spacing: 18) {
-                                // Workspaces Picker Section
-                                workspacesSection
-                                
-                                // Workspace Chats Picker Section
-                                workspaceChatsSection
-                                
-                                // Quick Action Chips (if idle)
-                                if !isExecuting && steps.isEmpty {
-                                    quickActionsSection
+                            LazyVStack(spacing: 14) {
+                                if messages.isEmpty && !isExecuting {
+                                    emptyChatHeroView
+                                        .padding(.top, 40)
+                                } else {
+                                    ForEach(messages) { msg in
+                                        MessageBubbleView(
+                                            message: msg,
+                                            onRetry: nil,
+                                            onEdit: nil
+                                        )
+                                        .id(msg.id)
+                                    }
                                 }
                                 
-                                // Live Execution Timeline & Terminal Logs
-                                if !steps.isEmpty || isExecuting {
-                                    executionTimelineSection
+                                // Live Reasoning / Tool Execution Orbit when executing
+                                if isExecuting {
+                                    executingLiveIndicator
+                                        .id("live_executing_indicator")
                                 }
                                 
-                                // Final Agent Output
-                                if let answer = finalAnswer {
-                                    finalAnswerSection(answer)
+                                if let error = errorMessage {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(NewtonTheme.coralRed)
+                                        Text(error)
+                                            .font(.system(size: 13))
+                                            .foregroundColor(NewtonTheme.coralRed)
+                                    }
+                                    .padding(12)
+                                    .background(NewtonTheme.coralRed.opacity(0.15))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .padding(.horizontal, 16)
+                                    .id("error_bubble")
                                 }
                                 
-                                // Bottom Spacer for autoscroll
                                 Color.clear
-                                    .frame(height: 20)
+                                    .frame(height: 10)
                                     .id("bottom_anchor")
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 24)
+                            .padding(.vertical, 14)
                         }
-                        .onChange(of: steps.count) { _ in
+                        .onChange(of: messages.count) { _ in
                             withAnimation(.easeOut(duration: 0.25)) {
                                 proxy.scrollTo("bottom_anchor", anchor: .bottom)
                             }
                         }
+                        .onChange(of: isExecuting) { executing in
+                            if executing {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                                }
+                            }
+                        }
                     }
                     
-                    // Bottom Input Dispatch Bar
-                    bottomDispatchBar
+                    // Native Bottom Input Bar (matching standard ChatView)
+                    bottomInputBar
                 }
             }
-            .navigationTitle("Mac Remote Studio")
+            .navigationTitle(selectedWorkspace?.name ?? "Mac Code Studio")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -103,14 +117,28 @@ public struct DesktopRemoteControlView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        Task { await refreshStatusAndWorkspaces() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(NewtonTheme.sand)
+                    HStack(spacing: 12) {
+                        Button {
+                            Haptics.light()
+                            startNewChatSession()
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(NewtonTheme.sand)
+                        }
+                        
+                        Button {
+                            showWorkspaceSheet = true
+                        } label: {
+                            Image(systemName: "folder")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(NewtonTheme.sand)
+                        }
                     }
                 }
+            }
+            .sheet(isPresented: $showWorkspaceSheet) {
+                workspacePickerSheet
             }
             .onAppear {
                 Task {
@@ -124,41 +152,42 @@ public struct DesktopRemoteControlView: View {
         }
     }
     
-    // MARK: - Connection Header
-    private var connectionHeader: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill((status?.online == true ? Color.green : Color.red).opacity(0.2))
-                    .frame(width: 32, height: 32)
-                
-                Circle()
-                    .fill(status?.online == true ? Color.green : Color.red)
-                    .frame(width: 12, height: 12)
-            }
+    // MARK: - Workspace & Host Header Bar
+    private var workspaceHeaderBar: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(status?.online == true ? Color.green : Color.red)
+                .frame(width: 8, height: 8)
             
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(status?.online == true ? "Mac Desktop Conectada" : "Mac Desktop Desconectada")
-                        .font(.system(size: 14, weight: .bold))
+            Text(status?.online == true ? "Mac Conectada" : "Mac Desconectada")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(NewtonTheme.textSecondary)
+            
+            Text("•")
+                .foregroundColor(NewtonTheme.textMuted)
+            
+            Button {
+                showWorkspaceSheet = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(NewtonTheme.sand)
+                    
+                    Text(selectedWorkspace?.name ?? "Seleccionar carpeta")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(NewtonTheme.textPrimary)
                     
-                    if status?.online == true {
-                        Text("Matrix Agente")
-                            .font(.system(size: 10, weight: .semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(NewtonTheme.sand.opacity(0.15))
-                            .foregroundColor(NewtonTheme.sand)
-                            .cornerRadius(6)
+                    if let b = selectedWorkspace?.branch, !b.isEmpty {
+                        Text("(\(b))")
+                            .font(.system(size: 11))
+                            .foregroundColor(NewtonTheme.textMuted)
                     }
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(NewtonTheme.textMuted)
                 }
-                
-                Text(status?.online == true
-                     ? "\(workspaces.count) workspaces sincronizados · Bucle autónomo activo"
-                     : "Abre la aplicación Newton en tu Mac para sincronizar")
-                    .font(.system(size: 12))
-                    .foregroundColor(NewtonTheme.textMuted)
             }
             
             Spacer()
@@ -167,378 +196,388 @@ public struct DesktopRemoteControlView: View {
                 Button(role: .destructive) {
                     Task { await cancelCurrentTask() }
                 } label: {
-                    Text("Detener")
-                        .font(.system(size: 12, weight: .bold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.red.opacity(0.15))
-                        .foregroundColor(Color.red)
-                        .cornerRadius(8)
+                    HStack(spacing: 4) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 9))
+                        Text("Detener")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.red.opacity(0.18))
+                    .foregroundColor(Color.red)
+                    .clipShape(Capsule())
                 }
             }
         }
-        .padding(12)
-        .background(NewtonTheme.card)
-        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(NewtonTheme.card.opacity(0.85))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(NewtonTheme.border, lineWidth: 1)
+            Divider()
+                .background(NewtonTheme.border),
+            alignment: .bottom
         )
     }
     
-    // MARK: - Workspaces Picker
-    private var workspacesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("WORKSPACE EN LA MAC")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(NewtonTheme.textMuted)
-            
-            if workspaces.isEmpty {
-                HStack {
-                    Image(systemName: "folder.badge.questionmark")
-                        .foregroundColor(NewtonTheme.textMuted)
-                    Text("No hay carpetas registradas. Inicia Newton en tu Mac.")
-                        .font(.system(size: 13))
-                        .foregroundColor(NewtonTheme.textMuted)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(NewtonTheme.card)
-                .cornerRadius(10)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(workspaces) { ws in
-                            let isSelected = (selectedWorkspace?.path == ws.path)
-                            Button {
-                                Haptics.selection()
-                                selectedWorkspace = ws
-                                selectedChat = ws.chats?.first
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "folder.fill")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(isSelected ? NewtonTheme.sand : NewtonTheme.textMuted)
-                                        
-                                        Text(ws.name)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundColor(isSelected ? NewtonTheme.textPrimary : NewtonTheme.textMuted)
-                                    }
-                                    
-                                    if let branch = ws.branch, !branch.isEmpty {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "arrow.triangle.branch")
-                                                .font(.system(size: 10))
-                                            Text(branch)
-                                                .font(.system(size: 10))
-                                        }
-                                        .foregroundColor(isSelected ? NewtonTheme.sand.opacity(0.8) : NewtonTheme.textMuted.opacity(0.7))
-                                    }
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(isSelected ? NewtonTheme.sand.opacity(0.12) : NewtonTheme.card)
-                                .cornerRadius(10)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(isSelected ? NewtonTheme.sand.opacity(0.5) : NewtonTheme.border, lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
-                }
+    // MARK: - Empty Chat Hero View
+    private var emptyChatHeroView: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(NewtonTheme.sand.opacity(0.12))
+                    .frame(width: 72, height: 72)
+                
+                Image(systemName: "laptopcomputer.and.iphone")
+                    .font(.system(size: 32))
+                    .foregroundColor(NewtonTheme.sand)
             }
-        }
-    }
-    
-    // MARK: - Workspace Chats Picker
-    private var workspaceChatsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("SESIONES DE CÓDIGO (CHATS)")
-                    .font(.system(size: 11, weight: .bold))
+            
+            VStack(spacing: 6) {
+                Text(selectedWorkspace != nil ? selectedWorkspace!.name : "Newton Code Studio")
+                    .font(.system(size: 20, weight: .bold, design: .serif))
+                    .foregroundColor(NewtonTheme.textPrimary)
+                
+                Text(selectedWorkspace != nil
+                     ? "Control remoto activo en \(selectedWorkspace!.path).\nCualquier orden que envíes se ejecutará en tu Mac."
+                     : "Conectando con tu Mac Desktop...")
+                    .font(.system(size: 13))
                     .foregroundColor(NewtonTheme.textMuted)
-                
-                Spacer()
-                
-                Button {
-                    Haptics.light()
-                    selectedChat = nil
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 12))
-                        Text("Nueva tarea")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundColor(selectedChat == nil ? NewtonTheme.sand : NewtonTheme.textMuted)
-                }
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
             }
             
-            let chats = selectedWorkspace?.chats ?? []
-            if chats.isEmpty {
-                HStack {
-                    Image(systemName: "text.bubble")
-                        .foregroundColor(NewtonTheme.textMuted)
-                    Text("No hay tareas previas. Escribe tu primera orden abajo.")
-                        .font(.system(size: 12))
-                        .foregroundColor(NewtonTheme.textMuted)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(NewtonTheme.card)
-                .cornerRadius(10)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        // "Nueva Tarea" chip
-                        Button {
-                            Haptics.selection()
-                            selectedChat = nil
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text("Nueva sesión")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(selectedChat == nil ? NewtonTheme.sand.opacity(0.18) : NewtonTheme.card)
-                            .foregroundColor(selectedChat == nil ? NewtonTheme.sand : NewtonTheme.textMuted)
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(selectedChat == nil ? NewtonTheme.sand.opacity(0.6) : NewtonTheme.border, lineWidth: 1)
-                            )
-                        }
-                        
-                        ForEach(chats) { chat in
-                            let isChatSelected = (selectedChat?.id == chat.id)
-                            Button {
-                                Haptics.selection()
-                                selectedChat = chat
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(isChatSelected ? NewtonTheme.sand : NewtonTheme.textMuted)
-                                    
-                                    Text(chat.title)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(isChatSelected ? NewtonTheme.textPrimary : NewtonTheme.textMuted)
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(isChatSelected ? NewtonTheme.sand.opacity(0.15) : NewtonTheme.card)
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(isChatSelected ? NewtonTheme.sand.opacity(0.5) : NewtonTheme.border, lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Quick Action Chips
-    private var quickActionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("ÓRDENES RÁPIDAS")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(NewtonTheme.textMuted)
-            
-            FlowLayout(spacing: 8) {
-                ForEach(quickPrompts, id: \.self) { p in
+            // Quick prompt suggestion pills
+            VStack(spacing: 8) {
+                ForEach([
+                    "Revisa los cambios recientes con git status",
+                    "Lista la estructura de carpetas y archivos",
+                    "Ejecuta los tests del proyecto en la terminal"
+                ], id: \.self) { prompt in
                     Button {
                         Haptics.light()
-                        taskPrompt = p
+                        inputText = prompt
+                        sendMessage()
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bolt.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(NewtonTheme.sand)
-                            Text(p)
+                        HStack {
+                            Image(systemName: "sparkle")
                                 .font(.system(size: 12))
+                                .foregroundColor(NewtonTheme.sand)
+                            Text(prompt)
+                                .font(.system(size: 13))
                                 .foregroundColor(NewtonTheme.textPrimary)
+                            Spacer()
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
                         .background(NewtonTheme.card)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(NewtonTheme.border, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(NewtonTheme.border, lineWidth: 0.8)
                         )
                     }
+                    .padding(.horizontal, 24)
                 }
             }
+            .padding(.top, 8)
         }
     }
     
-    // MARK: - Execution Timeline Section
-    private var executionTimelineSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("PASOS DEL AGENTE EN LA MAC")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(NewtonTheme.textMuted)
+    // MARK: - Live Reasoning & Tools Indicator
+    private var executingLiveIndicator: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ThinkingOrbView(size: 30, style: .globe)
+                .padding(.top, 2)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(activeToolName != nil ? "Ejecutando herramienta: \(activeToolName!)" : "Matrix está razonando en tu Mac...")
+                        .font(.system(size: 13, weight: .medium, design: .serif))
+                        .foregroundColor(NewtonTheme.sand)
+                    
+                    ProgressView()
+                        .scaleEffect(0.6)
+                }
                 
-                Spacer()
-                
-                if isExecuting {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                        Text("Ejecutando...")
+                // Collapsible inspection pill of live tool steps
+                if !currentStepLogs.isEmpty {
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(currentStepLogs.suffix(4).enumerated()), id: \.offset) { _, step in
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(step.stepType == "tool_done" ? Color.green : NewtonTheme.sand)
+                                        .frame(width: 5, height: 5)
+                                    Text(step.message ?? step.stepType)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(NewtonTheme.textMuted)
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
+                    } label: {
+                        Text("\(currentStepLogs.count) acciones en terminal / archivos")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(NewtonTheme.sand)
+                            .foregroundColor(NewtonTheme.textSecondary)
                     }
+                    .accentColor(NewtonTheme.sand)
                 }
             }
             
-            VStack(spacing: 8) {
-                ForEach(Array(steps.enumerated()), id: \.offset) { _, step in
-                    stepCard(step)
-                }
-            }
-        }
-    }
-    
-    // MARK: - Step Card
-    private func stepCard(_ step: CloudChatService.RemoteStepEvent) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: iconForTool(step.toolName ?? step.stepType))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(NewtonTheme.sand)
-                    .frame(width: 20)
-                
-                Text(step.toolName != nil ? "Herramienta: \(step.toolName!)" : step.stepType.capitalized)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(NewtonTheme.textPrimary)
-                
-                Spacer()
-                
-                Text(badgeForStep(step))
-                    .font(.system(size: 10, weight: .bold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(colorForStep(step).opacity(0.15))
-                    .foregroundColor(colorForStep(step))
-                    .cornerRadius(4)
-            }
-            
-            if let msg = step.message, !msg.isEmpty {
-                Text(msg)
-                    .font(.system(size: 12))
-                    .foregroundColor(NewtonTheme.textMuted)
-            }
-            
-            if let stdout = step.stdout, !stdout.isEmpty {
-                terminalBlock(stdout, isError: false)
-            }
-            
-            if let stderr = step.stderr, !stderr.isEmpty {
-                terminalBlock(stderr, isError: true)
-            }
+            Spacer()
         }
         .padding(12)
-        .background(NewtonTheme.card)
-        .cornerRadius(10)
+        .background(NewtonTheme.card.opacity(0.8))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(NewtonTheme.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(NewtonTheme.sand.opacity(0.3), lineWidth: 0.8)
         )
+        .padding(.horizontal, 16)
     }
     
-    private func terminalBlock(_ text: String, isError: Bool) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            Text(text)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(isError ? Color.red : NewtonTheme.forestGreen)
-                .padding(8)
-        }
-        .background(Color.black.opacity(0.4))
-        .cornerRadius(6)
-    }
-    
-    // MARK: - Final Answer Card
-    private func finalAnswerSection(_ answer: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundColor(NewtonTheme.sand)
-                Text("SOLUCIÓN FINAL DE MATRIX")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(NewtonTheme.sand)
-            }
-            
-            Text(answer)
-                .font(.system(size: 14))
-                .foregroundColor(NewtonTheme.textPrimary)
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(NewtonTheme.card)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(NewtonTheme.sand.opacity(0.3), lineWidth: 1)
-                )
-        }
-    }
-    
-    // MARK: - Bottom Dispatch Bar
-    private var bottomDispatchBar: some View {
-        VStack(spacing: 8) {
-            if let err = errorMessage {
-                Text(err)
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.red)
-                    .padding(.horizontal, 16)
-            }
+    // MARK: - Bottom Input Bar
+    private var bottomInputBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(NewtonTheme.border)
             
             HStack(spacing: 10) {
-                TextField("Instrucción para la Mac (e.g. arregla los tests)...", text: $taskPrompt)
-                    .font(.system(size: 14))
+                // Text Input
+                TextField("Escribe una instrucción para tu Mac...", text: $inputText, axis: .vertical)
+                    .font(.system(size: 15))
                     .foregroundColor(NewtonTheme.textPrimary)
+                    .lineLimit(1...5)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(NewtonTheme.card)
-                    .cornerRadius(20)
+                    .background(NewtonTheme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(NewtonTheme.border, lineWidth: 1)
                     )
                 
+                // Send Button
                 Button {
                     Haptics.medium()
-                    Task { await dispatchTask() }
+                    sendMessage()
                 } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(canDispatch ? NewtonTheme.sand : NewtonTheme.textMuted)
+                    ZStack {
+                        Circle()
+                            .fill(canSend ? NewtonTheme.sand : NewtonTheme.card)
+                            .frame(width: 36, height: 36)
+                        
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(canSend ? NewtonTheme.bg : NewtonTheme.textMuted)
+                    }
                 }
-                .disabled(!canDispatch)
+                .disabled(!canSend)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(NewtonTheme.bg)
         }
     }
     
-    private var canDispatch: Bool {
-        !taskPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+    private var canSend: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         selectedWorkspace != nil &&
         !isExecuting
     }
     
-    // MARK: - Helpers & Network Actions
+    // MARK: - Workspace & Chat Picker Sheet
+    private var workspacePickerSheet: some View {
+        NavigationView {
+            ZStack {
+                NewtonTheme.bg.ignoresSafeArea()
+                
+                List {
+                    Section(header: Text("WORKSPACES EN TU MAC").foregroundColor(NewtonTheme.textMuted)) {
+                        if workspaces.isEmpty {
+                            Text("No hay workspaces reportados por tu Mac.")
+                                .font(.system(size: 13))
+                                .foregroundColor(NewtonTheme.textMuted)
+                        } else {
+                            ForEach(workspaces) { ws in
+                                let isWsSelected = selectedWorkspace?.path == ws.path
+                                Button {
+                                    Haptics.selection()
+                                    selectWorkspace(ws)
+                                    showWorkspaceSheet = false
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "folder.fill")
+                                                    .foregroundColor(isWsSelected ? NewtonTheme.sand : NewtonTheme.textMuted)
+                                                Text(ws.name)
+                                                    .font(.system(size: 15, weight: .semibold))
+                                                    .foregroundColor(NewtonTheme.textPrimary)
+                                            }
+                                            
+                                            Text(ws.path)
+                                                .font(.system(size: 11, design: .monospaced))
+                                                .foregroundColor(NewtonTheme.textMuted)
+                                                .lineLimit(1)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if isWsSelected {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(NewtonTheme.sand)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if let ws = selectedWorkspace, let chats = ws.chats, !chats.isEmpty {
+                        Section(header: Text("CHATS EN \(ws.name)").foregroundColor(NewtonTheme.textMuted)) {
+                            ForEach(chats) { chat in
+                                let isChatSelected = selectedChat?.id == chat.id
+                                Button {
+                                    Haptics.selection()
+                                    loadChatSession(chat)
+                                    showWorkspaceSheet = false
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(chat.title)
+                                                .font(.system(size: 14, weight: .medium))
+                                                .foregroundColor(isChatSelected ? NewtonTheme.sand : NewtonTheme.textPrimary)
+                                                .lineLimit(1)
+                                            
+                                            if let msgCount = chat.messages?.count, msgCount > 0 {
+                                                Text("\(msgCount) mensajes")
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(NewtonTheme.textMuted)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if isChatSelected {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(NewtonTheme.sand)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
+            }
+            .navigationTitle("Seleccionar Workspace")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cerrar") {
+                        showWorkspaceSheet = false
+                    }
+                    .foregroundColor(NewtonTheme.sand)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func selectWorkspace(_ ws: CloudChatService.RemoteWorkspaceItem) {
+        selectedWorkspace = ws
+        if let firstChat = ws.chats?.first {
+            loadChatSession(firstChat)
+        } else {
+            startNewChatSession()
+        }
+    }
+    
+    private func loadChatSession(_ chat: CloudChatService.RemoteWorkspaceChat) {
+        selectedChat = chat
+        errorMessage = nil
+        
+        // Populate messages array from chat history
+        var converted: [Message] = []
+        if let rawMessages = chat.messages {
+            for m in rawMessages {
+                let roleStr = m["role"] ?? "assistant"
+                let content = m["content"] ?? ""
+                converted.append(Message(
+                    id: UUID().uuidString,
+                    role: roleStr == "user" ? .user : .assistant,
+                    content: content
+                ))
+            }
+        }
+        messages = converted
+    }
+    
+    private func startNewChatSession() {
+        selectedChat = nil
+        messages.removeAll()
+        errorMessage = nil
+        currentStepLogs.removeAll()
+    }
+    
+    private func sendMessage() {
+        guard let ws = selectedWorkspace else { return }
+        let promptToSend = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !promptToSend.isEmpty else { return }
+        
+        // 1. Append user message bubble to chat
+        let userMsg = Message(
+            id: UUID().uuidString,
+            role: .user,
+            content: promptToSend
+        )
+        messages.append(userMsg)
+        
+        inputText = ""
+        isExecuting = true
+        activeToolName = nil
+        currentStepLogs.removeAll()
+        errorMessage = nil
+        
+        Task {
+            do {
+                let res = try await CloudChatService.shared.dispatchDesktopCommand(
+                    workspacePath: ws.path,
+                    chatId: selectedChat?.id,
+                    task: promptToSend,
+                    model: "Singularity-Matrix"
+                )
+                self.activeSessionId = res.sessionId
+                
+                // If this was a new task, update selectedChat ID
+                if selectedChat == nil, let newCid = res.chatId {
+                    self.selectedChat = CloudChatService.RemoteWorkspaceChat(
+                        id: newCid,
+                        title: promptToSend,
+                        created_at: Date().timeIntervalSince1970,
+                        messages: nil
+                    )
+                }
+            } catch {
+                self.isExecuting = false
+                self.errorMessage = "Error al enviar a tu Mac: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func cancelCurrentTask() async {
+        do {
+            try await CloudChatService.shared.cancelDesktopCommand(sessionId: activeSessionId)
+            DispatchQueue.main.async {
+                self.isExecuting = false
+                self.activeToolName = nil
+            }
+        } catch {}
+    }
     
     private func refreshStatusAndWorkspaces() async {
         do {
@@ -548,7 +587,7 @@ public struct DesktopRemoteControlView: View {
                 self.status = st
                 self.workspaces = wsList
                 if self.selectedWorkspace == nil, let first = wsList.first {
-                    self.selectedWorkspace = first
+                    self.selectWorkspace(first)
                 }
             }
         } catch {
@@ -565,131 +604,31 @@ public struct DesktopRemoteControlView: View {
             for await step in stream {
                 guard !Task.isCancelled else { break }
                 DispatchQueue.main.async {
-                    if step.stepType == "task_done" {
+                    if step.stepType == "tool_start" {
+                        self.activeToolName = step.toolName
+                    } else if step.stepType == "tool_done" {
+                        self.activeToolName = nil
+                    } else if step.stepType == "task_done" {
                         self.isExecuting = false
-                        self.finalAnswer = step.message
+                        self.activeToolName = nil
+                        
+                        // Append final assistant response as a normal bubble
+                        if let answer = step.message, !answer.isEmpty {
+                            let assistantMsg = Message(
+                                id: UUID().uuidString,
+                                role: .assistant,
+                                content: answer
+                            )
+                            self.messages.append(assistantMsg)
+                        }
                     } else if step.stepType == "error" {
                         self.isExecuting = false
+                        self.activeToolName = nil
                         self.errorMessage = step.message
                     }
-                    self.steps.append(step)
+                    self.currentStepLogs.append(step)
                 }
             }
         }
-    }
-    
-    private func dispatchTask() async {
-        guard let ws = selectedWorkspace else { return }
-        let promptToSend = taskPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !promptToSend.isEmpty else { return }
-        
-        isExecuting = true
-        steps.removeAll()
-        finalAnswer = nil
-        errorMessage = nil
-        taskPrompt = ""
-        
-        do {
-            let res = try await CloudChatService.shared.dispatchDesktopCommand(
-                workspacePath: ws.path,
-                chatId: selectedChat?.id,
-                task: promptToSend,
-                model: "Singularity-Matrix"
-            )
-            self.activeSessionId = res.sessionId
-        } catch {
-            self.isExecuting = false
-            self.errorMessage = "Error al enviar comando: \(error.localizedDescription)"
-        }
-    }
-    
-    private func cancelCurrentTask() async {
-        do {
-            try await CloudChatService.shared.cancelDesktopCommand(sessionId: activeSessionId)
-            DispatchQueue.main.async {
-                self.isExecuting = false
-            }
-        } catch {}
-    }
-    
-    private func iconForTool(_ name: String) -> String {
-        switch name.lowercased() {
-        case "list_files": return "folder.badge.gearshape"
-        case "read_file": return "doc.text.magnifyingglass"
-        case "edit_file": return "scissors"
-        case "write_file", "create_file": return "plus.square"
-        case "delete_file": return "trash"
-        case "grep_search": return "magnifyingglass"
-        case "exec_bash": return "terminal.fill"
-        case "web_search": return "globe"
-        default: return "gearshape.2.fill"
-        }
-    }
-    
-    private func badgeForStep(_ step: CloudChatService.RemoteStepEvent) -> String {
-        if step.stepType == "tool_start" { return "RUNNING" }
-        if step.stepType == "tool_done" { return "DONE" }
-        if step.stepType == "task_done" { return "SUCCESS" }
-        if step.stepType == "error" { return "ERROR" }
-        return "INFO"
-    }
-    
-    private func colorForStep(_ step: CloudChatService.RemoteStepEvent) -> Color {
-        if step.stepType == "tool_start" { return NewtonTheme.sand }
-        if step.stepType == "tool_done" { return Color.green }
-        if step.stepType == "task_done" { return Color.green }
-        if step.stepType == "error" { return Color.red }
-        return NewtonTheme.textMuted
-    }
-}
-
-// Simple FlowLayout helper for iOS 16
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var height: CGFloat = 0
-        for row in rows {
-            let rowH = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            height += rowH + spacing
-        }
-        return CGSize(width: proposal.width ?? 0, height: max(0, height - spacing))
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var y = bounds.minY
-        for row in rows {
-            var x = bounds.minX
-            let rowH = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            for subview in row {
-                let s = subview.sizeThatFits(.unspecified)
-                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
-                x += s.width + spacing
-            }
-            y += rowH + spacing
-        }
-    }
-    
-    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubview]] {
-        let maxWidth = proposal.width ?? 0
-        var rows: [[LayoutSubview]] = []
-        var currentRow: [LayoutSubview] = []
-        var currentWidth: CGFloat = 0
-        
-        for subview in subviews {
-            let s = subview.sizeThatFits(.unspecified)
-            if currentWidth + s.width > maxWidth, !currentRow.isEmpty {
-                rows.append(currentRow)
-                currentRow = [subview]
-                currentWidth = s.width + spacing
-            } else {
-                currentRow.append(subview)
-                currentWidth += s.width + spacing
-            }
-        }
-        if !currentRow.isEmpty { rows.append(currentRow) }
-        return rows
     }
 }

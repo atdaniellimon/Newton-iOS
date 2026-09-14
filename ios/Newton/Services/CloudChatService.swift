@@ -595,6 +595,8 @@ public final class CloudChatService: ObservableObject {
     
     public struct RemoteStepEvent {
         public let stepType: String
+        public let chatId: String?
+        public let workspacePath: String?
         public let toolName: String?
         public let message: String?
         public let stdout: String?
@@ -689,6 +691,8 @@ public final class CloudChatService: ObservableObject {
                                     
                                     let step = RemoteStepEvent(
                                         stepType: json["stepType"] as? String ?? currentEventType ?? "step",
+                                        chatId: json["chatId"] as? String,
+                                        workspacePath: json["workspacePath"] as? String,
                                         toolName: json["toolName"] as? String,
                                         message: json["message"] as? String,
                                         stdout: json["stdout"] as? String,
