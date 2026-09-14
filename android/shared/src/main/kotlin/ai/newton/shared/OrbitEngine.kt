@@ -69,24 +69,24 @@ class OrbitEngine(
         }
         output = STRAY_THINK_CLOSE.replace(output, "")
 
-        // 2. Natural <orbit:name>{json}</orbit:name>.
-        NATURAL_ORBIT.findAll(output).toList().reversed().forEach { m ->
-            val name = m.groups[1]?.value.orEmpty().lowercase()
-            val paramsJson = m.groups[2]?.value.orEmpty().trim()
-            val result = executeOrbit(name, paramsJson, baseUrl, apiKey)
-            results.add(result)
-            if ((name == "generate_image" || name == "image_gen") && result.result.isNotEmpty()) {
-                detectedImageUrl = result.result
-            }
-            output = output.replace(m.value, "")
-        }
-
-        // 2b. Simple <orbit:generate>prompt</orbit:generate>.
+        // 2a. Simple <orbit:generate>prompt</orbit:generate>.
         SIMPLE_GENERATE.findAll(output).toList().reversed().forEach { m ->
             val prompt = m.groups[1]?.value.orEmpty().trim().replace("\"", "\\\"")
             val result = executeOrbit("generate_image", "{\"prompt\": \"$prompt\"}", baseUrl, apiKey)
             results.add(result)
             if (result.result.isNotEmpty()) detectedImageUrl = result.result
+            output = output.replace(m.value, "")
+        }
+
+        // 2b. Natural <orbit:name>{json}</orbit:name>.
+        NATURAL_ORBIT.findAll(output).toList().reversed().forEach { m ->
+            val name = m.groups[1]?.value.orEmpty().lowercase()
+            val paramsJson = m.groups[2]?.value.orEmpty().trim()
+            val result = executeOrbit(name, paramsJson, baseUrl, apiKey)
+            results.add(result)
+            if ((name in setOf("generate_image", "image_gen", "generate", "imagine", "draw")) && result.result.isNotEmpty()) {
+                detectedImageUrl = result.result
+            }
             output = output.replace(m.value, "")
         }
 
@@ -343,7 +343,7 @@ class OrbitEngine(
         private val TITLE_FALLBACK = Regex(""""title"\s*:\s*"([^"]+)"""")
         private val CONTENT_FALLBACK = Regex(""""content"\s*:\s*"([\s\S]*?)"\s*}?$""")
         private val REFUSAL_PROSE = Regex(
-            """(?i)(?:no puedo (?:generar|crear)[^\n.]*[\n.]?|lo siento[^\n]*imagen[^\n]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)""",
+            """(?i)(?:lo siento[^\n.]*(?:no puedo|im[aá]gen)[^\n.]*[\n.]?|no puedo (?:generar|crear)[^\n.]*[\n.]?|lo siento[^\n.]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)""",
         )
 
         private fun firstGroup(regex: Regex, input: String, group: Int): String? =
