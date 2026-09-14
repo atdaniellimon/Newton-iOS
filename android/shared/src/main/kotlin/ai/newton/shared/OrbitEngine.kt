@@ -313,38 +313,53 @@ class OrbitEngine(
     }
 
     companion object {
-        private val MARKDOWN_IMAGE = Regex("""!\[.*?]\((https?://.*?|data:image/.*?)\)""")
-        private val FBCDN_URL = Regex("""(https://[a-zA-Z0-9.\-]+\.fbcdn\.net/[^\s"'<>\n\r\t]+)""")
-        private val THINKING_BLOCK =
+        private val MARKDOWN_IMAGE by lazy { Regex("""!\[.*?]\((https?://.*?|data:image/.*?)\)""") }
+        private val FBCDN_URL by lazy { Regex("""(https://[a-zA-Z0-9.\-]+\.fbcdn\.net/[^\s"'<>\n\r\t]+)""") }
+        private val THINKING_BLOCK by lazy {
             Regex("""<think(?:ing)?>([\s\S]*?)</think(?:ing)?>""", RegexOption.IGNORE_CASE)
-        private val STRAY_THINK_CLOSE = Regex("""</think(?:ing)?>""", RegexOption.IGNORE_CASE)
-        private val NATURAL_ORBIT =
-            Regex("""<orbit:(\w+)>([\s\S]*?)</orbit:\1>""", RegexOption.IGNORE_CASE)
-        private val SIMPLE_GENERATE =
+        }
+        private val STRAY_THINK_CLOSE by lazy { Regex("""</think(?:ing)?>""", RegexOption.IGNORE_CASE) }
+        private val NATURAL_ORBIT by lazy {
+            Regex("""<orbit:([a-zA-Z0-9_]+)>([\s\S]*?)</orbit:\w+>""", RegexOption.IGNORE_CASE)
+        }
+        private val SIMPLE_GENERATE by lazy {
             Regex("""<orbit:generate>([\s\S]*?)</orbit:generate>""", RegexOption.IGNORE_CASE)
-        private val DOWNLOAD_BLOCK = Regex("""<download>([\s\S]*?)</download>""", RegexOption.IGNORE_CASE)
-        private val LEGACY_ORBIT =
-            Regex("""\[ORBIT:(\w+)]([\s\S]*?)(?:\[/ORBIT]|$)""", RegexOption.IGNORE_CASE)
-        private val JSON_TOOL =
+        }
+        private val DOWNLOAD_BLOCK by lazy { Regex("""<download>([\s\S]*?)</download>""", RegexOption.IGNORE_CASE) }
+        private val LEGACY_ORBIT by lazy {
+            Regex("""\[ORBIT:([a-zA-Z0-9_]+)]([\s\S]*?)(?:\[/ORBIT]|$)""", RegexOption.IGNORE_CASE)
+        }
+        private val JSON_TOOL by lazy {
             Regex("""```(?:json)?\s*\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[\s\S]*?})\s*}\s*```""", RegexOption.IGNORE_CASE)
-        private val SEARCH_DUMP =
-            Regex("""(?s)(?:Found \d+ results|URL:\s*https?://).*?(?=\n\n[A-Z¿¡]|$)""", RegexOption.IGNORE_CASE)
-        private val SCRAPE_LINES =
-            Regex("""(?m)^(?:URL:|Last Updated:|title:|keywords:|description:|\[Publicidad]).*$""", RegexOption.IGNORE_CASE)
-        private val CITATION_ID = Regex("""\[?Citation ID:\s*([a-zA-Z0-9_\-]+)]?""", RegexOption.IGNORE_CASE)
-        private val CONFIDENCE_TAG = Regex("""\[CONFIDENCE:\s*\w+]\s*[—–\-:]?\s*""", RegexOption.IGNORE_CASE)
-        private val LOGIC_CHAIN =
+        }
+        private val SEARCH_DUMP by lazy {
+            Regex("""(?:Found \d+ results|URL:\s*https?://).*?(?=\n\n|\Z)""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        }
+        private val SCRAPE_LINES by lazy {
+            Regex("""^(?:URL:|Last Updated:|title:|keywords:|description:|\[Publicidad]).*$""", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+        }
+        private val CITATION_ID by lazy { Regex("""\[?Citation ID:\s*([a-zA-Z0-9_-]+)]?""", RegexOption.IGNORE_CASE) }
+        private val CONFIDENCE_TAG by lazy { Regex("""\[CONFIDENCE:\s*\w+]\s*[-—–:]?\s*""", RegexOption.IGNORE_CASE) }
+        private val LOGIC_CHAIN by lazy {
             Regex("""\[PREMISE]\s*→\s*\[LOGIC]\s*→\s*\[CONCLUSION]""", RegexOption.IGNORE_CASE)
-        private val META_TOOL_CHATTER = Regex(
-            """(?i)(?:I've generated the media that you've requested[^\n]*|You MUST call the (?:Imagine Tool|tool)[^\n]*)""",
-        )
-        private val GENERATED_IMAGE_LABEL =
-            Regex("""(?im)^\s*(?:Generated Image|Imagen generada)\s*$""")
-        private val TITLE_FALLBACK = Regex(""""title"\s*:\s*"([^"]+)"""")
-        private val CONTENT_FALLBACK = Regex(""""content"\s*:\s*"([\s\S]*?)"\s*}?$""")
-        private val REFUSAL_PROSE = Regex(
-            """(?i)(?:lo siento[^\n.]*(?:no puedo|im[aá]gen)[^\n.]*[\n.]?|no puedo (?:generar|crear)[^\n.]*[\n.]?|lo siento[^\n.]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)""",
-        )
+        }
+        private val META_TOOL_CHATTER by lazy {
+            Regex(
+                """(?:I've generated the media that you've requested[^\n]*|You MUST call the (?:Imagine Tool|tool)[^\n]*)""",
+                RegexOption.IGNORE_CASE,
+            )
+        }
+        private val GENERATED_IMAGE_LABEL by lazy {
+            Regex("""^\s*(?:Generated Image|Imagen generada)\s*$""", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+        }
+        private val TITLE_FALLBACK by lazy { Regex(""""title"\s*:\s*"([^"]+)"""") }
+        private val CONTENT_FALLBACK by lazy { Regex(""""content"\s*:\s*"([\s\S]*?)"\s*}?$""") }
+        private val REFUSAL_PROSE by lazy {
+            Regex(
+                """(?:lo siento[^\n.]*(?:no puedo|im[aá]gen)[^\n.]*[\n.]?|no puedo (?:generar|crear)[^\n.]*[\n.]?|lo siento[^\n.]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)""",
+                RegexOption.IGNORE_CASE,
+            )
+        }
 
         private fun firstGroup(regex: Regex, input: String, group: Int): String? =
             regex.find(input)?.groups?.get(group)?.value

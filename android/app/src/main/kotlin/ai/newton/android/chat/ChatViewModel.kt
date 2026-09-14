@@ -38,8 +38,10 @@ class ChatViewModel(
     private val store: ConversationStore,
     private val settings: SettingsRepository,
     private val llm: LLMService = LLMService(),
-    private val orbits: OrbitEngine = OrbitEngine(),
+    orbitsInstance: OrbitEngine? = null,
 ) : ViewModel() {
+
+    private val orbits: OrbitEngine by lazy { orbitsInstance ?: OrbitEngine() }
 
     private val _ui = MutableStateFlow(ChatUiState())
     val ui: StateFlow<ChatUiState> = _ui.asStateFlow()
@@ -268,10 +270,10 @@ class ChatViewModel(
 object LiveParse {
     data class Result(val visible: String, val thinking: String, val insideThinking: Boolean)
 
-    private val closed = Regex("""<think(?:ing)?>([\s\S]*?)</think(?:ing)?>""", RegexOption.IGNORE_CASE)
-    private val strayClose = Regex("""</think(?:ing)?>""", RegexOption.IGNORE_CASE)
-    private val orbitTag = Regex("""<orbit:[^>]*>[\s\S]*?(?:</orbit:[^>]*>|$)""", RegexOption.IGNORE_CASE)
-    private val downloadTag = Regex("""<download>[\s\S]*?(?:</download>|$)""", RegexOption.IGNORE_CASE)
+    private val closed by lazy { Regex("""<think(?:ing)?>([\s\S]*?)</think(?:ing)?>""", RegexOption.IGNORE_CASE) }
+    private val strayClose by lazy { Regex("""</think(?:ing)?>""", RegexOption.IGNORE_CASE) }
+    private val orbitTag by lazy { Regex("""<orbit:[^>]*>[\s\S]*?(?:</orbit:[^>]*>|$)""", RegexOption.IGNORE_CASE) }
+    private val downloadTag by lazy { Regex("""<download>[\s\S]*?(?:</download>|$)""", RegexOption.IGNORE_CASE) }
 
     fun parse(rawStream: String): Result {
         var display = rawStream
