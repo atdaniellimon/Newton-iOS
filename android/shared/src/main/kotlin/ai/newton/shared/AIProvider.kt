@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 enum class AIProvider(val wireValue: String) {
+    @SerialName("nwtn") NEWTON("nwtn"),
     @SerialName("openrouter") OPENROUTER("openrouter"),
     @SerialName("openai") OPENAI("openai"),
     @SerialName("anthropic") ANTHROPIC("anthropic"),
@@ -21,6 +22,7 @@ enum class AIProvider(val wireValue: String) {
 
     val displayName: String
         get() = when (this) {
+            NEWTON -> "Newton Labs Gateway"
             OPENROUTER -> "OpenRouter"
             OPENAI -> "OpenAI"
             ANTHROPIC -> "Anthropic"
@@ -34,6 +36,7 @@ enum class AIProvider(val wireValue: String) {
 
     val defaultBaseUrl: String
         get() = when (this) {
+            NEWTON -> "https://api.newton.daniellimon.uk"
             OPENROUTER -> "https://openrouter.ai/api/v1"
             OPENAI -> "https://api.openai.com/v1"
             ANTHROPIC -> "https://api.anthropic.com/v1"
@@ -53,6 +56,7 @@ enum class AIProvider(val wireValue: String) {
 
     val defaultModelId: String
         get() = when (this) {
+            NEWTON -> "Singularity"
             OPENROUTER -> "anthropic/claude-3.5-sonnet"
             OPENAI -> "gpt-4o-mini"
             ANTHROPIC -> "claude-3-7-sonnet-20250219"

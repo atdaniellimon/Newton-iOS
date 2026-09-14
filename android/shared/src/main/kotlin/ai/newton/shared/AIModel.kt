@@ -5,15 +5,43 @@ import kotlinx.serialization.Serializable
 /** Mirrors Swift `AIModel` + `DefaultModelCatalog`. */
 @Serializable
 data class AIModel(
-    val id: String,
-    val name: String,
-    val provider: AIProvider,
-    val description: String = "",
-    val iconKey: String = "sparkles",
-)
+    val id: String = "Singularity",
+    val name: String = "Newton Singularity",
+    val provider: AIProvider = AIProvider.NEWTON,
+    val description: String = "General-purpose assistant: chat, vision, image generation.",
+    val iconKey: String = "atom",
+    val capabilities: List<String> = listOf("chat", "vision", "images"),
+    val ownedBy: String = "Newton Labs",
+) {
+    companion object {
+        val singularity = AIModel(
+            id = "Singularity",
+            name = "Newton Singularity",
+            provider = AIProvider.NEWTON,
+            description = "General-purpose assistant: chat, vision, image generation.",
+            iconKey = "atom",
+            capabilities = listOf("chat", "vision", "images"),
+            ownedBy = "Newton Labs",
+        )
+
+        val singularityMatrix = AIModel(
+            id = "Singularity-Matrix",
+            name = "Singularity Matrix",
+            provider = AIProvider.NEWTON,
+            description = "Programming specialist: code-first, debugging, architecture, refactors.",
+            iconKey = "chevron.left.forwardslash.chevron.right",
+            capabilities = listOf("chat", "code", "vision"),
+            ownedBy = "Newton Labs",
+        )
+    }
+}
 
 object DefaultModelCatalog {
-    fun models(provider: AIProvider): List<AIModel> = when (provider) {
+    fun models(provider: AIProvider = AIProvider.NEWTON): List<AIModel> = when (provider) {
+        AIProvider.NEWTON -> listOf(
+            AIModel.singularity,
+            AIModel.singularityMatrix,
+        )
         AIProvider.OPENROUTER -> listOf(
             AIModel("anthropic/claude-3.5-sonnet", "Claude 3.5 Sonnet", provider, "Top tier reasoning & code"),
             AIModel("deepseek/deepseek-r1", "DeepSeek R1", provider, "SOTA reasoning model"),

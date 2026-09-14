@@ -1,7 +1,12 @@
 package ai.newton.android.chat
 
+import ai.newton.android.data.AuthManager
+import ai.newton.android.data.ChatPeerEvent
+import ai.newton.android.data.ChatPeerEventType
+import ai.newton.android.data.CloudChatService
 import ai.newton.android.data.ConversationStore
 import ai.newton.android.data.SettingsRepository
+import ai.newton.android.data.WorkspaceManager
 import ai.newton.shared.AIProvider
 import ai.newton.shared.Conversation
 import ai.newton.shared.LLMService
@@ -25,18 +30,14 @@ data class ChatUiState(
 )
 
 /**
- * Android counterpart of Swift `ChatView.sendMessage` /
- * `generateAITitle` (ios/Newton/Views/Chat/ChatView.swift).
- *
- * Same live-parse rules: thinking tags (open + closed, both spellings) and
- * orbit/download tags are hidden from [visibleResponse] while streaming; the
- * full [rawStream] is kept and passed to [OrbitEngine] at the end, so tags
- * split across SSE chunks still execute. Thinking accumulated live is merged
- * with the engine's parse the same way Swift does.
+ * Android counterpart of Swift `ChatView.sendMessage` / `CloudChatService` streaming.
  */
 class ChatViewModel(
     private val store: ConversationStore,
     private val settings: SettingsRepository,
+    private val auth: AuthManager,
+    private val cloudService: CloudChatService,
+    private val workspaceManager: WorkspaceManager,
     private val llm: LLMService = LLMService(),
     orbitsInstance: OrbitEngine? = null,
 ) : ViewModel() {
@@ -47,11 +48,10 @@ class ChatViewModel(
     val ui: StateFlow<ChatUiState> = _ui.asStateFlow()
 
     private var streamJob: Job? = null
+    private var peerEventsJob: Job? = null
 
-    // Last-known settings, kept fresh by collectors below. Avoids runBlocking
-    // on Main: DataStore reads are async, and blocking Main for them can jank.
-    private var cachedProvider: AIProvider = AIProvider.OPENAI_COMPATIBLE
-    private var cachedModelId: String = AIProvider.OPENAI_COMPATIBLE.defaultModelId
+    private var cachedProvider: AIProvider = AIProvider.NEWTON
+    private var cachedModelId: String = "Singularity"
 
     init {
         viewModelScope.launch {
@@ -63,50 +63,174 @@ class ChatViewModel(
     }
 
     fun open(conversationId: String) {
+        val convo = store.conversations.value.firstOrNull { it.id == conversationId }
         _ui.value = _ui.value.copy(
-            conversation = store.conversations.value.firstOrNull { it.id == conversationId },
+            conversation = convo,
             error = null,
         )
+
+        // If messages are empty and logged in, pull from cloud
+        if (convo != null && !convo.isGhost && auth.isLoggedIn.value && convo.messages.isEmpty()) {
+            viewModelScope.launch {
+                try {
+                    val msgs = cloudService.fetchMessages(convo.id)
+                    if (msgs.isNotEmpty()) {
+                        val updated = convo.copy(messages = msgs)
+                        _ui.value = _ui.value.copy(conversation = updated)
+                        store.upsert(updated)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Listen to active chat peer events
+        startPeerEventsListener(conversationId)
+    }
+
+    private fun startPeerEventsListener(conversationId: String) {
+        peerEventsJob?.cancel()
+        if (!auth.isLoggedIn.value) return
+
+        peerEventsJob = viewModelScope.launch {
+            cloudService.streamChatEvents(conversationId).collect { ev ->
+                if (_ui.value.isStreaming) return@collect
+                val current = _ui.value.conversation ?: return@collect
+                if (current.id != conversationId) return@collect
+
+                when (ev.event) {
+                    ChatPeerEventType.MESSAGE_NEW -> {
+                        val msgId = ev.messageId ?: return@collect
+                        if (current.messages.none { it.id == msgId }) {
+                            val role = if (ev.role?.lowercase() == "user") MessageRole.USER else MessageRole.ASSISTANT
+                            val msg = Message(
+                                id = msgId,
+                                role = role,
+                                content = ev.content.orEmpty(),
+                                createdAt = System.currentTimeMillis(),
+                                isStreaming = false,
+                            )
+                            val updated = current.copy(messages = current.messages + msg)
+                            _ui.value = _ui.value.copy(conversation = updated)
+                            store.upsert(updated)
+                        }
+                    }
+                    ChatPeerEventType.AI_START -> {
+                        val msgId = ev.messageId ?: return@collect
+                        if (current.messages.none { it.id == msgId }) {
+                            val placeholder = Message(
+                                id = msgId,
+                                role = MessageRole.ASSISTANT,
+                                content = "",
+                                isStreaming = true,
+                            )
+                            _ui.value = _ui.value.copy(conversation = current.copy(messages = current.messages + placeholder))
+                        }
+                    }
+                    ChatPeerEventType.AI_DELTA -> {
+                        val msgId = ev.messageId ?: return@collect
+                        val delta = ev.delta ?: return@collect
+                        val updated = current.copy(
+                            messages = current.messages.map {
+                                if (it.id == msgId) it.copy(content = it.content + delta) else it
+                            },
+                        )
+                        _ui.value = _ui.value.copy(conversation = updated)
+                    }
+                    ChatPeerEventType.AI_DONE -> {
+                        val msgId = ev.messageId ?: return@collect
+                        val updated = current.copy(
+                            messages = current.messages.map {
+                                if (it.id == msgId) it.copy(isStreaming = false) else it
+                            },
+                        )
+                        _ui.value = _ui.value.copy(conversation = updated)
+                        store.upsert(updated)
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     fun newConversation(title: String = "New Conversation"): String {
         val convo = Conversation(
             title = title,
-            provider = cachedProvider,
+            provider = AIProvider.NEWTON,
             modelId = cachedModelId,
         )
         store.upsert(convo)
         _ui.value = ChatUiState(conversation = convo)
+        startPeerEventsListener(convo.id)
         return convo.id
     }
 
-    fun send(prompt: String, imageFileUrl: String? = null) {
+    fun setModel(modelId: String) {
+        val current = _ui.value.conversation ?: return
+        val updated = current.copy(modelId = modelId)
+        _ui.value = _ui.value.copy(conversation = updated)
+        store.upsert(updated)
+        viewModelScope.launch {
+            settings.setModelId(modelId)
+            if (auth.isLoggedIn.value && !current.isGhost) {
+                cloudService.updateChat(current.id, model = modelId)
+            }
+        }
+    }
+
+    fun toggleGhostMode() {
+        val current = _ui.value.conversation ?: return
+        val isNowGhost = !current.isGhost
+        val updated = current.copy(isGhost = isNowGhost)
+        _ui.value = _ui.value.copy(conversation = updated)
+        if (!isNowGhost) {
+            store.upsert(updated)
+        }
+    }
+
+    fun vanishGhost() {
+        val current = _ui.value.conversation ?: return
+        store.remove(current.id)
+        _ui.value = ChatUiState()
+    }
+
+    fun send(prompt: String, attachedImageBase64: String? = null, attachedFileName: String? = null) {
         val text = prompt.trim()
-        if (text.isEmpty() && imageFileUrl == null) return
-        val convo = _ui.value.conversation ?: run {
+        if (text.isEmpty() && attachedImageBase64 == null) return
+        var convo = _ui.value.conversation ?: run {
             newConversation()
             _ui.value.conversation!!
         }
 
-        val displayPrompt = text.ifEmpty { "Describe and analyze this image." }
-        val withUser = convo.copy(
-            title = if (convo.messages.isEmpty()) titleFrom(text) else convo.title,
-            messages = convo.messages + Message(
-                role = MessageRole.USER,
-                content = displayPrompt,
-                imageUrl = imageFileUrl,
-            ),
+        var displayPrompt = text
+        var backendPrompt = text
+        if (displayPrompt.isEmpty() && attachedImageBase64 != null) {
+            displayPrompt = "Describe and analyze this image."
+            backendPrompt = displayPrompt
+        }
+        if (!attachedFileName.isNullOrEmpty()) {
+            backendPrompt += "\n\n[Attached File: $attachedFileName]"
+        }
+
+        val isFirstMessage = convo.messages.isEmpty()
+        val userMsg = Message(
+            role = MessageRole.USER,
+            content = displayPrompt,
+            imageUrl = attachedImageBase64,
         )
         val assistantId = UUID.randomUUID().toString()
-        val withPlaceholder = withUser.copy(
-            messages = withUser.messages + Message(
-                id = assistantId,
-                role = MessageRole.ASSISTANT,
-                content = "",
-                isStreaming = true,
-            ),
+        val assistantPlaceholder = Message(
+            id = assistantId,
+            role = MessageRole.ASSISTANT,
+            content = "",
+            isStreaming = true,
         )
-        _ui.value = _ui.value.copy(conversation = withPlaceholder, isStreaming = true, error = null)
+
+        val updatedConvo = convo.copy(
+            title = if (isFirstMessage) titleFrom(text.ifEmpty { attachedFileName ?: "New Conversation" }) else convo.title,
+            messages = convo.messages + userMsg + assistantPlaceholder,
+        )
+        _ui.value = _ui.value.copy(conversation = updatedConvo, isStreaming = true, error = null)
+        store.upsert(updatedConvo)
 
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -114,23 +238,54 @@ class ChatViewModel(
             var visible = ""
             var thinking = ""
             var insideThinking = false
+
             try {
-                val provider = withPlaceholder.provider
-                val workspacePrompt = "" // wired to Workspace store in the workspaces milestone
-                val systemPrompt = buildString {
-                    append(SingularityPrompt.base)
-                    if (workspacePrompt.isNotEmpty()) {
-                        append("\n\n[ACTIVE PROJECT WORKSPACE]\n").append(workspacePrompt)
-                    }
+                // Determine whether to stream via CloudChatService or direct fallback
+                val useCloud = !updatedConvo.isGhost && auth.isLoggedIn.value
+                var targetChatId = updatedConvo.id
+
+                if (useCloud && !targetChatId.startsWith("chat_")) {
+                    try {
+                        val remote = cloudService.createChat(title = updatedConvo.title, model = updatedConvo.modelId)
+                        targetChatId = remote.id
+                        val replaced = updatedConvo.copy(id = remote.id)
+                        store.updateConversationId(updatedConvo.id, remote.id, replaced)
+                        _ui.value = _ui.value.copy(conversation = replaced)
+                        startPeerEventsListener(remote.id)
+                    } catch (_: Exception) {}
                 }
-                llm.streamCompletion(
-                    messages = withPlaceholder.messages.dropLast(1),
-                    provider = provider,
-                    modelId = withPlaceholder.modelId,
-                    baseUrl = settings.effectiveBaseUrl(provider),
-                    apiKey = settings.getApiKey(provider),
-                    systemPrompt = systemPrompt,
-                ).collect { token ->
+
+                val flow = if (useCloud) {
+                    val atts = mutableListOf<Pair<String, String>>()
+                    if (attachedImageBase64 != null) {
+                        atts.add("image" to attachedImageBase64)
+                    }
+                    cloudService.streamChatMessage(
+                        chatId = targetChatId,
+                        prompt = backendPrompt,
+                        model = updatedConvo.modelId,
+                        attachments = atts,
+                    )
+                } else {
+                    val activeWs = workspaceManager.activeWorkspace
+                    val systemPrompt = buildString {
+                        append(SingularityPrompt.base)
+                        if (activeWs != null && activeWs.customSystemPrompt.isNotEmpty()) {
+                            append("\n\n[ACTIVE PROJECT WORKSPACE: ").append(activeWs.name).append("]\n")
+                            append(activeWs.customSystemPrompt)
+                        }
+                    }
+                    llm.streamCompletion(
+                        messages = updatedConvo.messages.dropLast(1),
+                        provider = updatedConvo.provider,
+                        modelId = updatedConvo.modelId,
+                        baseUrl = settings.effectiveBaseUrl(updatedConvo.provider),
+                        apiKey = auth.nwtnKey.ifEmpty { settings.getApiKey(updatedConvo.provider) },
+                        systemPrompt = systemPrompt,
+                    )
+                }
+
+                flow.collect { token ->
                     rawStream += token
                     if (!token.contains('<') && !token.contains('>')) {
                         if (insideThinking) thinking += token else visible += token
@@ -143,13 +298,15 @@ class ChatViewModel(
                     patchAssistant(assistantId, visible, thinking.ifEmpty { null }, streaming = true)
                 }
 
+                // Run Orbit post-processing (image generation, web citation, calculations)
                 val processed = orbits.processOrbitsInText(
                     rawStream,
                     userPrompt = displayPrompt,
-                    baseUrl = settings.effectiveBaseUrl(withPlaceholder.provider),
-                    apiKey = settings.getApiKey(withPlaceholder.provider),
+                    baseUrl = AuthManager.API_BASE_URL + "/nwtn",
+                    apiKey = auth.nwtnKey,
                 )
                 val mergedThinking = mergeThinking(thinking, processed.thinkingContent.orEmpty())
+
                 val finished = _ui.value.conversation!!.copy(
                     messages = _ui.value.conversation!!.messages.map { msg ->
                         if (msg.id != assistantId) msg else msg.copy(
@@ -164,21 +321,17 @@ class ChatViewModel(
                 _ui.value = _ui.value.copy(conversation = finished, isStreaming = false)
                 store.upsert(finished)
 
-                if (withUser.messages.size == 1 && displayPrompt.isNotEmpty()) {
+                if (isFirstMessage && displayPrompt.isNotEmpty()) {
                     launch { generateAiTitle(finished.id, displayPrompt) }
                 }
             } catch (e: Exception) {
                 val kept = _ui.value.conversation
                 if (kept != null) {
-                    val cleaned = if (visible.isEmpty()) {
-                        kept.copy(messages = kept.messages.filterNot { it.id == assistantId })
-                    } else {
-                        kept.copy(
-                            messages = kept.messages.map {
-                                if (it.id == assistantId) it.copy(isStreaming = false) else it
-                            },
-                        )
-                    }
+                    val cleaned = kept.copy(
+                        messages = kept.messages.map {
+                            if (it.id == assistantId) it.copy(isStreaming = false) else it
+                        },
+                    )
                     _ui.value = _ui.value.copy(
                         conversation = cleaned,
                         isStreaming = false,
@@ -223,14 +376,13 @@ class ChatViewModel(
                 messages = listOf(
                     Message(
                         role = MessageRole.USER,
-                        content = "Create a concise, descriptive 2-4 word title in the language of this query: \"$prompt\". " +
-                            "Output ONLY the title, no quotes or punctuation.",
+                        content = "Create a concise, descriptive 2-4 word title in the language of this query: \"$prompt\". Output ONLY the title, no quotes or punctuation.",
                     ),
                 ),
                 provider = current.provider,
                 modelId = current.modelId,
-                baseUrl = settings.effectiveBaseUrl(current.provider),
-                apiKey = settings.getApiKey(current.provider),
+                baseUrl = AuthManager.API_BASE_URL + "/nwtn",
+                apiKey = auth.nwtnKey,
                 temperature = 0.3,
                 maxTokens = 15,
                 systemPrompt = "You are a concise title generator. Reply ONLY with a 2-4 word title.",
@@ -242,10 +394,17 @@ class ChatViewModel(
                 if (_ui.value.conversation?.id == conversationId) {
                     _ui.value = _ui.value.copy(conversation = renamed)
                 }
+                if (auth.isLoggedIn.value && !renamed.isGhost) {
+                    cloudService.updateChat(renamed.id, title = clean)
+                }
             }
-        } catch (_: Exception) {
-            // Title generation is best-effort (mirrors Swift fallback).
-        }
+        } catch (_: Exception) {}
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        streamJob?.cancel()
+        peerEventsJob?.cancel()
     }
 
     companion object {
@@ -263,43 +422,5 @@ class ChatViewModel(
                 else -> "$a\n\n---\n\n$b"
             }
         }
-    }
-}
-
-/** Live streaming parse — same tag rules as Swift `ChatView.sendMessage`. */
-object LiveParse {
-    data class Result(val visible: String, val thinking: String, val insideThinking: Boolean)
-
-    private val closed by lazy { Regex("""<think(?:ing)?>([\s\S]*?)</think(?:ing)?>""", RegexOption.IGNORE_CASE) }
-    private val strayClose by lazy { Regex("""</think(?:ing)?>""", RegexOption.IGNORE_CASE) }
-    private val orbitTag by lazy { Regex("""<orbit:[^>]*>[\s\S]*?(?:</orbit:[^>]*>|$)""", RegexOption.IGNORE_CASE) }
-    private val downloadTag by lazy { Regex("""<download>[\s\S]*?(?:</download>|$)""", RegexOption.IGNORE_CASE) }
-
-    fun parse(rawStream: String): Result {
-        var display = rawStream
-        var think = ""
-        closed.findAll(display).toList().reversed().forEach { m ->
-            val inner = m.groups[1]?.value.orEmpty()
-            think = if (think.isEmpty()) inner else "$inner\n\n---\n\n$think"
-            display = display.replace(m.value, "")
-        }
-        var inside = false
-        val openIdx = display.indexOf("<think", ignoreCase = true)
-        if (openIdx >= 0) {
-            val tail = display.substring(openIdx)
-            if (!tail.contains("</think", ignoreCase = true)) {
-                val tagEnd = tail.indexOf('>')
-                val thoughtTail = if (tagEnd >= 0) tail.substring(tagEnd + 1) else ""
-                if (thoughtTail.trim().isNotEmpty()) {
-                    think += (if (think.isEmpty()) "" else "\n\n---\n\n") + thoughtTail
-                }
-                display = display.substring(0, openIdx)
-                inside = true
-            }
-        }
-        display = strayClose.replace(display, "")
-        display = orbitTag.replace(display, "")
-        display = downloadTag.replace(display, "")
-        return Result(display, think, inside)
     }
 }

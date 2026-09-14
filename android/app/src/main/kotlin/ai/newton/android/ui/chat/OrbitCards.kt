@@ -124,23 +124,34 @@ fun OrbitCard(
 
         if (orbit.result.isNotBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .padding(8.dp),
-            ) {
-                val scrollState = rememberScrollState()
-                Text(
-                    text = orbit.result,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                    ),
-                    color = if (orbit.isSuccess) NewtonColors.ForestGreen else NewtonColors.CoralRed,
-                    modifier = Modifier.horizontalScroll(scrollState),
+            if (orbit.orbitName.lowercase() in listOf("generate_image", "image") && (orbit.result.startsWith("http") || orbit.result.startsWith("data:image/"))) {
+                coil.compose.AsyncImage(
+                    model = orbit.result,
+                    contentDescription = "Generated Image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .padding(8.dp),
+                ) {
+                    val scrollState = rememberScrollState()
+                    Text(
+                        text = orbit.result,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                        ),
+                        color = if (orbit.isSuccess) NewtonColors.ForestGreen else NewtonColors.CoralRed,
+                        modifier = Modifier.horizontalScroll(scrollState),
+                    )
+                }
             }
         }
     }
