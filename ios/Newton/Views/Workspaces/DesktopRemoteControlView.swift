@@ -177,8 +177,9 @@ public struct DesktopRemoteControlView: View {
             Text(status?.online == true 
                  ? L10n.tr("Connected to host", es: "Conectado al host") 
                  : L10n.tr("Disconnected from host", es: "Desconectado del host"))
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(NewtonTheme.textSecondary)
+                .lineLimit(1)
             
             Text("•")
                 .foregroundColor(NewtonTheme.textMuted)
@@ -192,22 +193,26 @@ public struct DesktopRemoteControlView: View {
                         .foregroundColor(NewtonTheme.sand)
                     
                     Text(selectedWorkspace?.name ?? L10n.tr("Select folder", es: "Seleccionar carpeta"))
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(NewtonTheme.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     
                     if let b = selectedWorkspace?.branch, !b.isEmpty {
                         Text("(\(b))")
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                             .foregroundColor(NewtonTheme.textMuted)
+                            .lineLimit(1)
                     }
                     
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundColor(NewtonTheme.textMuted)
                 }
             }
+            .layoutPriority(1)
             
-            Spacer()
+            Spacer(minLength: 4)
             
             if isExecuting {
                 Button(role: .destructive) {
@@ -521,17 +526,50 @@ public struct DesktopRemoteControlView: View {
         selectedChat = chat
         errorMessage = nil
         
-        // Populate messages array from chat history
+        // Populate messages array from chat history, filtering out internal agent loop tool steps
         var converted: [Message] = []
         if let rawMessages = chat.messages {
             for m in rawMessages {
                 let roleStr = m["role"] ?? "assistant"
-                let content = m["content"] ?? ""
-                converted.append(Message(
-                    id: UUID().uuidString,
-                    role: roleStr == "user" ? .user : .assistant,
-                    content: content
-                ))
+                var content = m["content"] ?? ""
+                
+                // If it's a user turn that was actually an internal tool result, skip it from normal user bubbles
+                if roleStr == "user" && content.hasPrefix("[TOOL_RESULT:") {
+                    continue
+                }
+                
+                // If it's an assistant turn that only executed a tool_call without conversational text, skip it
+                if roleStr == "assistant" && content.contains("<tool_call>") {
+                    // Extract any conversational text outside of <tool_call>...</tool_call>
+                    let cleaned = content.replacingOccurrences(of: "(?s)<tool_call>.*?</tool_call>", with: "", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if cleaned.isEmpty {
+                        continue
+                    }
+                    content = cleaned
+                }
+                
+                // Extract thinking tags if present
+                var thinkingContent: String? = nil
+                if let thinkRange = content.range(of: "(?s)<think(?:ing)?>.*?</think(?:ing)?>", options: .regularExpression) {
+                    let fullTag = String(content[thinkRange])
+                    let stripped = fullTag.replacingOccurrences(of: "<think>", with: "")
+                        .replacingOccurrences(of: "</think>", with: "")
+                        .replacingOccurrences(of: "<thinking>", with: "")
+                        .replacingOccurrences(of: "</thinking>", with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    thinkingContent = stripped
+                    content = content.replacingCharacters(in: thinkRange, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                
+                if !content.isEmpty {
+                    converted.append(Message(
+                        id: UUID().uuidString,
+                        role: roleStr == "user" ? .user : .assistant,
+                        content: content,
+                        thinkingContent: thinkingContent
+                    ))
+                }
             }
         }
         messages = converted
@@ -606,7 +644,13 @@ public struct DesktopRemoteControlView: View {
             DispatchQueue.main.async {
                 self.status = st
                 self.workspaces = wsList
-                if self.selectedWorkspace == nil, let first = wsList.first {
+                
+                // If a workspace was already selected, update its reference with latest chats
+                if let currentWs = self.selectedWorkspace {
+                    if let updated = wsList.first(where: { $0.path == currentWs.path }) {
+                        self.selectedWorkspace = updated
+                    }
+                } else if let first = wsList.first {
                     self.selectWorkspace(first)
                 }
             }
@@ -633,13 +677,30 @@ public struct DesktopRemoteControlView: View {
                         self.activeToolName = nil
                         
                         // Append final assistant response as a normal bubble
-                        if let answer = step.message, !answer.isEmpty {
-                            let assistantMsg = Message(
-                                id: UUID().uuidString,
-                                role: .assistant,
-                                content: answer
-                            )
-                            self.messages.append(assistantMsg)
+                        if let rawAnswer = step.message, !rawAnswer.isEmpty {
+                            var answer = rawAnswer.replacingOccurrences(of: "(?s)<tool_call>.*?</tool_call>", with: "", options: .regularExpression)
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                            
+                            var thinkingContent: String? = nil
+                            if let thinkRange = answer.range(of: "(?s)<think(?:ing)?>.*?</think(?:ing)?>", options: .regularExpression) {
+                                let fullTag = String(answer[thinkRange])
+                                thinkingContent = fullTag.replacingOccurrences(of: "<think>", with: "")
+                                    .replacingOccurrences(of: "</think>", with: "")
+                                    .replacingOccurrences(of: "<thinking>", with: "")
+                                    .replacingOccurrences(of: "</thinking>", with: "")
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                answer = answer.replacingCharacters(in: thinkRange, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            }
+                            
+                            if !answer.isEmpty {
+                                let assistantMsg = Message(
+                                    id: UUID().uuidString,
+                                    role: .assistant,
+                                    content: answer,
+                                    thinkingContent: thinkingContent
+                                )
+                                self.messages.append(assistantMsg)
+                            }
                         }
                     } else if step.stepType == "error" {
                         self.isExecuting = false
