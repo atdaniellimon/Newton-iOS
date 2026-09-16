@@ -216,6 +216,19 @@ public final class LLMService {
                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                         else { continue }
 
+                        // NWTN error in stream
+                        if let errorObj = json["error"] {
+                            let errMsg: String
+                            if let dict = errorObj as? [String: Any], let msg = dict["message"] as? String {
+                                errMsg = msg
+                            } else if let s = errorObj as? String {
+                                errMsg = s
+                            } else {
+                                errMsg = "Stream error"
+                            }
+                            throw NSError(domain: "LLMService", code: -3, userInfo: [NSLocalizedDescriptionKey: errMsg])
+                        }
+
                         // NWTN delta event
                         if let delta = json["delta"] as? String {
                             continuation.yield(delta)

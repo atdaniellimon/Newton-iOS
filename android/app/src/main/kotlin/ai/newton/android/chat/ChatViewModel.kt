@@ -327,6 +327,18 @@ class ChatViewModel(
                 }
             } catch (e: Exception) {
                 val kept = _ui.value.conversation
+                val rawMsg = e.message ?: e.toString()
+                val friendlyError = when {
+                    rawMsg.contains("tier_upgrade_required", ignoreCase = true) ->
+                        "El modelo 'Singularity-Matrix' requiere una suscripción Newton Pro o Matrix."
+                    rawMsg.contains("daily_image_quota_exceeded", ignoreCase = true) ->
+                        "Has alcanzado el límite diario de imágenes. Se reinicia a las 00:00:00 UTC."
+                    rawMsg.contains("no_credits", ignoreCase = true) ->
+                        "Has consumido los créditos mensuales de tokens. Actualiza tu plan en Configuración."
+                    rawMsg.contains("account_locked", ignoreCase = true) ->
+                        "Cuenta bloqueada temporalmente por intentos fallidos. Reintenta en 15 minutos."
+                    else -> rawMsg
+                }
                 if (kept != null) {
                     val cleaned = kept.copy(
                         messages = kept.messages.map {
@@ -336,11 +348,11 @@ class ChatViewModel(
                     _ui.value = _ui.value.copy(
                         conversation = cleaned,
                         isStreaming = false,
-                        error = e.message ?: e.toString(),
+                        error = friendlyError,
                     )
                     store.upsert(cleaned)
                 } else {
-                    _ui.value = _ui.value.copy(isStreaming = false, error = e.message ?: e.toString())
+                    _ui.value = _ui.value.copy(isStreaming = false, error = friendlyError)
                 }
             }
         }

@@ -86,7 +86,15 @@ class LLMService(
                     ""
                 }
                 response.close()
-                close(IllegalStateException("API Error (${response.code}): $body"))
+                val humanMsg = try {
+                    val root = json.parseToJsonElement(body).jsonObject
+                    root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
+                        ?: root["detail"]?.jsonPrimitive?.contentOrNull
+                        ?: body.ifEmpty { "HTTP ${response.code}" }
+                } catch (_: Exception) {
+                    body.ifEmpty { "HTTP ${response.code}" }
+                }
+                close(IllegalStateException(humanMsg))
                 return@callbackFlow
             }
 

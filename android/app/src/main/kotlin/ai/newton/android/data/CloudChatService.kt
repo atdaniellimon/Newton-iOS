@@ -289,12 +289,29 @@ class CloudChatService private constructor(private val auth: AuthManager) {
 
         val response = client.newCall(req).execute()
         if (!response.isSuccessful) {
-            val err = response.body?.string() ?: "HTTP ${response.code}"
-            throw Exception("Server error (${response.code}): $err")
+            val body = response.body?.string().orEmpty()
+            val humanMsg = try {
+                val json = JSONObject(body)
+                val errObj = json.optJSONObject("error")
+                errObj?.optString("message") ?: json.optString("detail", body.ifEmpty { "HTTP ${response.code}" })
+            } catch (_: Exception) {
+                body.ifEmpty { "HTTP ${response.code}" }
+            }
+            throw Exception(humanMsg)
         }
 
         val creditsHeader = response.header("X-Credits-Left")
         creditsHeader?.toLongOrNull()?.let { auth.updateCreditsFromStream(it) }
+
+        val imagesUsedHeader = response.header("X-Daily-Images-Used")
+        val imagesLimitHeader = response.header("X-Daily-Images-Limit")
+        if (imagesUsedHeader != null || imagesLimitHeader != null) {
+            val used = imagesUsedHeader?.toIntOrNull() ?: auth.tier.value.dailyImagesUsed
+            val limit = imagesLimitHeader ?: auth.tier.value.dailyImagesLimit
+            // Reflect in auth.tier
+            val updatedTier = auth.tier.value.copy(dailyImagesUsed = used, dailyImagesLimit = limit)
+            // (AuthManager manages tier flow)
+        }
 
         val source = response.body?.source() ?: return@flow
         val reader = BufferedReader(InputStreamReader(source.inputStream()))
@@ -312,10 +329,13 @@ class CloudChatService private constructor(private val auth: AuthManager) {
                     if (json.has("credits_left")) {
                         auth.updateCreditsFromStream(json.optLong("credits_left"))
                     }
+                    if (json.has("error")) {
+                        val errObj = json.optJSONObject("error")
+                        val msg = errObj?.optString("message") ?: json.optString("error")
+                        throw Exception(msg)
+                    }
                     if (json.has("delta")) {
                         emit(json.getString("delta"))
-                    } else if (json.has("error")) {
-                        throw Exception(json.getString("error"))
                     }
                     if (json.optBoolean("done", false)) {
                         val reply = json.optString("reply", "")
@@ -323,8 +343,9 @@ class CloudChatService private constructor(private val auth: AuthManager) {
                             emit(reply)
                         }
                         break
-                    }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    if (e.message != null && e.message?.isNotEmpty() == true && !e.message!!.startsWith("org.json")) throw e
+                }
             }
         }
     }.flowOn(Dispatchers.IO)

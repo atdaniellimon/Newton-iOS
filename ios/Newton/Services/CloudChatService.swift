@@ -304,14 +304,35 @@ public final class CloudChatService: ObservableObject {
                             AuthManager.shared.updateCreditsFromStream(cred)
                         }
                     }
+                    if let imgUsedHdr = http.value(forHTTPHeaderField: "X-Daily-Images-Used"), let used = Int(imgUsedHdr) {
+                        DispatchQueue.main.async {
+                            AuthManager.shared.tier.dailyImagesUsed = used
+                        }
+                    }
+                    if let imgLimitHdr = http.value(forHTTPHeaderField: "X-Daily-Images-Limit") {
+                        DispatchQueue.main.async {
+                            AuthManager.shared.tier.dailyImagesLimit = imgLimitHdr
+                        }
+                    }
                     
                     guard http.statusCode == 200 else {
                         var errText = ""
                         for try await byte in bytes {
                             errText.append(Character(UnicodeScalar(byte)))
-                            if errText.count > 1024 { break }
+                            if errText.count > 2048 { break }
                         }
-                        throw NSError(domain: "CloudChatService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error (\(http.statusCode)): \(errText)"])
+                        
+                        var humanError = "Server error (\(http.statusCode)): \(errText)"
+                        if let data = errText.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            if let errObj = json["error"] as? [String: Any],
+                               let msg = errObj["message"] as? String {
+                                humanError = msg
+                            } else if let detail = json["detail"] as? String {
+                                humanError = detail
+                            }
+                        }
+                        throw NSError(domain: "CloudChatService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: humanError])
                     }
                     
                     var buffer = ""
