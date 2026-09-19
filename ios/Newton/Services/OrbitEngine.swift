@@ -245,15 +245,7 @@ public final class OrbitEngine {
             outputText = metaRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
         }
         
-        // Strip markdown image syntax and repetitive Generated Image labels from text
-        if let mdImgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\(.*?\\)", options: []) {
-            outputText = mdImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
-        }
-        if let genImgRegex = try? NSRegularExpression(pattern: "(?im)^\\s*(?:Generated Image|Imagen generada)\\s*$", options: []) {
-            outputText = genImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
-        }
-        
-        // 4. Detect direct markdown images if output by the model
+        // 4. Detect direct markdown images if output by the model (MUST happen before stripping)
         if detectedImageUrl == nil {
             if let imgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\((https?://.*?|data:image/.*?)\\)", options: []) {
                 let nsStr = outputText as NSString
@@ -263,21 +255,33 @@ public final class OrbitEngine {
             }
         }
         
+        // Strip markdown image syntax and repetitive Generated Image labels from text
+        if let mdImgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\(.*?\\)", options: []) {
+            outputText = mdImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        if let genImgRegex = try? NSRegularExpression(pattern: "(?im)^\\s*(?:Generated Image|Imagen generada)\\s*$", options: []) {
+            outputText = genImgRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
+        }
+        
         // 5. Image-intent fallback: user asked for an image but the model replied
-        // in prose (e.g. claimed inability) without emitting any image orbit tag.
-        // Detect intent client-side and generate anyway so natural requests work.
+        // in prose (e.g. claimed inability or simply described it) without emitting any image orbit tag.
+        // Detect intent client-side and generate anyway so natural requests work seamlessly.
         if detectedImageUrl == nil && !results.contains(where: { ["image_gen", "generate_image", "imagine", "draw"].contains($0.orbitName.lowercased()) }) {
             let lowerPrompt = userPrompt.lowercased()
-            let imageKeywords = ["genera una imagen", "generame una imagen", "crea una imagen", "haz una imagen", "dibuja", "draw", "generate an image", "create an image", "make an image", "generate a picture", "/imagine"]
-            let wantsImage = imageKeywords.contains(where: { lowerPrompt.contains($0) }) || lowerPrompt.hasPrefix("imagine")
+            let imageKeywords = [
+                "genera una imagen", "generame una imagen", "generar una imagen", "crea una imagen", "creame una imagen",
+                "haz una imagen", "hazme una imagen", "dibuja", "dibujame", "draw", "generate an image", "create an image",
+                "make an image", "generate a picture", "paint", "pinta", "ilustra", "/imagine", "imagine"
+            ]
+            let wantsImage = imageKeywords.contains(where: { lowerPrompt.contains($0) }) || lowerPrompt.hasPrefix("imagen de") || lowerPrompt.hasPrefix("foto de")
             if wantsImage {
                 let cleanUserPrompt = userPrompt.replacingOccurrences(of: "\"", with: " ").replacingOccurrences(of: "\n", with: " ")
                 let fallback = await executeOrbit(name: "generate_image", paramsJson: "{\"prompt\": \"\(cleanUserPrompt)\"}", baseUrl: baseUrl, apiKey: apiKey)
                 results.append(fallback)
                 if !fallback.result.isEmpty {
                     detectedImageUrl = fallback.result
-                    // Strip refusal prose since the image was actually produced
-                    if let refusalRegex = try? NSRegularExpression(pattern: "(?i)(?:no puedo (?:generar|crear)[^\n.]*[\n.]?|lo siento[^\n]*imagen[^\n]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)", options: []) {
+                    // Strip refusal or inability prose since the image was actually produced
+                    if let refusalRegex = try? NSRegularExpression(pattern: "(?i)(?:no (?:puedo|tengo la capacidad de|soy capaz de) (?:generar|crear|dibujar)[^\n.]*[\n.]?|lo siento[^\n]*imagen[^\n]*[\n.]?|como (?:modelo de lenguaje|ia)[^\n]*imagen[^\n]*[\n.]?|i can(?:not|'t) (?:generate|create) images?[^\n.]*[\n.]?)", options: []) {
                         outputText = refusalRegex.stringByReplacingMatches(in: outputText, options: [], range: NSRange(location: 0, length: (outputText as NSString).length), withTemplate: "")
                     }
                 }

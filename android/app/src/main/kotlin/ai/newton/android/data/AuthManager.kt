@@ -348,6 +348,14 @@ class AuthManager private constructor(private val appContext: Context) {
         _creditsRemaining.value = newCreditsRemaining
     }
 
+    fun updateDailyImagesFromStream(used: Int, limit: String? = null) {
+        val current = _tier.value
+        _tier.value = current.copy(
+            dailyImagesUsed = used,
+            dailyImagesLimit = limit ?: current.dailyImagesLimit
+        )
+    }
+
     fun logout() {
         val key = nwtnKey
         if (key.isNotEmpty()) {

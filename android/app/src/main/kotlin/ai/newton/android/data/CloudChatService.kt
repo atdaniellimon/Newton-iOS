@@ -307,10 +307,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
         val imagesLimitHeader = response.header("X-Daily-Images-Limit")
         if (imagesUsedHeader != null || imagesLimitHeader != null) {
             val used = imagesUsedHeader?.toIntOrNull() ?: auth.tier.value.dailyImagesUsed
-            val limit = imagesLimitHeader ?: auth.tier.value.dailyImagesLimit
-            // Reflect in auth.tier
-            val updatedTier = auth.tier.value.copy(dailyImagesUsed = used, dailyImagesLimit = limit)
-            // (AuthManager manages tier flow)
+            auth.updateDailyImagesFromStream(used, imagesLimitHeader)
         }
 
         val source = response.body?.source() ?: return@flow
@@ -343,6 +340,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
                             emit(reply)
                         }
                         break
+                    }
                 } catch (e: Exception) {
                     if (e.message != null && e.message?.isNotEmpty() == true && !e.message!!.startsWith("org.json")) throw e
                 }
