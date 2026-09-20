@@ -31,8 +31,12 @@ public struct MainView: View {
                     navigationPath.append(convoId)
                 }
             )
-            .navigationDestination(for: String.self) { convoId in
-                ChatWrapperView(initialId: convoId)
+            .navigationDestination(for: String.self) { targetId in
+                if targetId.hasPrefix("remote:") {
+                    RemoteChatRouteView(routeString: targetId)
+                } else {
+                    ChatWrapperView(initialId: targetId)
+                }
             }
         }
         .accentColor(NewtonTheme.sand)
@@ -115,5 +119,37 @@ public struct ChatWrapperView: View {
                 }
             }
         }
+    }
+}
+
+
+public struct RemoteChatRouteView: View {
+    public let routeString: String
+    
+    // Format: "remote:<encodedWsPath>:<chatId>" or "remote:<encodedWsPath>" or "remote:new"
+    public var body: some View {
+        let parts = routeString.components(separatedBy: ":")
+        let wsPath = parts.count > 1 ? (parts[1].removingPercentEncoding ?? parts[1]) : nil
+        let chatId = parts.count > 2 ? parts[2] : nil
+        
+        let wsItem = wsPath != nil && !wsPath!.isEmpty ? CloudChatService.RemoteWorkspaceItem(
+            name: (wsPath! as NSString).lastPathComponent,
+            path: wsPath!,
+            hasGit: nil,
+            branch: nil,
+            chats: nil
+        ) : nil
+        
+        let chatItem = chatId != nil && !chatId!.isEmpty ? CloudChatService.RemoteWorkspaceChat(
+            id: chatId!,
+            title: L10n.tr("Remote Task", es: "Tarea Remota"),
+            created_at: nil,
+            messages: nil
+        ) : nil
+        
+        DesktopRemoteControlView(
+            initialWorkspace: wsItem,
+            initialChat: chatItem
+        )
     }
 }

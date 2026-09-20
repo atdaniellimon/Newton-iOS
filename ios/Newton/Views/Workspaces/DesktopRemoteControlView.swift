@@ -43,9 +43,8 @@ public struct DesktopRemoteControlView: View {
     }
     
     public var body: some View {
-        NavigationView {
-            ZStack {
-                NewtonTheme.bg.ignoresSafeArea()
+        ZStack {
+            NewtonTheme.bg.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Minimal Workspace & Host Bar
@@ -117,16 +116,7 @@ public struct DesktopRemoteControlView: View {
             .navigationTitle(selectedWorkspace?.name ?? L10n.tr("Remote Studio", es: "Remote Studio"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        Haptics.light()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(NewtonTheme.textMuted)
-                    }
-                }
+                // Leading item provided by NavigationStack back button
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
@@ -164,7 +154,6 @@ public struct DesktopRemoteControlView: View {
             .onDisappear {
                 streamTask?.cancel()
             }
-        }
     }
     
     // MARK: - Workspace & Host Header Bar
@@ -526,48 +515,131 @@ public struct DesktopRemoteControlView: View {
         selectedChat = chat
         errorMessage = nil
         
-        // Populate messages array from chat history, filtering out internal agent loop tool steps
         var converted: [Message] = []
         if let rawMessages = chat.messages {
+            var pendingToolResults: [String: String] = [:] // toolName: output
+            
+            // First pass: collect tool outputs from user turns
+            for m in rawMessages {
+                let roleStr = m["role"] ?? "assistant"
+                let content = m["content"] ?? ""
+                if roleStr == "user" {
+                    if content.hasPrefix("<tool_response") || content.hasPrefix("<tool_results") {
+                        // Extract <result tool="xyz">content</result> or <tool_response tool="xyz">content</tool_response>
+                        let pattern = #"(?s)<(?:result|tool_response)[^>]*?tool=["']([^"']+)["'][^>]*?>(.*?)</(?:result|tool_response)>"#
+                        if let regex = try? NSRegularExpression(pattern: pattern) {
+                            let nsContent = content as NSString
+                            let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+                            for match in matches {
+                                if match.numberOfRanges >= 3 {
+                                    let toolName = nsContent.substring(with: match.range(at: 1))
+                                    let toolOut = nsContent.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                                    pendingToolResults[toolName] = toolOut
+                                }
+                            }
+                        }
+                    } else if content.hasPrefix("[TOOL_RESULT:") {
+                        let trimmed = content.replacingOccurrences(of: "[TOOL_RESULT:", with: "")
+                        let parts = trimmed.split(separator: "]", maxSplits: 1, omittingEmptySubsequences: true)
+                        if parts.count >= 2 {
+                            let toolName = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                            let toolOut = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            pendingToolResults[toolName] = toolOut
+                        }
+                    }
+                }
+            }
+            
             for m in rawMessages {
                 let roleStr = m["role"] ?? "assistant"
                 var content = m["content"] ?? ""
                 
-                // If it's a user turn that was actually an internal tool result, skip it from normal user bubbles
-                if roleStr == "user" && content.hasPrefix("[TOOL_RESULT:") {
+                // Filter internal user turns that are only tool response injections
+                if roleStr == "user" {
+                    if content.hasPrefix("<tool_response") || content.hasPrefix("<tool_results") || content.hasPrefix("<system_gate") || content.hasPrefix("<system_notice") || content.hasPrefix("[TOOL_RESULT:") {
+                        continue
+                    }
+                    if content.contains("USER INTENT:") {
+                        let pattern = #"USER INTENT:\s*([\s\S]*?)(?:\n\nYou are working autonomous|\n\[ACTIVE WORKSPACE|$)"#
+                        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                           let match = regex.firstMatch(in: content, range: NSRange(location: 0, length: (content as NSString).length)),
+                           match.numberOfRanges >= 2 {
+                            content = (content as NSString).substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                    } else if content.contains("[LOCAL WORKSPACE INSPECTION:") {
+                        if let lastDoubleNewline = content.range(of: "\n\n", options: .backwards) {
+                            content = String(content[lastDoubleNewline.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                    }
+                    
+                    converted.append(Message(
+                        id: UUID().uuidString,
+                        role: .user,
+                        content: content
+                    ))
                     continue
                 }
                 
-                // If it's an assistant turn that only executed a tool_call without conversational text, skip it
-                if roleStr == "assistant" && content.contains("<tool_call>") {
-                    // Extract any conversational text outside of <tool_call>...</tool_call>
-                    let cleaned = content.replacingOccurrences(of: "(?s)<tool_call>.*?</tool_call>", with: "", options: .regularExpression)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    if cleaned.isEmpty {
-                        continue
+                // Role assistant
+                var orbitResults: [OrbitExecutionResult] = []
+                
+                // Extract all tool_call blocks
+                let toolPattern = #"(?s)<tool_call>([\s\S]*?)</tool_call>"#
+                if let toolRegex = try? NSRegularExpression(pattern: toolPattern) {
+                    let nsContent = content as NSString
+                    let matches = toolRegex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+                    for match in matches {
+                        if match.numberOfRanges >= 2 {
+                            let rawJson = nsContent.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let data = rawJson.data(using: .utf8),
+                               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let toolName = obj["tool"] as? String {
+                                
+                                let paramObj = obj["parameters"] as? [String: Any] ?? [:]
+                                let paramStr: String
+                                if let pData = try? JSONSerialization.data(withJSONObject: paramObj, options: [.prettyPrinted]),
+                                   let s = String(data: pData, encoding: .utf8) {
+                                    paramStr = s
+                                } else {
+                                    paramStr = "\(paramObj)"
+                                }
+                                
+                                let out = pendingToolResults[toolName] ?? "Completado con éxito."
+                                orbitResults.append(OrbitExecutionResult(
+                                    orbitName: toolName,
+                                    params: paramStr,
+                                    result: out,
+                                    isSuccess: !out.lowercased().contains("error")
+                                ))
+                            }
+                        }
                     }
-                    content = cleaned
                 }
                 
-                // Extract thinking tags if present
+                // Clean content from tool_call
+                var cleanContent = content.replacingOccurrences(of: "(?s)<tool_call>.*?</tool_call>", with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Extract thinking tags
                 var thinkingContent: String? = nil
-                if let thinkRange = content.range(of: "(?s)<think(?:ing)?>.*?</think(?:ing)?>", options: .regularExpression) {
-                    let fullTag = String(content[thinkRange])
+                if let thinkRange = cleanContent.range(of: "(?s)<think(?:ing)?>.*?</think(?:ing)?>", options: .regularExpression) {
+                    let fullTag = String(cleanContent[thinkRange])
                     let stripped = fullTag.replacingOccurrences(of: "<think>", with: "")
                         .replacingOccurrences(of: "</think>", with: "")
                         .replacingOccurrences(of: "<thinking>", with: "")
                         .replacingOccurrences(of: "</thinking>", with: "")
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                     thinkingContent = stripped
-                    content = content.replacingCharacters(in: thinkRange, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    cleanContent = cleanContent.replacingCharacters(in: thinkRange, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
                 }
                 
-                if !content.isEmpty {
+                if !cleanContent.isEmpty || !orbitResults.isEmpty || thinkingContent != nil {
                     converted.append(Message(
                         id: UUID().uuidString,
-                        role: roleStr == "user" ? .user : .assistant,
-                        content: content,
-                        thinkingContent: thinkingContent
+                        role: .assistant,
+                        content: cleanContent,
+                        thinkingContent: thinkingContent,
+                        orbitResults: orbitResults
                     ))
                 }
             }
@@ -672,6 +744,23 @@ public struct DesktopRemoteControlView: View {
                         self.activeToolName = step.toolName
                     } else if step.stepType == "tool_done" {
                         self.activeToolName = nil
+                        // Create interactive OrbitExecutionResult card live in chat
+                        if let toolName = step.toolName, !toolName.isEmpty {
+                            let out = step.stdout ?? step.stderr ?? step.message ?? "Acción completada con éxito."
+                            let orbit = OrbitExecutionResult(
+                                orbitName: toolName,
+                                params: step.toolName ?? "",
+                                result: out,
+                                isSuccess: step.stderr == nil || step.stderr?.isEmpty == true
+                            )
+                            let actionMessage = Message(
+                                id: UUID().uuidString,
+                                role: .assistant,
+                                content: "",
+                                orbitResults: [orbit]
+                            )
+                            self.messages.append(actionMessage)
+                        }
                     } else if step.stepType == "task_done" {
                         self.isExecuting = false
                         self.activeToolName = nil

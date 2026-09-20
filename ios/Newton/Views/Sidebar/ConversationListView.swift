@@ -125,9 +125,10 @@ public struct ConversationListView: View {
                     
                     Button {
                         Haptics.light()
-                        showWorkspaces = true
+                        currentMode = .remoteStudio
+                        loadRemoteStudioData()
                     } label: {
-                        SidebarItemRow(icon: "folder.fill", title: L10n.tr("Workspaces", es: "Espacios de trabajo"), isSelected: false)
+                        SidebarItemRow(icon: "folder.fill", title: L10n.tr("Workspaces & Host", es: "Espacios de trabajo"), isSelected: currentMode == .remoteStudio)
                     }
                     
                     Button {
@@ -259,12 +260,7 @@ public struct ConversationListView: View {
         .sheet(isPresented: $showWorkspaces) {
             WorkspaceListView()
         }
-        .sheet(isPresented: $showDesktopRemote) {
-            DesktopRemoteControlView(
-                initialWorkspace: activeRemoteWorkspace,
-                initialChat: activeRemoteChat
-            )
-        }
+
         .onAppear {
             loadRemoteStatusQuietly()
         }
@@ -526,9 +522,11 @@ public struct ConversationListView: View {
     }
     
     private func openRemoteSession(workspace: CloudChatService.RemoteWorkspaceItem?, chat: CloudChatService.RemoteWorkspaceChat?) {
-        activeRemoteWorkspace = workspace
-        activeRemoteChat = chat
-        showDesktopRemote = true
+        let wsPart = workspace?.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
+        let chatPart = chat?.id ?? ""
+        let routeId = "remote:\(wsPart):\(chatPart)"
+        selectedConversationId = routeId
+        onSelectConversation?(routeId)
     }
     
     private func loadRemoteStatusQuietly() {
