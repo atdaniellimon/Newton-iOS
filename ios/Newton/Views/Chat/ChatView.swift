@@ -144,33 +144,7 @@ public struct ChatView: View {
                         }
                         .padding(.vertical, 10)
                     }
-                    .overlay(
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                        proxy.scrollTo("bottom_anchor", anchor: .bottom)
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundColor(NewtonTheme.sand)
-                                        .frame(width: 36, height: 36)
-                                        .background(NewtonTheme.card.opacity(0.95))
-                                        .clipShape(Circle())
-                                        .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(NewtonTheme.border, lineWidth: 0.8)
-                                        )
-                                }
-                                .padding(.trailing, 16)
-                                .padding(.bottom, 12)
-                            }
-                        }
-                    )
+                    .overlay(scrollToBottomOverlay(proxy: proxy))
                     .onChange(of: conversation.messages.count) { _ in
                         withAnimation {
                             proxy.scrollTo("bottom_anchor", anchor: .bottom)
@@ -239,23 +213,23 @@ public struct ChatView: View {
         .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    Haptics.light()
-                    activeSheet = .remoteStudio
-                } label: {
+            if conversation.isRemoteCodeChat {
+                ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 5) {
-                        Image(systemName: "laptopcomputer.and.iphone")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Remote")
-                            .font(.system(size: 12, weight: .semibold))
-                            .lineLimit(1)
+                        Circle()
+                            .fill((CloudChatService.shared.desktopStatus?.online == true) ? Color.green : Color.red)
+                            .frame(width: 7, height: 7)
+                        Text(CloudChatService.shared.desktopStatus?.online == true ? "Host Online" : "Host Offline")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundColor(NewtonTheme.sand)
                     }
-                    .foregroundColor(NewtonTheme.sand)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(NewtonTheme.sand.opacity(0.12))
+                    .background(NewtonTheme.card)
                     .clipShape(Capsule())
+                    .overlay(
+                        Capsule().stroke(NewtonTheme.border, lineWidth: 0.5)
+                    )
                 }
             }
             
@@ -436,6 +410,35 @@ public struct ChatView: View {
         .onDisappear {
             peerEventTask?.cancel()
             peerEventTask = nil
+        }
+    }
+    
+    @ViewBuilder
+    private func scrollToBottomOverlay(proxy: ScrollViewProxy) -> some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(NewtonTheme.sand)
+                        .frame(width: 36, height: 36)
+                        .background(NewtonTheme.card.opacity(0.95))
+                        .clipShape(Circle())
+                        .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
+                        .overlay(
+                            Circle()
+                                .stroke(NewtonTheme.border, lineWidth: 0.8)
+                        )
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, 12)
+            }
         }
     }
     
