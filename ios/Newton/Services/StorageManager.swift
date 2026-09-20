@@ -275,7 +275,7 @@ public final class StorageManager: ObservableObject {
             }
         case .chatDeleted:
             deleteConversation(id: chatId)
-        case .unknown:
+        case .desktopStatus, .unknown:
             break
         }
     }
