@@ -1,0 +1,10 @@
+Nombre del Proyecto: newton-desktop
+Versión: 0.1.0
+Dependencias:
+  dotenv: ^16.4.7
+  framework7-icons: ^5.0.5
+  marked: ^18.0.13
+  three: ^0.186.0
+Dependencias de Desarrollo:
+  electron: ^33.2.0
+  electron-reload: ^2.0.0-alpha.1

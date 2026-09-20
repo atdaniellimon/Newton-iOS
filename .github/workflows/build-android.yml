@@ -36,8 +36,9 @@ jobs:
           unzip -q /tmp/gradle.zip -d /tmp
           echo "/tmp/gradle-8.7/bin" >> "$GITHUB_PATH"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
 
       - name: Run shared tests
         working-directory: android
@@ -65,13 +66,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install platform & build-tools
         run: |
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-          yes | sdkmanager --licenses > /dev/null || true
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          fi
+          yes | $SDKMANAGER --licenses || true
+          $SDKMANAGER "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Install Gradle 8.7
         run: |

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: blob:;">
+  <title>Newton AI</title>
+  <link rel="icon" type="image/png" href="../assets/icon.png">
+  <link rel="stylesheet" href="../../node_modules/framework7-icons/css/framework7-icons.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- 3D Kinetic Everforest Background Canvas -->
+  <div id="background-canvas"></div>
+
+  <!-- macOS Drag Region / Titlebar -->
+  <div class="window-titlebar">
+    <div class="titlebar-left">
+      <div class="mode-segmented-pill" id="titlebar-mode-pill">
+        <button class="mode-pill-btn active" data-mode="chat" id="btn-mode-home">
+          <i class="f7-icons">house_fill</i>
+          <span>Home</span>
+        </button>
+        <button class="mode-pill-btn" data-mode="code" id="btn-mode-code">
+          <i class="f7-icons">chevron_left_slash_chevron_right</i>
+          <span>Code</span>
+        </button>
+      </div>
+    </div>
+    <div class="titlebar-center">
+      <span class="window-title-brand" id="titlebar-brand">Newton</span>
+    </div>
+    <div class="titlebar-right">
+      <select id="mode-select" class="mode-select" style="display: none;">
+        <option value="chat">Chat</option>
+        <option value="code">Code</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="app-container" id="app-container" data-mode="chat">
+    
+    <!-- ====================================================================
+         1. CHAT MODE SIDEBAR (Everforest iOS Style)
+         ==================================================================== -->
+    <aside class="sidebar sidebar-chat-view" id="sidebar-chat">
+      <div class="sidebar-nav-section">
+        <button class="sidebar-nav-item active" id="btn-nav-chats" style="margin-top: 10px;">
+          <i class="f7-icons">chat_bubble_2</i>
+          <span>Chats</span>
+        </button>
+        <button class="sidebar-nav-item" id="btn-ghost-mode" title="Sesión efímera sin guardar">
+          <i class="f7-icons icon-ghost">clock</i>
+          <span>Ghost Session</span>
+        </button>
+        <button class="sidebar-nav-item" id="btn-gallery" title="Galería de arte">
+          <i class="f7-icons icon-gallery">photo_on_rectangle</i>
+          <span>Art gallery</span>
+        </button>
+      </div>
+
+      <div class="sidebar-recents-header">
+        <span class="recents-label">Recents</span>
+      </div>
+
+      <div class="sidebar-history" id="chat-history-list">
+        <div class="history-item empty-placeholder">
+          <span>Loading conversations...</span>
+        </div>
+      </div>
+
+      <div class="sidebar-bottom-bar">
+        <div class="user-profile-bar user-profile-integrated" id="user-profile-bar">
+          <div class="user-avatar-circle" id="user-avatar">?</div>
+          <div class="user-info-meta">
+            <div class="user-email-text" id="user-email">Sin sesión</div>
+            <div class="user-tier-credits">
+              <span class="tier-badge-ios" id="user-tier">Invitado</span>
+              <span class="credits-label" id="user-credits">--</span>
+            </div>
+          </div>
+          <button class="btn-settings-inline" id="btn-settings" title="Configuración">
+            <i class="f7-icons">gear_alt</i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ====================================================================
+         2. CODE MODE SIDEBAR (Claude Code Charcoal Style)
+         ==================================================================== -->
+    <aside class="sidebar sidebar-code-view" id="sidebar-code" style="display: none;">
+      <div class="code-workspaces-header">
+        <span class="code-section-title">WORKSPACES</span>
+        <button class="btn-code-add-folder" id="btn-code-add-workspace" title="Agregar directorio...">
+          <i class="f7-icons">plus</i>
+        </button>
+      </div>
+
+      <div class="code-workspaces-tree" id="code-workspaces-tree">
+        <!-- Populated dynamically with workspaces and their chats -->
+      </div>
+
+      <!-- User Profile in Code Mode (Consistent Integrated Footer) -->
+      <div class="sidebar-bottom-bar">
+        <div class="user-profile-bar user-profile-integrated" id="code-user-profile-bar">
+          <div class="user-avatar-circle" id="code-user-avatar">?</div>
+          <div class="user-info-meta">
+            <div class="user-email-text" id="code-user-email">Sin sesión</div>
+            <div class="user-tier-credits">
+              <span class="tier-badge-ios" id="code-user-tier">Invitado</span>
+              <span class="credits-label" id="code-user-credits">--</span>
+            </div>
+          </div>
+          <button class="btn-settings-inline" id="btn-code-settings" title="Configuración">
+            <i class="f7-icons">gear_alt</i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ====================================================================
+         3. CHAT WORKSPACE (Everforest iOS Style)
+         ==================================================================== -->
+    <main class="chat-workspace chat-workspace-view" id="chat-workspace-view">
+      <header class="workspace-header">
+        <div class="workspace-header-left">
+          <span id="active-chat-title" class="active-chat-title">New chat</span>
+        </div>
+
+        <div id="ghost-banner" class="ghost-banner" style="display: none;">
+          <span class="ghost-label">Ghost Session</span>
+          <button id="btn-vanish" class="btn-vanish" title="Borrar y cerrar sesión temporal">Vanish</button>
+        </div>
+
+        <div class="workspace-header-right">
+          <div class="model-picker-wrapper">
+            <select id="model-select" class="model-select-picker" title="Seleccionar modelo de Newton">
+              <option value="Singularity">Singularity</option>
+              <option value="Singularity-Matrix">Singularity Matrix</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <div class="messages-container" id="messages-container">
+        <!-- Newton Hero Welcome View -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="hero-brand-group">
+            <img src="../assets/newton_logo.png" alt="Newton" class="hero-brand-icon">
+            <h1 class="hero-title">What will you discover today?</h1>
+            <p class="hero-subtitle" id="hero-subtitle">Ask Newton to explain, build, or reason — one focused place to start.</p>
+          </div>
+          <div class="hero-primary-row">
+            <button class="hero-primary-cta" id="hero-primary-cta" data-prompt="Explain the fundamental principles of quantum computing and qubits with a clear analogy.">
+              <i class="f7-icons">sparkles</i>
+              <span>Start a discovery</span>
+            </button>
+          </div>
+          <div class="hero-secondary-list" aria-label="Quick starts">
+            <span class="hero-secondary-label">Or try</span>
+            <button class="hero-secondary-btn" data-prompt="Write a modern, robust Python script using asyncio and BeautifulSoup to scrape and parse data.">Code &amp; debug — Python web scraper <small>Asyncio + BeautifulSoup, ready to run</small></button>
+            <button class="hero-secondary-btn" data-prompt="Draft a concise technical architecture specification for a high-performance streaming API.">Write &amp; draft — Streaming API spec <small>High-performance, production-shaped</small></button>
+            <button class="hero-secondary-btn" data-prompt="Analyze the mathematical foundations, reasoning capabilities, and architecture of modern neural attention models.">Analyze &amp; reason — Attention models <small>Mathematical foundations</small></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="attachment-preview-bar" id="attachment-preview-bar" style="display: none;">
+        <div class="attachment-preview-pill" id="attachment-item">
+          <i class="f7-icons attachment-icon" id="attachment-icon">doc_fill</i>
+          <span class="attachment-name" id="attachment-name"></span>
+          <button type="button" class="btn-remove-attachment" id="btn-remove-attachment" title="Remover adjunto">
+            <i class="f7-icons">xmark_circle_fill</i>
+          </button>
+        </div>
+      </div>
+
+      <div class="input-bar-container">
+        <form id="chat-form" class="message-input-capsule">
+          <button type="button" id="btn-attach" class="btn-circle-action" title="Adjuntar archivo o imagen">
+            <i class="f7-icons">plus</i>
+          </button>
+          <input type="file" id="file-input" style="display: none;" accept="image/*,.pdf,.txt,.py,.js,.json,.md">
+
+          <textarea
+            id="prompt-input"
+            rows="1"
+            placeholder="Reply to Newton..."
+            autocomplete="off"
+          ></textarea>
+
+          <button type="submit" id="btn-send" class="btn-circle-send" title="Enviar" disabled>
+            <i class="f7-icons" id="btn-send-icon">arrow_up</i>
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <!-- ====================================================================
+         4. CODE WORKSPACE (Claude Code Carbon Style)
+         ==================================================================== -->
+    <main class="code-workspace code-workspace-view" id="code-workspace-view" style="display: none;">
+      <!-- Code Top Header: Clean modern breadcrumb navigation -->
+      <header class="code-top-nav" id="code-top-nav">
+        <div class="code-nav-left">
+          <div class="code-breadcrumb-item clickable" id="btn-header-ws">
+            <i class="f7-icons" style="font-size: 13px; color: #4ed187;">folder_fill</i>
+            <span id="code-breadcrumb-ws" class="breadcrumb-ws-name">desktop</span>
+          </div>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-sep" id="code-breadcrumb-task-sep" style="display: none;">/</span>
+          <span id="code-breadcrumb-task" class="breadcrumb-task-name" style="display: none;">Nueva tarea</span>
+        </div>
+        <div class="code-nav-right">
+          <button class="btn-code-nav-action" id="btn-open-terminal-drawer" title="Terminal integrada">
+            <i class="f7-icons">terminal</i>
+            <span>Terminal</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Code Center Dashboard / Chat Scroll View -->
+      <div class="code-center-scroll" id="code-center-scroll">
+        
+        <!-- Dashboard Overview Widget -->
+        <div class="code-dashboard-card" id="code-dashboard-card">
+          <img src="../assets/newton_logo.png" alt="Newton">
+          <h1>Let's code.</h1>
+        </div>
+
+        <!-- Dynamic Code Session Chat / Terminal Feed -->
+        <div class="code-messages-stream" id="code-messages-stream" style="display: none;">
+          <!-- Messages will append here when interacting in Code Mode -->
+        </div>
+      </div>
+
+      <!-- File Manager / Terminal Drawer Overlay (collapsible) -->
+      <div class="code-tools-drawer" id="code-tools-drawer" style="display: none;">
+        <div class="tools-drawer-header">
+          <span class="tools-drawer-title" id="tools-drawer-title">Explorador de Archivos</span>
+          <button class="btn-drawer-close" id="btn-close-drawer"><i class="f7-icons">xmark</i></button>
+        </div>
+        <div class="tools-drawer-body" id="tools-drawer-body">
+          <!-- Populated with File Tree or Terminal Output -->
+        </div>
+      </div>
+
+      <!-- Floating Code Bottom Input Bar -->
+      <div class="code-floating-bar-container">
+        <div class="code-input-box">
+          <form id="code-task-form">
+            <textarea
+              id="code-task-input"
+              rows="1"
+              placeholder="Describe a task or ask a question"
+              autocomplete="off"
+            ></textarea>
+            <button type="submit" id="btn-code-submit" class="btn-code-submit" title="Ejecutar tarea">
+              <i class="f7-icons">arrow_up</i>
+            </button>
+          </form>
+        </div>
+
+        <!-- Bottom Controls Row: Bypass permissions + Model + Effort -->
+        <div class="code-bottom-controls-row">
+          <div class="code-controls-left">
+            <label class="bypass-permissions-label" title="Permite crear, editar archivos y ejecutar comandos sin confirmación">
+              <input type="checkbox" id="check-bypass-permissions" checked>
+              <span>Bypass permissions</span>
+            </label>
+          </div>
+
+          <div class="code-controls-right">
+            <!-- Model locked to Newton Singularity-Matrix -->
+            <div class="code-model-badge">
+              <span>Singularity Matrix</span>
+            </div>
+
+            <!-- Effort Selector: High, Medium, Low -->
+            <div class="code-effort-badge clickable" id="btn-toggle-effort" title="Ajustar nivel de esfuerzo de razonamiento">
+              <span id="label-effort-val">High</span>
+              <span class="effort-circle-indicator" id="effort-circle-indicator">◯</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal: Art Gallery View -->
+    <div id="art-gallery-modal" class="modal-sheet-overlay" style="display: none;">
+      <div class="modal-sheet-card gallery-modal-card">
+        <div class="modal-sheet-header">
+          <div class="modal-header-left">
+            <h2 class="modal-title-serif">Art gallery</h2>
+          </div>
+          <div class="modal-header-right">
+            <button class="btn-modal-close" id="btn-close-gallery" title="Cerrar">
+              <i class="f7-icons">xmark</i>
+            </button>
+          </div>
+        </div>
+
+        <div class="gallery-generator-bar">
+          <input
+            type="text"
+            id="gallery-prompt-input"
+            class="gallery-prompt-input"
+            placeholder="Crea arte con Newton Singularity (ej. Cyberpunk programmer workstation with rain)..."
+          >
+          <button id="btn-gallery-generate" class="btn-gallery-generate">
+            <i class="f7-icons">sparkles</i>
+            <span>Generar</span>
+          </button>
+        </div>
+
+        <div class="gallery-segmented-picker">
+          <button class="gallery-tab-btn active" data-tab="generated" id="tab-generated">
+            <span>Generadas (<span id="count-generated">0</span>)</span>
+          </button>
+          <button class="gallery-tab-btn" data-tab="sent" id="tab-sent">
+            <span>Subidas / Fotos (<span id="count-sent">0</span>)</span>
+          </button>
+        </div>
+
+        <div class="gallery-scroll-area">
+          <div id="gallery-grid" class="gallery-grid"></div>
+          <div id="gallery-empty-state" class="gallery-empty-state" style="display: none;">
+            <i class="f7-icons gallery-empty-icon">paintpalette</i>
+            <h3>No hay imágenes aún</h3>
+            <p>Escribe un prompt arriba para generar una obra de arte o adjunta fotos en tus chats.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Settings View -->
+    <div id="settings-modal" class="modal-sheet-overlay" style="display: none;">
+      <div class="modal-sheet-card settings-modal-card">
+        <div class="modal-sheet-header">
+          <div class="modal-header-left">
+            <h2 class="modal-title-serif">Configuración</h2>
+          </div>
+          <div class="modal-header-right">
+            <button class="btn-modal-close" id="btn-close-settings" title="Cerrar">
+              <i class="f7-icons">xmark</i>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-scroll-area">
+          <div class="settings-section">
+            <div class="settings-section-title">CUENTA & ACCESO</div>
+            <div class="settings-grouped-card">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">person_crop_circle</i>
+                  <span>Usuario</span>
+                </div>
+                <div class="settings-row-right" id="settings-username">Sin sesión</div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">envelope</i>
+                  <span>Email</span>
+                </div>
+                <div class="settings-row-right" id="settings-email">Sin sesión</div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">key</i>
+                  <span>API Key</span>
+                </div>
+                <div class="settings-row-right key-row-right">
+                  <span id="settings-api-key" class="key-preview">••••••••••••••••</span>
+                  <button id="btn-copy-key" class="btn-row-action" title="Copiar API Key">
+                    <i class="f7-icons">doc_on_doc</i>
+                  </button>
+                  <button id="btn-rotate-key" class="btn-row-action btn-danger" title="Rotar clave de API">
+                    <i class="f7-icons">arrow_2_circlepath</i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">PLAN & SUSCRIPCIÓN</div>
+            <div class="settings-grouped-card">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">sparkles</i>
+                  <span>Nivel de Acceso</span>
+                </div>
+                <div class="settings-row-right">
+                  <span class="tier-badge-ios" id="settings-tier-badge">Matrix</span>
+                  <span class="price-subtext">($3,000 MXN/mes)</span>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">chart_bar</i>
+                  <span>Créditos de Tokens</span>
+                </div>
+                <div class="settings-row-right font-mono" id="settings-credits">9,998,753,292</div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">speedometer</i>
+                  <span>Límite de Peticiones</span>
+                </div>
+                <div class="settings-row-right" id="settings-rpm">600 RPM (Matrix Ultra)</div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">clock</i>
+                  <span>Uso 5 Horas / Semanal</span>
+                </div>
+                <div class="settings-row-right" id="settings-quotas">85 / 2,500 reqs</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">INFERENCIA & MODELOS</div>
+            <div class="settings-grouped-card">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">cube</i>
+                  <span>Modelo por Defecto</span>
+                </div>
+                <div class="settings-row-right">
+                  <select id="setting-default-model" class="settings-select">
+                    <option value="Singularity">Singularity</option>
+                    <option value="Singularity-Matrix">Singularity Matrix</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">waveform_path</i>
+                  <span>Transmisión en Tiempo Real (SSE)</span>
+                </div>
+                <div class="settings-row-right">
+                  <label class="ios-switch">
+                    <input type="checkbox" id="setting-stream-toggle" checked>
+                    <span class="ios-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">pencil_ellipsis_rectangle</i>
+                  <span>Generar Títulos Automáticos</span>
+                </div>
+                <div class="settings-row-right">
+                  <label class="ios-switch">
+                    <input type="checkbox" id="setting-autotitle-toggle" checked>
+                    <span class="ios-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">APARIENCIA & EXPERIENCIA</div>
+            <div class="settings-grouped-card">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">moon_stars</i>
+                  <span>Modo de Tema</span>
+                </div>
+                <div class="settings-row-right">
+                  <select id="setting-theme" class="settings-select">
+                    <option value="dark">Dark (Everforest)</option>
+                    <option value="light">Light (Warm Canvas)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">sparkles</i>
+                  <span>Expandir Razonamiento ("Thinked")</span>
+                </div>
+                <div class="settings-row-right">
+                  <label class="ios-switch">
+                    <input type="checkbox" id="setting-thinked-expand" checked>
+                    <span class="ios-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">globe</i>
+                  <span>Idioma de la Interfaz</span>
+                </div>
+                <div class="settings-row-right">
+                  <select id="setting-language" class="settings-select">
+                    <option value="es">Español</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">DATOS & ALMACENAMIENTO</div>
+            <div class="settings-grouped-card">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">trash</i>
+                  <span>Galería de Arte</span>
+                </div>
+                <div class="settings-row-right">
+                  <button id="btn-clear-gallery" class="btn-settings-action">Limpiar Galería</button>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">arrow_down_doc</i>
+                  <span>Historial de Conversaciones</span>
+                </div>
+                <div class="settings-row-right">
+                  <button id="btn-export-chats" class="btn-settings-action">Exportar JSON</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">SISTEMA</div>
+            <div class="settings-grouped-card">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <i class="f7-icons">info_circle</i>
+                  <span>Versión</span>
+                </div>
+                <div class="settings-row-right">Newton Desktop v0.1.0 • Core 2.2</div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row clickable" id="btn-switch-account-row" style="cursor: pointer;">
+                <div class="settings-row-left">
+                  <i class="f7-icons">person_2</i>
+                  <span>Cambiar de Cuenta</span>
+                </div>
+                <div class="settings-row-right">
+                  <i class="f7-icons" style="font-size: 11px; color: #888;">chevron_right</i>
+                </div>
+              </div>
+              <div class="settings-divider"></div>
+              <div class="settings-row btn-logout-row" id="btn-logout-row">
+                <div class="settings-row-left text-danger">
+                  <i class="f7-icons text-danger">arrow_right_square</i>
+                  <span class="text-danger">Cerrar Sesión</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Image Lightbox Preview -->
+    <div id="lightbox-modal" class="lightbox-overlay" style="display: none;">
+      <div class="lightbox-content">
+        <button class="lightbox-close" id="btn-lightbox-close"><i class="f7-icons">xmark</i></button>
+        <img id="lightbox-img" src="" alt="Vista previa">
+        <div class="lightbox-caption" id="lightbox-caption"></div>
+        <div class="lightbox-actions">
+          <button id="btn-lightbox-copy" class="btn-lightbox-action"><i class="f7-icons">doc_on_doc</i> Copiar Enlace</button>
+          <button id="btn-lightbox-open" class="btn-lightbox-action"><i class="f7-icons">arrow_up_right</i> Abrir en Navegador</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         Modal: Authentication Screen (Login / Register / Direct Key)
+         ==================================================================== -->
+    <div id="auth-modal" class="modal-sheet-overlay auth-modal-overlay" style="display: none;">
+      <div class="modal-sheet-card auth-card">
+        <button class="btn-auth-dismiss" id="btn-dismiss-auth" style="display: none;" title="Cerrar"><i class="f7-icons">xmark</i></button>
+        <!-- Auth Header with Thinking Orb -->
+        <div class="auth-header">
+          <div class="auth-orb-wrapper" id="auth-orb-container"></div>
+          <h2 class="auth-title">Newton AI</h2>
+          <p class="auth-subtitle">Acceso a la plataforma de inteligencia Newton Singularity</p>
+        </div>
+
+        <!-- Segmented Tab Switcher -->
+        <div class="auth-segmented-pill">
+          <button type="button" class="auth-pill-btn active" id="tab-auth-login">Iniciar Sesión</button>
+          <button type="button" class="auth-pill-btn" id="tab-auth-register">Crear Cuenta</button>
+          <button type="button" class="auth-pill-btn" id="tab-auth-key">Clave API</button>
+        </div>
+
+        <!-- Error / Info Banner -->
+        <div class="auth-alert-banner" id="auth-alert-banner" style="display: none;">
+          <i class="f7-icons auth-alert-icon">exclamationmark_triangle_fill</i>
+          <span id="auth-alert-msg">Mensaje de error</span>
+        </div>
+
+        <!-- 1. Form Login -->
+        <form class="auth-form-body" id="form-auth-login">
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="login-username">Usuario o Correo</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">person</i>
+              <input type="text" id="login-username" class="auth-input" placeholder="ejemplo@daniellimon.uk" required autocomplete="username">
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="login-password">Contraseña</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">lock</i>
+              <input type="password" id="login-password" class="auth-input" placeholder="••••••••••••" required autocomplete="current-password">
+              <button type="button" class="btn-toggle-password" id="btn-toggle-login-pwd" title="Mostrar/ocultar"><i class="f7-icons">eye</i></button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-auth-primary" id="btn-submit-login">
+            <span>Entrar a Newton</span>
+            <i class="f7-icons">arrow_right</i>
+          </button>
+        </form>
+
+        <!-- 2. Form Register -->
+        <form class="auth-form-body" id="form-auth-register" style="display: none;">
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="register-username">Nombre de Usuario</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">person</i>
+              <input type="text" id="register-username" class="auth-input" placeholder="dan_developer" required autocomplete="username">
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="register-email">Correo Electrónico</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">envelope</i>
+              <input type="email" id="register-email" class="auth-input" placeholder="nombre@correo.com" required autocomplete="email">
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="register-password">Contraseña</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">lock</i>
+              <input type="password" id="register-password" class="auth-input" placeholder="Mínimo 8 caracteres" required autocomplete="new-password">
+              <button type="button" class="btn-toggle-password" id="btn-toggle-reg-pwd" title="Mostrar/ocultar"><i class="f7-icons">eye</i></button>
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="register-tier">Plan / Nivel de Acceso</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">cube</i>
+              <select id="register-tier" class="auth-input auth-select">
+                <option value="base">Newton Base (Modelos estándar · 250 MXN)</option>
+                <option value="pro">Newton Pro (Singularity + Orbits · 850 MXN)</option>
+                <option value="matrix" selected>Newton Matrix (Full Singularity Matrix · Ultra)</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-auth-primary" id="btn-submit-register">
+            <span>Crear Cuenta</span>
+            <i class="f7-icons">plus</i>
+          </button>
+        </form>
+
+        <!-- 3. Form Direct API Key -->
+        <form class="auth-form-body" id="form-auth-key" style="display: none;">
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="input-direct-api-key">Clave Secreta de API (ntwn-...)</label>
+            <div class="auth-input-wrapper">
+              <i class="f7-icons auth-input-icon">key</i>
+              <input type="password" id="input-direct-api-key" class="auth-input" placeholder="ntwn-..." required autocomplete="off">
+            </div>
+          </div>
+          <p class="auth-key-hint">Puedes conectar directamente tu clave API provista por Newton Gateway.</p>
+
+          <button type="submit" class="btn-auth-primary" id="btn-submit-key">
+            <span>Conectar Clave</span>
+            <i class="f7-icons">link</i>
+          </button>
+        </form>
+
+        <!-- Auth Footer -->
+        <div class="auth-footer">
+          <span>Servidor: <strong>api.newton.daniellimon.uk</strong></span>
+          <span class="auth-footer-dot">•</span>
+          <span>Cifrado Seguro SSL TLS 1.3</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts: marked lazy-loaded after first paint via app.js; orbs/bg -->
+  <script src="thinking-orbs.js" defer></script>
+  <script type="module" src="bg.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

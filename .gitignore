@@ -7,9 +7,12 @@
 .idea/
 .vscode/
 
-# Node
+# Node & Electron
 node_modules/
 npm-debug.log*
+desktop/node_modules/
+desktop/dist/
+desktop/.session.json
 
 # Python
 __pycache__/

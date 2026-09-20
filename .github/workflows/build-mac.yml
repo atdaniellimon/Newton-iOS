@@ -16,26 +16,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
-          xcodebuild -version
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
 
-      - name: Run Mac Build Script
-        run: |
-          chmod +x mac/build_mac.sh
-          ./mac/build_mac.sh
+      - name: Install Dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build Electron App & DMG
+        working-directory: desktop
+        run: npx electron-builder --mac dmg --publish never
+
+      - name: Package App as ZIP
+        working-directory: desktop/dist/mac
+        run: zip -r -y "../Newton-Mac.zip" "Newton.app"
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Newton-macOS-Universal-DMG
-          path: build/Newton-Mac.dmg
+          name: Newton-Desktop-macOS-DMG
+          path: desktop/dist/*.dmg
           retention-days: 14
 
       - name: Upload ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Newton-macOS-Universal-ZIP
-          path: build/Newton-Mac.zip
+          name: Newton-Desktop-macOS-ZIP
+          path: desktop/dist/Newton-Mac.zip
           retention-days: 14
