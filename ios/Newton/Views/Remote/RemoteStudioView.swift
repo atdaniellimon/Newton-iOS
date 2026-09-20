@@ -12,6 +12,11 @@
 
 import SwiftUI
 
+public typealias RemoteDesktopStatus = CloudChatService.RemoteDesktopStatus
+public typealias RemoteWorkspaceItem = CloudChatService.RemoteWorkspaceItem
+public typealias RemoteStepEvent = CloudChatService.RemoteStepEvent
+public typealias RemoteWorkspaceChat = CloudChatService.RemoteWorkspaceChat
+
 public struct RemoteStudioView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var cloudService = CloudChatService.shared
