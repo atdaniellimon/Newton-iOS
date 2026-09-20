@@ -4,11 +4,9 @@
 //
 //  Created for Newton iOS.
 //  Local JSON & iCloud Ubiquitous Key-Value synchronization with Ephemeral Ghost Mode support.
-//  Fully integrated with Newton Labs Gateway v2.2.0 Cloud Chat API (/nwtn/chats & /nwtn/sync/events).
 //
 
 import Foundation
-import Combine
 
 public final class StorageManager: ObservableObject {
     public static let shared = StorageManager()
@@ -23,13 +21,9 @@ public final class StorageManager: ObservableObject {
         return docs.appendingPathComponent(conversationsFileName)
     }
     
-    private var cancellables = Set<AnyCancellable>()
-    
     private init() {
         loadConversations()
         setupCloudObserver()
-        setupAuthObserver()
-        setupGlobalSyncListener()
     }
     
     private func setupCloudObserver() {
@@ -43,149 +37,11 @@ public final class StorageManager: ObservableObject {
         NSUbiquitousKeyValueStore.default.synchronize()
     }
     
-    private func setupAuthObserver() {
-        // When user logs in, pull remote cloud chats
-        AuthManager.shared.$isLoggedIn
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] loggedIn in
-                guard let self = self else { return }
-                if loggedIn {
-                    Task { @MainActor [weak self] in
-                        await self?.syncWithRemoteServer()
-                    }
-                }
-            }
-            .store(in: &cancellables)
-    }
-    
-    public func reconnectSyncListenerIfNeeded() {
-        CloudChatService.shared.startGlobalSyncListener { [weak self] event in
-            guard let self = self else { return }
-            self.handleRemoteSyncEvent(event)
-        }
-    }
-    
-    private func setupGlobalSyncListener() {
-        reconnectSyncListenerIfNeeded()
-    }
-    
-    // MARK: - Server Synchronization
-    
-    @MainActor
-    public func syncWithRemoteServer() async {
-        guard AuthManager.shared.isLoggedIn else { return }
-        do {
-            let remoteChats = try await CloudChatService.shared.fetchChats()
-            // Keep local ghosts
-            let ghosts = self.conversations.filter { $0.isGhost }
-            
-            // Merge remote chats with local messages if available
-            var merged: [Conversation] = []
-            for rChat in remoteChats {
-                if let existing = self.conversations.first(where: { $0.id == rChat.id }) {
-                    var updated = rChat
-                    // Preserve already loaded local messages
-                    if !existing.messages.isEmpty {
-                        updated.messages = existing.messages
-                    }
-                    merged.append(updated)
-                } else {
-                    merged.append(rChat)
-                }
-            }
-            
-            self.conversations = ghosts + merged
-            sortConversations()
-            saveConversations()
-        } catch {
-            print("Remote cloud sync failed: \(error.localizedDescription)")
-        }
-    }
-    
-    private func handleRemoteSyncEvent(_ event: CloudSyncEvent) {
-        guard let chatId = event.chatId else { return }
-        
-        switch event.event {
-        case .chatCreated:
-            if !conversations.contains(where: { $0.id == chatId }) {
-                let newConvo = Conversation(
-                    id: chatId,
-                    title: event.title ?? "New Conversation",
-                    messages: [],
-                    isPinned: event.isPinned ?? false,
-                    isGhost: false,
-                    modelId: event.model ?? SettingsManager.shared.currentModelId,
-                    createdAt: Date(),
-                    updatedAt: event.updatedAt ?? Date()
-                )
-                conversations.insert(newConvo, at: 0)
-                sortConversations()
-                saveConversations()
-            }
-        case .chatUpdated:
-            if let idx = conversations.firstIndex(where: { $0.id == chatId }) {
-                if let title = event.title {
-                    conversations[idx].title = title
-                }
-                if let isPinned = event.isPinned {
-                    conversations[idx].isPinned = isPinned
-                }
-                if let model = event.model {
-                    conversations[idx].modelId = model
-                }
-                if let updated = event.updatedAt {
-                    conversations[idx].updatedAt = updated
-                }
-                sortConversations()
-                saveConversations()
-            }
-        case .chatDeleted:
-            conversations.removeAll(where: { $0.id == chatId })
-            saveConversations()
-        case .unknown:
-            break
-        }
-    }
-    
-    // MARK: - Conversation Lifecycle
-    
     public func createConversation(title: String = "New Conversation") -> Conversation {
         let newConvo = Conversation(title: title, messages: [])
         conversations.insert(newConvo, at: 0)
         sortConversations()
         saveConversations()
-        
-        if AuthManager.shared.isLoggedIn {
-            Task { @MainActor in
-                do {
-                    let remote = try await CloudChatService.shared.createChat(
-                        title: title,
-                        model: newConvo.modelId
-                    )
-                    // Update local placeholder ID to server ID
-                    if let idx = self.conversations.firstIndex(where: { $0.id == newConvo.id }) {
-                        let updated = self.conversations[idx]
-                        self.conversations.remove(at: idx)
-                        let synced = Conversation(
-                            id: remote.id,
-                            title: updated.title,
-                            messages: updated.messages,
-                            isPinned: updated.isPinned,
-                            isGhost: false,
-                            modelId: updated.modelId,
-                            createdAt: updated.createdAt,
-                            updatedAt: remote.updatedAt
-                        )
-                        self.conversations.insert(synced, at: 0)
-                        self.sortConversations()
-                        self.saveConversations()
-                    }
-                } catch {
-                    print("Failed to sync new chat to cloud API: \(error.localizedDescription)")
-                }
-            }
-        }
-        
         return newConvo
     }
 
@@ -210,18 +66,6 @@ public final class StorageManager: ObservableObject {
         conversations.removeAll(where: { $0.isGhost })
     }
     
-    public func updateConversationId(from oldId: String, to newId: String, updated: Conversation) {
-        if let index = conversations.firstIndex(where: { $0.id == oldId }) {
-            conversations[index] = updated
-            sortConversations()
-            if !updated.isGhost {
-                saveConversations()
-            }
-        } else {
-            updateConversation(updated)
-        }
-    }
-    
     public func updateConversation(_ convo: Conversation) {
         if let index = conversations.firstIndex(where: { $0.id == convo.id }) {
             var updated = convo
@@ -230,16 +74,6 @@ public final class StorageManager: ObservableObject {
             sortConversations()
             if !convo.isGhost {
                 saveConversations()
-                if AuthManager.shared.isLoggedIn {
-                    Task {
-                        try? await CloudChatService.shared.updateChat(
-                            id: convo.id,
-                            title: convo.title,
-                            isPinned: convo.isPinned,
-                            model: convo.modelId
-                        )
-                    }
-                }
             }
         }
     }
@@ -247,47 +81,21 @@ public final class StorageManager: ObservableObject {
     public func togglePin(id: String) {
         if let index = conversations.firstIndex(where: { $0.id == id }) {
             conversations[index].isPinned.toggle()
-            let isPinned = conversations[index].isPinned
-            let isGhost = conversations[index].isGhost
             sortConversations()
-            if !isGhost {
+            if !conversations[index].isGhost {
                 saveConversations()
-                if AuthManager.shared.isLoggedIn {
-                    Task {
-                        try? await CloudChatService.shared.updateChat(
-                            id: id,
-                            isPinned: isPinned
-                        )
-                    }
-                }
             }
         }
     }
     
     public func deleteConversation(at offsets: IndexSet) {
-        let idsToDelete = offsets.map { conversations[$0].id }
         conversations.remove(atOffsets: offsets)
         saveConversations()
-        
-        if AuthManager.shared.isLoggedIn {
-            for id in idsToDelete {
-                Task {
-                    try? await CloudChatService.shared.deleteChat(id: id)
-                }
-            }
-        }
     }
     
     public func deleteConversation(id: String) {
-        let wasGhost = conversations.first(where: { $0.id == id })?.isGhost ?? false
         conversations.removeAll(where: { $0.id == id })
         saveConversations()
-        
-        if !wasGhost && AuthManager.shared.isLoggedIn {
-            Task {
-                try? await CloudChatService.shared.deleteChat(id: id)
-            }
-        }
     }
     
     public func sortConversations() {
@@ -340,5 +148,76 @@ public final class StorageManager: ObservableObject {
         }
         
         loadFromCloud()
+    }
+    
+    // MARK: - Remote Server Synchronization (api.newton.daniellimon.uk)
+    
+    @MainActor
+    public func syncWithRemoteServer() async {
+        guard AuthManager.shared.isLoggedIn else { return }
+        do {
+            let remoteChats = try await CloudChatService.shared.fetchChats(limit: 100)
+            let ghosts = self.conversations.filter { $0.isGhost }
+            var merged: [Conversation] = []
+            
+            for rChat in remoteChats {
+                if let existing = self.conversations.first(where: { $0.id == rChat.id }) {
+                    var updated = rChat
+                    updated.isPinned = rChat.isPinned
+                    updated.title = rChat.title
+                    updated.modelId = rChat.modelId
+                    if !existing.messages.isEmpty {
+                        updated.messages = existing.messages
+                    }
+                    merged.append(updated)
+                } else {
+                    merged.append(rChat)
+                }
+            }
+            
+            self.conversations = ghosts + merged
+            self.sortConversations()
+            self.saveConversations()
+        } catch {
+            print("Failed to sync chats with remote server: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    public func handleRemoteSyncEvent(_ event: CloudSyncEvent) {
+        guard let chatId = event.chatId else { return }
+        switch event.event {
+        case .chatCreated:
+            if !conversations.contains(where: { $0.id == chatId }) {
+                let newConvo = Conversation(
+                    id: chatId,
+                    title: event.title ?? "New Conversation",
+                    messages: [],
+                    isPinned: event.isPinned ?? false,
+                    isGhost: false,
+                    modelId: event.model ?? SettingsManager.shared.currentModelId,
+                    createdAt: event.updatedAt ?? Date(),
+                    updatedAt: event.updatedAt ?? Date()
+                )
+                conversations.insert(newConvo, at: 0)
+                sortConversations()
+                saveConversations()
+            }
+        case .chatUpdated:
+            if let index = conversations.firstIndex(where: { $0.id == chatId }) {
+                var updated = conversations[index]
+                if let t = event.title { updated.title = t }
+                if let p = event.isPinned { updated.isPinned = p }
+                if let m = event.model { updated.modelId = m }
+                if let u = event.updatedAt { updated.updatedAt = u }
+                conversations[index] = updated
+                sortConversations()
+                saveConversations()
+            }
+        case .chatDeleted:
+            deleteConversation(id: chatId)
+        case .unknown:
+            break
+        }
     }
 }

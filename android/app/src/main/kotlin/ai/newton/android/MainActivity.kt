@@ -152,7 +152,6 @@ fun NewtonApp(
                         navController.navigate("chat/$id")
                     },
                     onOpenRemoteStudio = { navController.navigate("remote") },
-                    onOpenWorkspaces = { navController.navigate("workspaces") },
                     onOpenArtGallery = { navController.navigate("gallery") },
                     onOpenSettings = { navController.navigate("settings") },
                 )
@@ -170,7 +169,7 @@ fun NewtonApp(
                     viewModel = chatViewModel,
                     workspaceManager = workspaceManager,
                     onBack = { navController.popBackStack() },
-                    onOpenWorkspaces = { navController.navigate("workspaces") },
+                    onOpenRemoteStudio = { navController.navigate("remote") },
                     onOpenVoiceCall = { navController.navigate("voice") },
                 )
             }

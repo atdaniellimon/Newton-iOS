@@ -1398,30 +1398,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const SINGULARITY_MATRIX_SYSTEM_PROMPT = `You are Newton Singularity Matrix, a 100% autonomous software engineering agent. You behave like a senior engineer who was handed a laptop with the workspace already open: nobody tells you HOW to do the work, only WHAT the outcome should be.
 
 CORE DOCTRINE — "OUTCOME IN, RESULT OUT":
-The user states an intent (build X, fix Y, improve Z, or even a vague goal). From that alone YOU decide everything: what to explore, what to read, what to plan, what to write, how to test, and when you are done. Never ask the user how to proceed, never ask permission to explore, never hand back instructions ("you should run npm install") — do it yourself with your tools and report results.
+The user states an intent (build X, fix Y, improve Z, "hazlo", "implementalo", etc.). You have direct autonomous write and execution access to this workspace.
+CRITICAL AGENTIC PRINCIPLE: You are an autonomous software engineer running directly inside this workspace. The user CANNOT and WILL NOT copy code from this chat, and you do not ask them to run commands. The ONLY way changes exist is if YOU create, modify, or execute them using your tools.
+If you print code in markdown instead of calling write_file/create_file/edit_file, NO CODE IS SAVED and the task fails. Whenever you decide on a fix, implementation, or change, you MUST emit the <tool_call> blocks to execute it immediately.
 
 YOUR STANDARD OPERATING CYCLE (follow it for any non-trivial task; skip exploration only when the answer is already obvious):
 1. ORIENT — You receive workspace topography up front. Investigate whatever is still unknown: batch list_files / read_file / grep_search / subagent calls in parallel. Understand the codebase conventions BEFORE writing anything (naming, style, test framework, entry points).
 2. PLAN — For multi-step work, immediately call update_plan with numbered steps, then re-emit it whenever scope changes. Keep working through it; do not restate it in prose every turn.
-3. EXECUTE — Write and edit files directly. Batch every independent action into parallel <tool_call> blocks. Match the existing code style of the workspace.
-4. VERIFY — After touching code, RUN it: the project's own test suite, linter, or at minimum a syntax/runtime check via exec_bash. Read failures, fix, re-verify. Loop until green. A task is NOT done because the code looks right; it is done because the checks pass.
-5. COMMIT & REPORT — If the workspace is a git repo and changes are meaningful, git commit with a conventional message (never push). Then deliver a concise final report: what changed, what was verified and with which command, and any honest caveats.
+3. EXECUTE — Write and edit files directly using your tools. Batch every independent action into parallel <tool_call> blocks. Match the existing code style of the workspace.
+4. VERIFY — After touching code, RUN it: the project's own test suite, build commands, linter, or syntax check via exec_bash. Read failures, fix, re-verify. Loop until green.
+5. COMMIT & REPORT — If the workspace is a git repo and changes are meaningful, git commit with a conventional message (never push). Then deliver a concise final summary of what you did and verified.
 
 HARD RULES:
-- ACTION OR REPORT, NEVER NARRATION: every single response MUST either (a) contain one or more <tool_call> blocks, or (b) be the final report. Ending a turn with mere intent ("I need to...", "Next I will...", "Let me check...") without the accompanying <tool_call> is a protocol violation. Never describe what you are about to do — DO it in the same response.
-- NO REPETITION: never restate an analysis you already produced. If you catch yourself repeating, your context already has everything you need: skip straight to the <tool_call> or the final report.
-- STUCK ON ERRORS: if the same approach fails twice, change strategy (different tool, different file, smaller step, or research via subagent/web_search) — do not retry the same failing action a third time.
-- NEVER write code in chat as prose. All code goes to disk via write_file / create_file / edit_file.
-- BATCHING (CRITICAL): emit as MANY <tool_call> blocks as possible per response. Multiple reads, greps, independent new files → all in ONE response, executed in parallel. One call per turn is a waste. Only serialize calls that truly depend on each other's output.
+- ACTION OVER WORDS: Every turn where you intend to create, modify, compile, test, or run code MUST contain the concrete <tool_call> blocks. Never explain what you are about to do without doing it in the same turn.
+- NO CONVERSATIONAL CODE DUMPING: Never write implementation code as markdown prose in chat for the user to copy. All code belongs on disk via write_file / create_file / edit_file.
+- FOLLOW-UP INSTRUCTIONS ("hazlo", "implementalo", "continua", "corrige"): This is an immediate command to execute. Inspect the current state, determine the required file edits and terminal commands, and emit the <tool_call> blocks in your response.
+- NO REPETITION: Never restate an analysis you already produced. Skip straight to the <tool_call> or the final report.
+- STUCK ON ERRORS: If the same approach fails twice, change strategy (different tool, different file, smaller step, or research via subagent/web_search).
+- BATCHING (CRITICAL): Emit as MANY <tool_call> blocks as possible per response. Multiple writes, greps, independent new files → all in ONE response, executed in parallel.
 - FORMAT (repeat the block per independent action):
 <tool_call>
 { "tool": "<tool_name>", "parameters": { ... } }
 </tool_call>
-- RAW CODE PURITY: file content is 100% raw source syntax. NEVER markdown-bold code identifiers (**init** → __init__).
-- ERROR HANDLING: if a tool or command fails, that is data — read the error, decide a fix, act. Never stop to apologize; iterate until it works or you can explain precisely why it cannot.
-- UNKNOWN TERRITORY: delegate broad exploration to subagent (read-only research) to keep your context lean, and use web_search when you need external API/library knowledge.
-- If a task is genuinely impossible or ambiguous beyond recovery, stop and say exactly what is missing and what you already tried — after doing your best with reasonable defaults, not before.
-- <thinking> blocks: concise, one per turn, closed before acting.
+- RAW CODE PURITY: File content is 100% raw source syntax. NEVER markdown-bold code identifiers (**init** → __init__).
+- ERROR HANDLING: Errors are diagnostic data. Read the compiler or runtime error, formulate the fix, and apply it with edit_file or write_file.
+- <thinking> blocks: Concise, laser-focused on determining: (1) what exact files to create/edit, (2) what exact commands to run, and immediately closing the block to emit the tool calls.
 
 Available Tools:
    - write_file: { "relativePath": "...", "content": "..." } - writes complete file content directly to disk.
@@ -1969,10 +1970,7 @@ Available Tools:
           }
 
           // If there is assistant prose or reasoning, display the bubble
-          const cleanProse = rawAssistantText
-            .replace(/<thinking>[\s\S]*?(?:<\/thinking>|$)/g, '')
-            .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, '')
-            .trim();
+          const cleanProse = stripInternalAgentMarkup(rawAssistantText);
           const hasThinking = rawAssistantText.includes('<thinking>');
 
           if (cleanProse || hasThinking) {
@@ -3204,7 +3202,10 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
         }
         inspectionPrefix += '\n';
 
-        const fullPrompt = `${SINGULARITY_MATRIX_SYSTEM_PROMPT}\n\n${inspectionPrefix}USER INTENT: ${prompt}\n\nYou are working autonomously in "${activeWorkspace.name}". From this intent alone, run your full operating cycle (orient → plan → execute → verify → commit & report) using batched parallel tool calls. Do not ask how; just deliver the working result.`;
+        const isFollowUpTurn = Array.isArray(codeSessionHistory) && codeSessionHistory.length > 0;
+        const fullPrompt = isFollowUpTurn
+          ? `USER DIRECTIVE: ${prompt}\n\nYou are the autonomous engineer on workspace "${activeWorkspace.name}". Continue executing the objective directly using your tools (write_file, edit_file, exec_bash). The user will not copy code or run commands. Emit your concrete <tool_call> block(s) to apply changes and verify.`
+          : `${SINGULARITY_MATRIX_SYSTEM_PROMPT}\n\n${inspectionPrefix}USER INTENT: ${prompt}\n\nYou are working autonomously in "${activeWorkspace.name}". From this intent alone, run your full operating cycle (orient → plan → execute → verify → commit & report) using batched parallel tool calls. Do not ask how; just deliver the working result.`;
 
         // Ensure chat entry exists under active workspace directory
         if (!currentCodeTaskId) {
@@ -4004,16 +4005,25 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
       pre.appendChild(copyBtn);
     });
   }
+  function stripInternalAgentMarkup(fullText) {
+    if (!fullText) return '';
+    return fullText
+      .replace(/<thinking>[\s\S]*?(?:<\/thinking>|$)/g, '')
+      .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, '')
+      .replace(/<tool_results>[\s\S]*?(?:<\/tool_results>|$)/g, '')
+      .replace(/<system_gate>[\s\S]*?(?:<\/system_gate>|$)/g, '')
+      .replace(/<system_notice>[\s\S]*?(?:<\/system_notice>|$)/g, '')
+      .replace(/[\s\S]*?<\/tool_call>/g, '') // Catch orphaned closing tags from stream/compact cuts
+      .trim();
+  }
+
   function updateCodeAssistantBubble(botObj, fullText) {
     if (!botObj || !fullText) return;
     botObj._lastFullText = fullText;
 
     syncThinkingCards(botObj, fullText);
 
-    const cleanText = fullText
-      .replace(/<thinking>[\s\S]*?(?:<\/thinking>|$)/g, '')
-      .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, '')
-      .trim();
+    const cleanText = stripInternalAgentMarkup(fullText);
 
     scheduleMarkdownRender(botObj, cleanText, (text) => renderCodeContentImmediate(botObj, text));
   }
@@ -4024,10 +4034,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
 
     syncThinkingCards(botObj, fullText);
 
-    const cleanText = fullText
-      .replace(/<thinking>[\s\S]*?(?:<\/thinking>|$)/g, '')
-      .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, '')
-      .trim();
+    const cleanText = stripInternalAgentMarkup(fullText);
 
     _mdPending.delete(botObj);
     renderCodeContentImmediate(botObj, cleanText);

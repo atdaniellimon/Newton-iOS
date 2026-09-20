@@ -31,11 +31,16 @@ public struct MainView: View {
                     navigationPath.append(convoId)
                 }
             )
-            .navigationDestination(for: String.self) { targetId in
-                if targetId.hasPrefix("remote:") {
-                    RemoteChatRouteView(routeString: targetId)
+            .navigationDestination(for: String.self) { convoId in
+                if let index = storage.conversations.firstIndex(where: { $0.id == convoId }) {
+                    ChatView(conversation: $storage.conversations[index])
                 } else {
-                    ChatWrapperView(initialId: targetId)
+                    ZStack {
+                        NewtonTheme.bgDark
+                            .ignoresSafeArea()
+                        Text("Conversation not found")
+                            .foregroundColor(NewtonTheme.textSecondary)
+                    }
                 }
             }
         }
@@ -45,22 +50,11 @@ public struct MainView: View {
         }
         .onAppear {
             syncService.triggerManualSync()
-            if auth.isLoggedIn {
-                Task {
-                    await storage.syncWithRemoteServer()
-                }
-                storage.reconnectSyncListenerIfNeeded()
-            }
         }
         .onChange(of: auth.isLoggedIn) { loggedIn in
             if !loggedIn {
                 navigationPath = NavigationPath()
                 selectedConversationId = nil
-            } else {
-                Task {
-                    await storage.syncWithRemoteServer()
-                }
-                storage.reconnectSyncListenerIfNeeded()
             }
         }
         } // end auth.isLoggedIn
@@ -88,68 +82,5 @@ public struct MainView: View {
                 navigationPath.append(newConvo.id)
             }
         }
-    }
-}
-
-public struct ChatWrapperView: View {
-    @ObservedObject var storage = StorageManager.shared
-    public let initialId: String
-    @State private var currentId: String
-    
-    public init(initialId: String) {
-        self.initialId = initialId
-        self._currentId = State(initialValue: initialId)
-    }
-    
-    public var body: some View {
-        Group {
-            if let index = storage.conversations.firstIndex(where: { $0.id == currentId }) {
-                ChatView(conversation: $storage.conversations[index])
-            } else if let index = storage.conversations.firstIndex(where: { $0.id == initialId }) {
-                ChatView(conversation: $storage.conversations[index])
-                    .onAppear {
-                        currentId = initialId
-                    }
-            } else {
-                ZStack {
-                    NewtonTheme.bgDark
-                        .ignoresSafeArea()
-                    Text(L10n.tr("Loading conversation...", es: "Cargando conversación..."))
-                        .foregroundColor(NewtonTheme.textSecondary)
-                }
-            }
-        }
-    }
-}
-
-
-public struct RemoteChatRouteView: View {
-    public let routeString: String
-    
-    // Format: "remote:<encodedWsPath>:<chatId>" or "remote:<encodedWsPath>" or "remote:new"
-    public var body: some View {
-        let parts = routeString.components(separatedBy: ":")
-        let wsPath = parts.count > 1 ? (parts[1].removingPercentEncoding ?? parts[1]) : nil
-        let chatId = parts.count > 2 ? parts[2] : nil
-        
-        let wsItem = wsPath != nil && !wsPath!.isEmpty ? CloudChatService.RemoteWorkspaceItem(
-            name: (wsPath! as NSString).lastPathComponent,
-            path: wsPath!,
-            hasGit: nil,
-            branch: nil,
-            chats: nil
-        ) : nil
-        
-        let chatItem = chatId != nil && !chatId!.isEmpty ? CloudChatService.RemoteWorkspaceChat(
-            id: chatId!,
-            title: L10n.tr("Remote Task", es: "Tarea Remota"),
-            created_at: nil,
-            messages: nil
-        ) : nil
-        
-        DesktopRemoteControlView(
-            initialWorkspace: wsItem,
-            initialChat: chatItem
-        )
     }
 }

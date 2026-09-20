@@ -160,7 +160,7 @@ class RemoteControlViewModel(
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val baseUrl = settings.effectiveBaseUrl(AIProvider.OPENAI_COMPATIBLE)
+                val baseUrl = "https://api.newton.daniellimon.uk"
                 val statusReq = Request.Builder()
                     .url("$baseUrl/nwtn/desktop/status")
                     .get()
@@ -211,7 +211,7 @@ class RemoteControlViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val baseUrl = settings.effectiveBaseUrl(AIProvider.OPENAI_COMPATIBLE)
+                val baseUrl = "https://api.newton.daniellimon.uk"
                 val selectedChatId = _ui.value.selectedChat?.id
                 val payloadMap = mutableMapOf<String, String>(
                     "workspacePath" to ws.path,
@@ -306,7 +306,7 @@ class RemoteControlViewModel(
         _ui.value = _ui.value.copy(isExecuting = false)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val baseUrl = settings.effectiveBaseUrl(AIProvider.OPENAI_COMPATIBLE)
+                val baseUrl = "https://api.newton.daniellimon.uk"
                 val req = Request.Builder()
                     .url("$baseUrl/nwtn/desktop/cancel")
                     .post("{}".toRequestBody("application/json".toMediaType()))
@@ -334,6 +334,14 @@ fun DesktopRemoteControlScreen(
         "Busca cuellos de botella y optimiza",
         "Lista los archivos del proyecto",
     )
+
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+        while (true) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.refresh()
+        }
+    }
 
     LaunchedEffect(uiState.steps.size) {
         if (uiState.steps.isNotEmpty()) {

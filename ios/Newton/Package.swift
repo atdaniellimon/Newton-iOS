@@ -5,7 +5,6 @@ import PackageDescription
 
 let package = Package(
     name: "Newton",
-    defaultLocalization: "en",
     platforms: [
         .iOS(.v16),
         .macOS(.v13)

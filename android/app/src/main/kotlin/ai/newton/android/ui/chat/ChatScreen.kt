@@ -103,7 +103,7 @@ fun ChatScreen(
     viewModel: ChatViewModel,
     workspaceManager: WorkspaceManager,
     onBack: () -> Unit,
-    onOpenWorkspaces: () -> Unit,
+    onOpenRemoteStudio: () -> Unit,
     onOpenVoiceCall: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -180,24 +180,24 @@ fun ChatScreen(
                             )
                         }
 
-                        // Active Workspace Pill
+                        // Remote Studio Button
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier
-                                .clip(CircleShape)
-                                .background(NewtonColors.Sand.copy(alpha = 0.15f))
-                                .clickable(onClick = onOpenWorkspaces)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(NewtonColors.Sand.copy(alpha = 0.12f))
+                                .clickable(onClick = onOpenRemoteStudio)
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Folder,
+                                imageVector = Icons.Default.Laptop,
                                 contentDescription = null,
                                 tint = NewtonColors.Sand,
                                 modifier = Modifier.size(12.dp),
                             )
                             Text(
-                                text = activeWorkspace?.name ?: "Global",
+                                text = "Remote",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 11.sp,

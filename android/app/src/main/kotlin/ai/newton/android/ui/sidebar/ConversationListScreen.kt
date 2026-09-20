@@ -69,7 +69,6 @@ fun ConversationListScreen(
     cloudService: CloudChatService,
     onSelectConversation: (String) -> Unit,
     onOpenRemoteStudio: () -> Unit,
-    onOpenWorkspaces: () -> Unit,
     onOpenArtGallery: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -80,6 +79,9 @@ fun ConversationListScreen(
     LaunchedEffect(auth.isLoggedIn) {
         if (auth.isLoggedIn.value) {
             store.syncWithRemoteServer(cloudService, auth)
+            cloudService.startGlobalSyncListener { event ->
+                store.handleRemoteSyncEvent(event)
+            }
         }
     }
 
@@ -139,17 +141,10 @@ fun ConversationListScreen(
 
                 SidebarItemRow(
                     icon = Icons.Default.Laptop,
-                    title = "Control Remoto Mac",
+                    title = "Remote Studio (Mac)",
                     tint = NewtonColors.Aqua,
                     isSelected = false,
                     onClick = onOpenRemoteStudio,
-                )
-
-                SidebarItemRow(
-                    icon = Icons.Default.Folder,
-                    title = "Espacios de trabajo",
-                    isSelected = false,
-                    onClick = onOpenWorkspaces,
                 )
 
                 SidebarItemRow(

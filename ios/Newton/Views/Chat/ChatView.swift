@@ -15,7 +15,7 @@ private enum ActiveModalSheet: Identifiable {
     case camera
     case photoLibrary
     case settings
-    case workspaces
+    case remoteStudio
     case modelPicker
 
     var id: String {
@@ -23,7 +23,7 @@ private enum ActiveModalSheet: Identifiable {
         case .camera:       return "camera"
         case .photoLibrary: return "photoLibrary"
         case .settings:     return "settings"
-        case .workspaces:   return "workspaces"
+        case .remoteStudio: return "remoteStudio"
         case .modelPicker:  return "modelPicker"
         }
     }
@@ -47,7 +47,7 @@ public struct ChatView: View {
     @State private var showFileImporter: Bool = false
     @State private var showVoiceCall: Bool = false
     @State private var exportFileUrl: URL? = nil
-    @State private var activeChatPeerTask: Task<Void, Never>? = nil
+    @State private var peerEventTask: Task<Void, Never>? = nil
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
@@ -114,7 +114,7 @@ public struct ChatView: View {
                                 HStack(spacing: 12) {
                                     ThinkingOrbView(size: 32, style: .globe)
                                     
-                                    Text(L10n.tr("Newton is reasoning...", es: "Newton está razonando..."))
+                                    Text("Newton is reasoning...")
                                         .font(.system(size: 14, weight: .medium, design: .serif))
                                         .foregroundColor(NewtonTheme.sand)
                                     
@@ -200,7 +200,7 @@ public struct ChatView: View {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 13))
                             .foregroundColor(NewtonTheme.coralRed)
-                        Text(L10n.tr("Session ended by Newton.", es: "Sesión finalizada por Newton."))
+                        Text("Session ended by Newton.")
                             .font(.system(size: 13, weight: .semibold, design: .serif))
                             .foregroundColor(NewtonTheme.textSecondary)
                     }
@@ -244,12 +244,12 @@ public struct ChatView: View {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
                     Haptics.light()
-                    activeSheet = .workspaces
+                    activeSheet = .remoteStudio
                 } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: workspaceManager.activeWorkspace?.iconName ?? "globe")
+                        Image(systemName: "laptopcomputer.and.iphone")
                             .font(.system(size: 13, weight: .semibold))
-                        Text(workspaceManager.activeWorkspace?.name ?? "Global")
+                        Text("Remote")
                             .font(.system(size: 12, weight: .semibold))
                             .lineLimit(1)
                     }
@@ -380,8 +380,8 @@ public struct ChatView: View {
                 }
             case .settings:
                 SettingsView()
-            case .workspaces:
-                WorkspaceListView()
+            case .remoteStudio:
+                RemoteStudioView()
             case .modelPicker:
                 ModelPickerSheet(selectedModelId: Binding(
                     get: { conversation.modelId },
@@ -416,101 +416,77 @@ public struct ChatView: View {
                 print("File import error: \(error)")
             }
         }
-        .onAppear {
-            loadCloudMessagesIfNeeded()
-            startListeningToPeerEvents()
-        }
-        .onDisappear {
-            stopListeningToPeerEvents()
-        }
-    }
-    
-    private func loadCloudMessagesIfNeeded() {
-        guard !conversation.isGhost, AuthManager.shared.isLoggedIn, conversation.messages.isEmpty else { return }
-        Task {
-            do {
-                let msgs = try await CloudChatService.shared.fetchMessages(chatId: conversation.id)
-                await MainActor.run {
-                    if conversation.messages.isEmpty && !msgs.isEmpty {
-                        conversation.messages = msgs
+        .task {
+            // 1. Fetch remote messages if empty and authenticated
+            if !conversation.isGhost && AuthManager.shared.isLoggedIn && conversation.messages.isEmpty {
+                if let remoteMsgs = try? await CloudChatService.shared.fetchMessages(chatId: conversation.id), !remoteMsgs.isEmpty {
+                    await MainActor.run {
+                        conversation.messages = remoteMsgs
                         storage.updateConversation(conversation)
                     }
                 }
-            } catch {
-                print("Failed to fetch cloud messages: \(error.localizedDescription)")
             }
+            
+            // 2. Start Live Peer Event Listener (SSE stream from desktop/cloud)
+            startPeerEventListener()
+        }
+        .onDisappear {
+            peerEventTask?.cancel()
+            peerEventTask = nil
         }
     }
     
-    private func startListeningToPeerEvents() {
-        guard !conversation.isGhost, AuthManager.shared.isLoggedIn else { return }
-        stopListeningToPeerEvents()
-        
-        activeChatPeerTask = Task {
+    private func startPeerEventListener() {
+        guard !conversation.isGhost, AuthManager.shared.isLoggedIn, !conversation.id.isEmpty else { return }
+        peerEventTask?.cancel()
+        peerEventTask = Task {
             let stream = CloudChatService.shared.streamChatEvents(chatId: conversation.id)
-            for await ev in stream {
+            for await event in stream {
                 guard !Task.isCancelled else { break }
+                guard !isStreaming else { continue } // Don't conflict with local active streaming
+                
                 await MainActor.run {
-                    handlePeerEvent(ev)
+                    switch event.event {
+                    case .messageNew:
+                        guard let msgId = event.messageId else { return }
+                        if !conversation.messages.contains(where: { $0.id == msgId }) {
+                            let role: MessageRole = (event.role?.lowercased() == "user") ? .user : .assistant
+                            let newMsg = Message(
+                                id: msgId,
+                                role: role,
+                                content: event.content ?? "",
+                                isStreaming: false
+                            )
+                            conversation.messages.append(newMsg)
+                            storage.updateConversation(conversation)
+                        }
+                    case .aiStart:
+                        guard let msgId = event.messageId else { return }
+                        if !conversation.messages.contains(where: { $0.id == msgId }) {
+                            let placeholder = Message(
+                                id: msgId,
+                                role: .assistant,
+                                content: "",
+                                isStreaming: true
+                            )
+                            conversation.messages.append(placeholder)
+                        }
+                    case .aiDelta:
+                        guard let msgId = event.messageId, let delta = event.delta else { return }
+                        if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
+                            conversation.messages[idx].content += delta
+                        }
+                    case .aiDone:
+                        guard let msgId = event.messageId else { return }
+                        if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
+                            conversation.messages[idx].isStreaming = false
+                            storage.updateConversation(conversation)
+                        }
+                    case .chatUpdated, .chatDeleted, .unknown:
+                        break
+                    }
                 }
             }
-        }
-    }
-    
-    private func stopListeningToPeerEvents() {
-        activeChatPeerTask?.cancel()
-        activeChatPeerTask = nil
-    }
-    
-    @MainActor
-    private func handlePeerEvent(_ ev: ChatPeerEvent) {
-        // If this client is actively streaming a response, ignore peer events for the same chat to avoid race conditions
-        guard !isStreaming else { return }
-        
-        switch ev.event {
-        case .messageNew:
-            if let msgId = ev.messageId, !conversation.messages.contains(where: { $0.id == msgId }) {
-                let role: MessageRole = (ev.role?.lowercased() == "user") ? .user : .assistant
-                let msg = Message(
-                    id: msgId,
-                    role: role,
-                    content: ev.content ?? "",
-                    createdAt: Date(),
-                    isStreaming: false
-                )
-                conversation.messages.append(msg)
-                storage.updateConversation(conversation)
-            }
-        case .aiStart:
-            if let msgId = ev.messageId, !conversation.messages.contains(where: { $0.id == msgId }) {
-                let placeholder = Message(
-                    id: msgId,
-                    role: .assistant,
-                    content: "",
-                    createdAt: Date(),
-                    isStreaming: true
-                )
-                conversation.messages.append(placeholder)
-            }
-        case .aiDelta:
-            if let msgId = ev.messageId, let delta = ev.delta {
-                if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
-                    conversation.messages[idx].content += delta
-                }
-            }
-        case .aiDone:
-            if let msgId = ev.messageId {
-                if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
-                    conversation.messages[idx].isStreaming = false
-                    storage.updateConversation(conversation)
-                }
-            }
-        case .chatUpdated:
-            break
-        case .chatDeleted:
-            break
-        case .unknown:
-            break
         }
     }
     
@@ -637,44 +613,11 @@ public struct ChatView: View {
             }
 
             do {
-                let stream: AsyncThrowingStream<String, Error>
-                if !conversation.isGhost && AuthManager.shared.isLoggedIn {
-                    var targetChatId = conversation.id
-                    if !targetChatId.hasPrefix("chat_") {
-                        do {
-                            let remote = try await CloudChatService.shared.createChat(
-                                title: conversation.title,
-                                model: conversation.modelId
-                            )
-                            targetChatId = remote.id
-                            await MainActor.run {
-                                let oldId = conversation.id
-                                conversation.id = remote.id
-                                conversation.updatedAt = remote.updatedAt
-                                storage.updateConversationId(from: oldId, to: remote.id, updated: conversation)
-                            }
-                        } catch {
-                            print("Pre-creation of cloud chat failed: \(error)")
-                        }
-                    }
-
-                    var nwtnAttachments: [NWTNAttachment] = []
-                    if let img = imgBase64DataUrl {
-                        nwtnAttachments.append(NWTNAttachment(type: "image", data: img, name: "image.jpg"))
-                    }
-                    stream = CloudChatService.shared.streamChatMessage(
-                        chatId: targetChatId,
-                        prompt: backendPayloadPrompt,
-                        model: conversation.modelId,
-                        attachments: nwtnAttachments
-                    )
-                } else {
-                    stream = LLMService.shared.streamCompletion(
-                        messages: messagesToSend,
-                        modelId: conversation.modelId,
-                        systemPrompt: systemPrompt
-                    )
-                }
+                let stream = LLMService.shared.streamCompletion(
+                    messages: messagesToSend,
+                    modelId: conversation.modelId,
+                    systemPrompt: systemPrompt
+                )
                 
                 for try await token in stream {
                     guard !Task.isCancelled else { break }
@@ -777,11 +720,10 @@ public struct ChatView: View {
     
     @MainActor
     private func updateLiveStreamingMessage(id: String, content: String, thinking: String) {
-        let index = conversation.messages.firstIndex(where: { $0.id == id }) ?? (conversation.messages.indices.last)
-        guard let idx = index else { return }
+        guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else { return }
         var msgs = conversation.messages
-        msgs[idx].content = content
-        msgs[idx].thinkingContent = thinking.isEmpty ? nil : thinking
+        msgs[index].content = content
+        msgs[index].thinkingContent = thinking.isEmpty ? nil : thinking
         conversation.messages = msgs
     }
 
@@ -794,12 +736,11 @@ public struct ChatView: View {
         currentThinking: String,
         thinkingContent: String?
     ) {
-        let index = conversation.messages.firstIndex(where: { $0.id == id }) ?? (conversation.messages.indices.last)
-        if let idx = index {
+        if let index = conversation.messages.firstIndex(where: { $0.id == id }) {
             var msgs = conversation.messages
-            msgs[idx].content = finalContent
-            msgs[idx].imageUrl = imageUrl
-            msgs[idx].orbitResults = orbitResults
+            msgs[index].content = finalContent
+            msgs[index].imageUrl = imageUrl
+            msgs[index].orbitResults = orbitResults
             let liveTrim = currentThinking.trimmingCharacters(in: .whitespacesAndNewlines)
             let engTrim = (thinkingContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let mergedThinking: String
@@ -808,8 +749,8 @@ public struct ChatView: View {
             else if engTrim.contains(liveTrim) { mergedThinking = engTrim }
             else if liveTrim.contains(engTrim) { mergedThinking = liveTrim }
             else { mergedThinking = liveTrim + "\n\n---\n\n" + engTrim }
-            msgs[idx].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
-            msgs[idx].isStreaming = false
+            msgs[index].thinkingContent = mergedThinking.isEmpty ? nil : mergedThinking
+            msgs[index].isStreaming = false
             conversation.messages = msgs
         }
         

@@ -530,17 +530,10 @@ public struct FormattedAssistantContent: View {
                 if block.isCode, let code = block.code {
                     CodeBlockView(code: code, language: block.language ?? "")
                 } else if let txt = block.text {
-                    if let attr = try? AttributedString(markdown: txt, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                        Text(attr)
-                            .font(.system(size: 15, design: .serif))
-                            .foregroundColor(NewtonTheme.textPrimary)
-                            .lineSpacing(4)
-                    } else {
-                        Text(verbatim: txt)
-                            .font(.system(size: 15, design: .serif))
-                            .foregroundColor(NewtonTheme.textPrimary)
-                            .lineSpacing(4)
-                    }
+                    Text(LocalizedStringKey(txt))
+                        .font(.system(size: 15, design: .serif))
+                        .foregroundColor(NewtonTheme.textPrimary)
+                        .lineSpacing(4)
                 }
             }
         }
