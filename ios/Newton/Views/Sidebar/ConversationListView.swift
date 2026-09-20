@@ -181,85 +181,111 @@ public struct ConversationListView: View {
                 
                 // Conversations List with Pinning and Deletion
                 List {
-                    ForEach(filteredConversations) { convo in
-                        Button(action: {
-                            Haptics.selection()
-                            selectedConversationId = convo.id
-                            onSelectConversation?(convo.id)
-                        }) {
-                            HStack(spacing: 8) {
-                                if convo.isPinned {
-                                    Image(systemName: "pin.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(NewtonTheme.sand)
-                                }
-                                
-                                if convo.isGhost {
-                                    Image(systemName: "ghost.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
-                                } else if convo.isRemoteCodeChat {
-                                    Image(systemName: "terminal.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(NewtonTheme.sand)
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(convo.title)
-                                        .font(.system(size: 15, weight: convo.isPinned ? .semibold : .regular))
-                                        .foregroundColor(NewtonTheme.textPrimary)
-                                        .lineLimit(1)
-                                    
-                                    if let wsName = convo.workspaceName {
-                                        Text(wsName)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(NewtonTheme.textMuted)
-                                    }
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
+                    if filteredConversations.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: selectedFilterTab == .remote ? "laptopcomputer" : "bubble.left.and.bubble.right")
+                                .font(.system(size: 32))
+                                .foregroundColor(NewtonTheme.textMuted.opacity(0.6))
+                                .padding(.top, 40)
+                            
+                            Text(selectedFilterTab == .remote ? "No hay tareas de Remote Studio aún" : "No hay conversaciones aún")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                            
+                            Text(selectedFilterTab == .remote ? "Crea una tarea con '+' para ejecutar código en tu Mac." : "Inicia un nuevo chat con el botón '+'.")
+                                .font(.system(size: 13))
+                                .foregroundColor(NewtonTheme.textMuted)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 24)
                         }
+                        .frame(maxWidth: .infinity)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
-                        .swipeActions(edge: .leading) {
-                            Button {
-                                Haptics.light()
-                                storage.togglePin(id: convo.id)
-                            } label: {
-                                Label(convo.isPinned ? "Unpin" : "Pin", systemImage: convo.isPinned ? "pin.slash.fill" : "pin.fill")
+                    } else {
+                        ForEach(filteredConversations) { convo in
+                            Button(action: {
+                                Haptics.selection()
+                                selectedConversationId = convo.id
+                                onSelectConversation?(convo.id)
+                            }) {
+                                HStack(spacing: 8) {
+                                    if convo.isPinned {
+                                        Image(systemName: "pin.fill")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(NewtonTheme.sand)
+                                    }
+                                    
+                                    if convo.isGhost {
+                                        Image(systemName: "ghost.fill")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                                    } else if convo.isRemoteCodeChat {
+                                        Image(systemName: "terminal.fill")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(NewtonTheme.sand)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(convo.title)
+                                            .font(.system(size: 15, weight: convo.isPinned ? .semibold : .regular))
+                                            .foregroundColor(NewtonTheme.textPrimary)
+                                            .lineLimit(1)
+                                        
+                                        if let wsName = convo.workspaceName {
+                                            Text(wsName)
+                                                .font(.system(size: 11, design: .monospaced))
+                                                .foregroundColor(NewtonTheme.textMuted)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
                             }
-                            .tint(NewtonTheme.sand)
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                Haptics.medium()
-                                storage.deleteConversation(id: convo.id)
-                            } label: {
-                                Label("Delete", systemImage: "trash.fill")
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    Haptics.light()
+                                    storage.togglePin(id: convo.id)
+                                } label: {
+                                    Label(convo.isPinned ? "Unpin" : "Pin", systemImage: convo.isPinned ? "pin.slash.fill" : "pin.fill")
+                                }
+                                .tint(NewtonTheme.sand)
                             }
-                        }
-                        .contextMenu {
-                            Button {
-                                Haptics.light()
-                                storage.togglePin(id: convo.id)
-                            } label: {
-                                Label(convo.isPinned ? "Unpin Chat" : "Pin Chat", systemImage: convo.isPinned ? "pin.slash" : "pin")
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    Haptics.medium()
+                                    storage.deleteConversation(id: convo.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash.fill")
+                                }
                             }
-                            
-                            Button(role: .destructive) {
-                                Haptics.medium()
-                                storage.deleteConversation(id: convo.id)
-                            } label: {
-                                Label("Delete Chat", systemImage: "trash")
+                            .contextMenu {
+                                Button {
+                                    Haptics.light()
+                                    storage.togglePin(id: convo.id)
+                                } label: {
+                                    Label(convo.isPinned ? "Unpin Chat" : "Pin Chat", systemImage: convo.isPinned ? "pin.slash" : "pin")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    Haptics.medium()
+                                    storage.deleteConversation(id: convo.id)
+                                } label: {
+                                    Label("Delete Chat", systemImage: "trash")
+                                }
                             }
                         }
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .refreshable {
+                    await storage.syncWithRemoteServer()
+                    await cloudService.refreshHostStatus()
+                }
                 
                 Divider()
                     .background(NewtonTheme.border)
@@ -309,9 +335,22 @@ public struct ConversationListView: View {
         .sheet(isPresented: $showArtGallery) {
             ArtGalleryView()
         }
+        .onAppear {
+            Task {
+                await storage.syncWithRemoteServer()
+                await cloudService.refreshHostStatus()
+            }
+        }
+        .onChange(of: selectedFilterTab) { _ in
+            Task {
+                await storage.syncWithRemoteServer()
+                await cloudService.refreshHostStatus()
+            }
+        }
         .task {
             // 1. Pull initial state from cloud
             await storage.syncWithRemoteServer()
+            await cloudService.refreshHostStatus()
             
             // 2. Start persistent global SSE sync stream
             CloudChatService.shared.startGlobalSyncListener { event in

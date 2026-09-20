@@ -157,11 +157,17 @@ public final class StorageManager: ObservableObject {
         guard AuthManager.shared.isLoggedIn else { return }
         do {
             // 1. Fetch Standard Cloud Chats
-            let remoteChats = try await CloudChatService.shared.fetchChats(limit: 100)
+            var remoteChats: [Conversation] = []
+            do {
+                remoteChats = try await CloudChatService.shared.fetchChats(limit: 100)
+            } catch {
+                print("⚠️ [StorageManager] Failed to fetch standard cloud chats: \(error.localizedDescription)")
+            }
             
             // 2. Fetch Remote Desktop Workspaces Code Chats
             var remoteCodeConversations: [Conversation] = []
-            if let workspaces = try? await CloudChatService.shared.fetchDesktopWorkspaces() {
+            do {
+                let workspaces = try await CloudChatService.shared.fetchDesktopWorkspaces()
                 for ws in workspaces {
                     if let chats = ws.chats {
                         for chat in chats {
@@ -199,6 +205,10 @@ public final class StorageManager: ObservableObject {
                         }
                     }
                 }
+            } catch {
+                print("⚠️ [StorageManager] Failed to fetch desktop workspaces: \(error.localizedDescription)")
+                // Preserve existing remote code chats if the fetch fails
+                remoteCodeConversations = self.conversations.filter { $0.isRemoteCodeChat }
             }
             
             let ghosts = self.conversations.filter { $0.isGhost }
@@ -225,8 +235,11 @@ public final class StorageManager: ObservableObject {
                 if let existing = self.conversations.first(where: { $0.id == cChat.id }) {
                     var updated = cChat
                     updated.isPinned = existing.isPinned
+                    // If existing has local messages and the fetched chat has none, keep local
                     if !existing.messages.isEmpty && cChat.messages.isEmpty {
                         updated.messages = existing.messages
+                    } else if !cChat.messages.isEmpty {
+                        updated.messages = cChat.messages
                     }
                     merged.append(updated)
                 } else {
