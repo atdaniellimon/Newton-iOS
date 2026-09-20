@@ -33,6 +33,11 @@ public struct Haptics {
         generator.notificationOccurred(.error)
     }
     
+    public static func warning() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.warning)
+    }
+    
     public static func selection() {
         let generator = UISelectionFeedbackGenerator()
         generator.selectionChanged()
