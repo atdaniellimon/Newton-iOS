@@ -60,6 +60,7 @@ public enum CloudSyncEventType: String {
     case chatCreated = "chat:created"
     case chatUpdated = "chat:updated"
     case chatDeleted = "chat:deleted"
+    case desktopStatus = "desktop:status"
     case unknown
 }
 
@@ -77,6 +78,7 @@ public enum ChatPeerEventType: String {
     case aiStart = "ai:start"
     case aiDelta = "ai:delta"
     case aiDone = "ai:done"
+    case aiTool = "ai:tool"
     case chatUpdated = "chat:updated"
     case chatDeleted = "chat:deleted"
     case unknown
@@ -88,6 +90,8 @@ public struct ChatPeerEvent {
     public let role: String?
     public let delta: String?
     public let content: String?
+    public let tool: String?
+    public let toolOutput: String?
 }
 
 // MARK: - CloudChatService
@@ -487,10 +491,25 @@ public final class CloudChatService: ObservableObject {
                                     
                                     let evType: CloudSyncEventType
                                     switch eventTypeStr {
-                                    case "chat:created": evType = .chatCreated
-                                    case "chat:updated": evType = .chatUpdated
-                                    case "chat:deleted": evType = .chatDeleted
-                                    default:             evType = .unknown
+                                    case "chat:created":    evType = .chatCreated
+                                    case "chat:updated":    evType = .chatUpdated
+                                    case "chat:deleted":    evType = .chatDeleted
+                                    case "desktop:status":  evType = .desktopStatus
+                                    default:                evType = .unknown
+                                    }
+                                    
+                                    if evType == .desktopStatus {
+                                        let isOnline = json["online"] as? Bool ?? true
+                                        let count = json["workspaces_count"] as? Int ?? 0
+                                        let lastSeen = json["timestamp"] as? Double ?? Date().timeIntervalSince1970
+                                        DispatchQueue.main.async {
+                                            self.desktopStatus = RemoteDesktopStatus(
+                                                online: isOnline,
+                                                workspaces_count: count,
+                                                last_seen: lastSeen,
+                                                active_workspace: nil
+                                            )
+                                        }
                                     }
                                     
                                     let chatId = json["id"] as? String ?? json["chat_id"] as? String
@@ -581,6 +600,7 @@ public final class CloudChatService: ObservableObject {
                                     case "ai:start":    evType = .aiStart
                                     case "ai:delta":    evType = .aiDelta
                                     case "ai:done":     evType = .aiDone
+                                    case "ai:tool":     evType = .aiTool
                                     case "chat:updated":evType = .chatUpdated
                                     case "chat:deleted":evType = .chatDeleted
                                     default:            evType = .unknown
@@ -591,7 +611,9 @@ public final class CloudChatService: ObservableObject {
                                         messageId: json["id"] as? String ?? json["message_id"] as? String,
                                         role: json["role"] as? String,
                                         delta: json["delta"] as? String,
-                                        content: json["content"] as? String
+                                        content: json["content"] as? String,
+                                        tool: json["tool"] as? String,
+                                        toolOutput: json["output"] as? String
                                     )
                                     
                                     continuation.yield(peerEvent)

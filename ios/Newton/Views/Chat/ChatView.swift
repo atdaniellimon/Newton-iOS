@@ -478,16 +478,44 @@ public struct ChatView: View {
                             conversation.messages.append(placeholder)
                         }
                     case .aiDelta:
-                        guard let msgId = event.messageId, let delta = event.delta else { return }
-                        if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
-                            conversation.messages[idx].content += delta
+                        if let delta = event.delta {
+                            if let msgId = event.messageId, let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
+                                conversation.messages[idx].content += delta
+                            } else if let lastIdx = conversation.messages.indices.last, conversation.messages[lastIdx].role == .assistant {
+                                conversation.messages[lastIdx].content += delta
+                            } else {
+                                let newMsg = Message(
+                                    id: event.messageId ?? "delta_\(UUID().uuidString.prefix(8))",
+                                    role: .assistant,
+                                    content: delta,
+                                    isStreaming: true
+                                )
+                                conversation.messages.append(newMsg)
+                            }
                         }
-                    case .aiDone:
-                        guard let msgId = event.messageId else { return }
-                        if let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
-                            conversation.messages[idx].isStreaming = false
+                    case .aiTool:
+                        if let toolName = event.tool {
+                            let toolText = "\n`[Tool: \(toolName)]` \(event.toolOutput ?? "")\n"
+                            if let lastIdx = conversation.messages.indices.last, conversation.messages[lastIdx].role == .assistant {
+                                conversation.messages[lastIdx].content += toolText
+                            } else {
+                                let toolMsg = Message(
+                                    id: "tool_\(UUID().uuidString.prefix(8))",
+                                    role: .assistant,
+                                    content: toolText,
+                                    isStreaming: false
+                                )
+                                conversation.messages.append(toolMsg)
+                            }
                             storage.updateConversation(conversation)
                         }
+                    case .aiDone:
+                        if let msgId = event.messageId, let idx = conversation.messages.firstIndex(where: { $0.id == msgId }) {
+                            conversation.messages[idx].isStreaming = false
+                        } else if let lastIdx = conversation.messages.indices.last {
+                            conversation.messages[lastIdx].isStreaming = false
+                        }
+                        storage.updateConversation(conversation)
                     case .chatUpdated, .chatDeleted, .unknown:
                         break
                     }
