@@ -34,8 +34,8 @@ jobs:
       - name: Build Newton iOS App
         run: |
           mkdir -p build/Release-iphoneos
-          set -o pipefail
-          if ! xcodebuild build \
+          set +e
+          xcodebuild build \
             -project "ios/Newton/Newton.xcodeproj" \
             -scheme "Newton" \
             -configuration Release \
@@ -45,11 +45,18 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            CONFIGURATION_BUILD_DIR="$(pwd)/build/Release-iphoneos" 2>&1 | tee /tmp/xcodebuild.log; then
-            echo "::error::xcodebuild failed with exit code $?"
-            echo "--- RECENT LOG ERRORS ---"
-            grep -E "error:" /tmp/xcodebuild.log || tail -n 100 /tmp/xcodebuild.log
-            exit 1
+            CONFIGURATION_BUILD_DIR="$(pwd)/build/Release-iphoneos" > /tmp/xcodebuild.log 2>&1
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < <(grep -E "(error:|fatal error:)" /tmp/xcodebuild.log | head -n 30)
+            if ! grep -q -E "(error:|fatal error:)" /tmp/xcodebuild.log; then
+              while IFS= read -r line; do
+                echo "::error::$line"
+              done < <(tail -n 25 /tmp/xcodebuild.log)
+            fi
+            exit $STATUS
           fi
 
       - name: Package into IPA
