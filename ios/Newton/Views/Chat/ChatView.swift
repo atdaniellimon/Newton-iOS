@@ -15,7 +15,6 @@ private enum ActiveModalSheet: Identifiable {
     case camera
     case photoLibrary
     case settings
-    case remoteStudio
     case modelPicker
 
     var id: String {
@@ -23,7 +22,6 @@ private enum ActiveModalSheet: Identifiable {
         case .camera:       return "camera"
         case .photoLibrary: return "photoLibrary"
         case .settings:     return "settings"
-        case .remoteStudio: return "remoteStudio"
         case .modelPicker:  return "modelPicker"
         }
     }
@@ -294,12 +292,19 @@ public struct ChatView: View {
                             .lineLimit(1)
 
                         HStack(spacing: 4) {
-                            Image(systemName: conversation.modelId == "Singularity-Matrix" ? "chevron.left.forwardslash.chevron.right" : "atom")
-                                .font(.system(size: 8, weight: .semibold))
-                            Text(settings.availableModels.first(where: { $0.id == conversation.modelId })?.name ?? conversation.modelId)
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 7, weight: .bold))
+                            if conversation.isRemoteCodeChat {
+                                Image(systemName: "terminal.fill")
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text(conversation.workspaceName ?? "Remote Studio")
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            } else {
+                                Image(systemName: conversation.modelId == "Singularity-Matrix" ? "chevron.left.forwardslash.chevron.right" : "atom")
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text(settings.availableModels.first(where: { $0.id == conversation.modelId })?.name ?? conversation.modelId)
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 7, weight: .bold))
+                            }
                         }
                         .foregroundColor(NewtonTheme.sand)
                     }
@@ -380,8 +385,6 @@ public struct ChatView: View {
                 }
             case .settings:
                 SettingsView()
-            case .remoteStudio:
-                RemoteStudioView()
             case .modelPicker:
                 ModelPickerSheet(selectedModelId: Binding(
                     get: { conversation.modelId },
@@ -605,6 +608,54 @@ public struct ChatView: View {
             var currentThinking = ""
             var isInsideThinkingTag = false
             var rawStream = ""
+            
+            // Remote Studio Code Task Dispatch
+            if conversation.isRemoteCodeChat, let wsPath = conversation.workspacePath, !wsPath.isEmpty {
+                do {
+                    let dispatchRes = try await CloudChatService.shared.dispatchDesktopCommand(
+                        workspacePath: wsPath,
+                        chatId: conversation.id,
+                        task: userPrompt,
+                        model: "Singularity-Matrix"
+                    )
+                    
+                    let stream = CloudChatService.shared.streamDesktopSession()
+                    for await step in stream {
+                        guard !Task.isCancelled else { break }
+                        if step.stepType == "agent_message" || step.stepType == "tool_start" || step.stepType == "tool_result" {
+                            let stepText = step.message ?? step.stdout ?? ""
+                            if !stepText.isEmpty {
+                                fullResponse += "\n" + stepText
+                                await updateLiveStreamingMessage(id: assistantMessageId, content: fullResponse, thinking: currentThinking)
+                            }
+                        } else if step.stepType == "task_done" {
+                            if let finalReply = step.message, !finalReply.isEmpty {
+                                fullResponse = finalReply
+                            }
+                            break
+                        } else if step.stepType == "error" {
+                            let errDesc = step.message ?? "Error executing remote task"
+                            throw NSError(domain: "RemoteStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: errDesc])
+                        }
+                    }
+                    
+                    await finalizeStreamingMessage(
+                        id: assistantMessageId,
+                        finalContent: fullResponse.isEmpty ? "Tarea completada por Newton Desktop Host." : fullResponse,
+                        imageUrl: nil,
+                        orbitResults: [],
+                        currentThinking: "",
+                        thinkingContent: nil
+                    )
+                } catch {
+                    await handleStreamFailure(id: assistantMessageId, error: error, fullResponse: fullResponse)
+                }
+                
+                await MainActor.run {
+                    isStreaming = false
+                }
+                return
+            }
             
             let temp = settings.temperature
             var systemPrompt = SettingsManager.singularitySystemPrompt

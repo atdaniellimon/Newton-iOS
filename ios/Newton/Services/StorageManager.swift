@@ -156,10 +156,55 @@ public final class StorageManager: ObservableObject {
     public func syncWithRemoteServer() async {
         guard AuthManager.shared.isLoggedIn else { return }
         do {
+            // 1. Fetch Standard Cloud Chats
             let remoteChats = try await CloudChatService.shared.fetchChats(limit: 100)
+            
+            // 2. Fetch Remote Desktop Workspaces Code Chats
+            var remoteCodeConversations: [Conversation] = []
+            if let workspaces = try? await CloudChatService.shared.fetchDesktopWorkspaces() {
+                for ws in workspaces {
+                    if let chats = ws.chats {
+                        for chat in chats {
+                            // Convert raw message dictionaries to Message models
+                            var chatMessages: [Message] = []
+                            if let rawMsgs = chat.messages {
+                                for (idx, raw) in rawMsgs.enumerated() {
+                                    let roleStr = raw["role"] ?? "user"
+                                    let contentStr = raw["content"] ?? ""
+                                    let role: MessageRole = (roleStr == "user") ? .user : .assistant
+                                    chatMessages.append(Message(
+                                        id: "\(chat.id)_msg_\(idx)",
+                                        role: role,
+                                        content: contentStr,
+                                        createdAt: Date(timeIntervalSince1970: chat.created_at ?? Date().timeIntervalSince1970)
+                                    ))
+                                }
+                            }
+                            
+                            let date = chat.created_at.map { Date(timeIntervalSince1970: $0) } ?? Date()
+                            let codeConvo = Conversation(
+                                id: chat.id,
+                                title: chat.title.isEmpty ? "Code Task" : chat.title,
+                                messages: chatMessages,
+                                isPinned: false,
+                                isGhost: false,
+                                modelId: "Singularity-Matrix",
+                                isRemoteCodeChat: true,
+                                workspacePath: ws.path,
+                                workspaceName: ws.name,
+                                createdAt: date,
+                                updatedAt: date
+                            )
+                            remoteCodeConversations.append(codeConvo)
+                        }
+                    }
+                }
+            }
+            
             let ghosts = self.conversations.filter { $0.isGhost }
             var merged: [Conversation] = []
             
+            // Merge Standard Cloud Chats
             for rChat in remoteChats {
                 if let existing = self.conversations.first(where: { $0.id == rChat.id }) {
                     var updated = rChat
@@ -172,6 +217,20 @@ public final class StorageManager: ObservableObject {
                     merged.append(updated)
                 } else {
                     merged.append(rChat)
+                }
+            }
+            
+            // Merge Remote Workspace Code Chats
+            for cChat in remoteCodeConversations {
+                if let existing = self.conversations.first(where: { $0.id == cChat.id }) {
+                    var updated = cChat
+                    updated.isPinned = existing.isPinned
+                    if !existing.messages.isEmpty && cChat.messages.isEmpty {
+                        updated.messages = existing.messages
+                    }
+                    merged.append(updated)
+                } else {
+                    merged.append(cChat)
                 }
             }
             

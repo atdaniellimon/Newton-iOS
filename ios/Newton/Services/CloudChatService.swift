@@ -100,8 +100,44 @@ public final class CloudChatService: ObservableObject {
     
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
+    @Published public var desktopStatus: RemoteDesktopStatus? = nil
+    @Published public var desktopWorkspaces: [RemoteWorkspaceItem] = []
     
-    private init() {}
+    private var hostPresenceTask: Task<Void, Never>? = nil
+    
+    private init() {
+        startHostPresenceMonitoring()
+    }
+    
+    public func startHostPresenceMonitoring() {
+        hostPresenceTask?.cancel()
+        hostPresenceTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self else { break }
+                if AuthManager.shared.isLoggedIn {
+                    await self.refreshHostStatus()
+                }
+                try? await Task.sleep(nanoseconds: 8_000_000_000) // Poll every 8s
+            }
+        }
+    }
+    
+    @MainActor
+    public func refreshHostStatus() async {
+        do {
+            let status = try await fetchDesktopStatus()
+            self.desktopStatus = status
+            if status.online {
+                let ws = try await fetchDesktopWorkspaces()
+                self.desktopWorkspaces = ws
+            }
+        } catch {
+            // If request fails or network drops, don't crash
+            if self.desktopStatus?.online == true {
+                self.desktopStatus = RemoteDesktopStatus(online: false, workspaces_count: 0, last_seen: nil, active_workspace: nil)
+            }
+        }
+    }
     
     // MARK: - Request Helper
     

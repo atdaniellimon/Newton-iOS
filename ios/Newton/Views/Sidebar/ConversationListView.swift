@@ -11,14 +11,21 @@ import SwiftUI
 public struct ConversationListView: View {
     @ObservedObject var storage = StorageManager.shared
     @ObservedObject var settings = SettingsManager.shared
+    @ObservedObject var cloudService = CloudChatService.shared
     
     @Binding public var selectedConversationId: String?
     public var onSelectConversation: ((String) -> Void)? = nil
     
+    public enum FilterTab {
+        case all
+        case chats
+        case remote
+    }
+    
+    @State private var selectedFilterTab: FilterTab = .all
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
     @State private var showArtGallery: Bool = false
-    @State private var showRemoteStudio: Bool = false
     
     public init(selectedConversationId: Binding<String?>, onSelectConversation: ((String) -> Void)? = nil) {
         self._selectedConversationId = selectedConversationId
@@ -26,7 +33,16 @@ public struct ConversationListView: View {
     }
     
     private var filteredConversations: [Conversation] {
-        let list = storage.conversations
+        var list = storage.conversations
+        switch selectedFilterTab {
+        case .all:
+            break
+        case .chats:
+            list = list.filter { !$0.isRemoteCodeChat }
+        case .remote:
+            list = list.filter { $0.isRemoteCodeChat }
+        }
+        
         if searchText.isEmpty {
             return list
         }
@@ -61,7 +77,78 @@ public struct ConversationListView: View {
                 
                 // Studio Section Navigation Items (Chats, Ghost, Remote Studio, Art gallery)
                 VStack(spacing: 4) {
-                    SidebarItemRow(icon: "bubble.left.and.bubble.right", title: "Chats", isSelected: true)
+                    // Host Presence Card Pill
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(cloudService.desktopStatus?.online == true ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                        
+                        Text(cloudService.desktopStatus?.online == true ? "Mac Host Conectado" : "Mac Host Desconectado")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(cloudService.desktopStatus?.online == true ? Color.green : NewtonTheme.textMuted)
+                        
+                        Spacer()
+                        
+                        if cloudService.desktopStatus?.online == true {
+                            Text("\(cloudService.desktopWorkspaces.count) ws")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(NewtonTheme.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(NewtonTheme.surface.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(.bottom, 6)
+                    
+                    // Filter Mode Picker: All Chats vs Remote Studio Code Chats
+                    HStack(spacing: 6) {
+                        Button {
+                            Haptics.selection()
+                            selectedFilterTab = .all
+                        } label: {
+                            Text("All")
+                                .font(.system(size: 12, weight: selectedFilterTab == .all ? .semibold : .regular))
+                                .foregroundColor(selectedFilterTab == .all ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(selectedFilterTab == .all ? NewtonTheme.card : Color.clear)
+                                .clipShape(Capsule())
+                        }
+                        
+                        Button {
+                            Haptics.selection()
+                            selectedFilterTab = .chats
+                        } label: {
+                            Text("Chats")
+                                .font(.system(size: 12, weight: selectedFilterTab == .chats ? .semibold : .regular))
+                                .foregroundColor(selectedFilterTab == .chats ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(selectedFilterTab == .chats ? NewtonTheme.card : Color.clear)
+                                .clipShape(Capsule())
+                        }
+                        
+                        Button {
+                            Haptics.selection()
+                            selectedFilterTab = .remote
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "laptopcomputer")
+                                    .font(.system(size: 10))
+                                Text("Remote")
+                            }
+                            .font(.system(size: 12, weight: selectedFilterTab == .remote ? .semibold : .regular))
+                            .foregroundColor(selectedFilterTab == .remote ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(selectedFilterTab == .remote ? NewtonTheme.card : Color.clear)
+                            .clipShape(Capsule())
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.bottom, 6)
                     
                     Button {
                         Haptics.medium()
@@ -74,24 +161,17 @@ public struct ConversationListView: View {
                     
                     Button {
                         Haptics.light()
-                        showRemoteStudio = true
-                    } label: {
-                        SidebarItemRow(icon: "laptopcomputer.and.iphone", title: "Remote Studio", isSelected: false)
-                    }
-                    
-                    Button {
-                        Haptics.light()
                         showArtGallery = true
                     } label: {
                         SidebarItemRow(icon: "cube.transparent", title: "Art gallery", isSelected: false)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.bottom, 10)
                 
                 // "Recents" Section Header
                 HStack {
-                    Text("Recents")
+                    Text(selectedFilterTab == .remote ? "Remote Studio Tasks" : "Recents")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(NewtonTheme.textMuted)
                     Spacer()
@@ -118,12 +198,24 @@ public struct ConversationListView: View {
                                     Image(systemName: "ghost.fill")
                                         .font(.system(size: 11))
                                         .foregroundColor(Color(red: 0.75, green: 0.55, blue: 0.95))
+                                } else if convo.isRemoteCodeChat {
+                                    Image(systemName: "terminal.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(NewtonTheme.sand)
                                 }
                                 
-                                Text(convo.title)
-                                    .font(.system(size: 15, weight: convo.isPinned ? .semibold : .regular))
-                                    .foregroundColor(NewtonTheme.textPrimary)
-                                    .lineLimit(1)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(convo.title)
+                                        .font(.system(size: 15, weight: convo.isPinned ? .semibold : .regular))
+                                        .foregroundColor(NewtonTheme.textPrimary)
+                                        .lineLimit(1)
+                                    
+                                    if let wsName = convo.workspaceName {
+                                        Text(wsName)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(NewtonTheme.textMuted)
+                                    }
+                                }
                                 
                                 Spacer()
                             }
@@ -217,9 +309,6 @@ public struct ConversationListView: View {
         .sheet(isPresented: $showArtGallery) {
             ArtGalleryView()
         }
-        .sheet(isPresented: $showRemoteStudio) {
-            RemoteStudioView()
-        }
         .task {
             // 1. Pull initial state from cloud
             await storage.syncWithRemoteServer()
@@ -233,9 +322,31 @@ public struct ConversationListView: View {
     
     private func createNewChat() {
         Haptics.light()
-        let newConvo = storage.createConversation()
-        selectedConversationId = newConvo.id
-        onSelectConversation?(newConvo.id)
+        if selectedFilterTab == .remote, let firstWs = cloudService.desktopWorkspaces.first {
+            let taskId = "task_\(Int(Date().timeIntervalSince1970))"
+            let remoteConvo = Conversation(
+                id: taskId,
+                title: "Remote Code Task",
+                messages: [],
+                isPinned: false,
+                isGhost: false,
+                modelId: "Singularity-Matrix",
+                isRemoteCodeChat: true,
+                workspacePath: firstWs.path,
+                workspaceName: firstWs.name,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            storage.conversations.insert(remoteConvo, at: 0)
+            storage.sortConversations()
+            storage.saveConversations()
+            selectedConversationId = remoteConvo.id
+            onSelectConversation?(remoteConvo.id)
+        } else {
+            let newConvo = storage.createConversation()
+            selectedConversationId = newConvo.id
+            onSelectConversation?(newConvo.id)
+        }
     }
 }
 

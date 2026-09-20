@@ -221,9 +221,28 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Auto-sync local workspaces to gateway
+    // Auto-sync local workspaces and code chats to gateway
     if (window.newtonAPI?.listWorkspaces) {
-      loadCodeWorkspaces().catch(() => {});
+      // Hydrate code chats from disk on boot
+      if (window.newtonAPI?.loadCodeChats) {
+        window.newtonAPI.loadCodeChats().then(res => {
+          if (res?.success && Array.isArray(res.data)) {
+            for (const entry of res.data) {
+              workspaceChatsMap[entry.workspacePath] = entry.chats;
+            }
+          }
+          loadCodeWorkspaces().catch(() => {});
+        }).catch(() => {
+          loadCodeWorkspaces().catch(() => {});
+        });
+      } else {
+        loadCodeWorkspaces().catch(() => {});
+      }
+
+      // Keep periodic heartbeat sync (every 10s) so iOS always detects host online & latest code chats
+      setInterval(() => {
+        syncDesktopWorkspacesWithChats();
+      }, 10000);
     }
 
     await Promise.allSettled([
