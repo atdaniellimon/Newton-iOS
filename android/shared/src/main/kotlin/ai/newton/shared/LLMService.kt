@@ -88,11 +88,11 @@ class LLMService(
                 response.close()
                 val humanMsg = try {
                     val root = json.parseToJsonElement(body).jsonObject
-                    root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
+                    val parsed = root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
                         ?: root["detail"]?.jsonPrimitive?.contentOrNull
-                        ?: body.ifEmpty { "HTTP ${response.code}" }
+                    if (parsed != null) "HTTP ${response.code}: $parsed" else if (body.isNotEmpty()) "HTTP ${response.code}: $body" else "HTTP ${response.code}"
                 } catch (_: Exception) {
-                    body.ifEmpty { "HTTP ${response.code}" }
+                    if (body.isNotEmpty()) "HTTP ${response.code}: $body" else "HTTP ${response.code}"
                 }
                 close(IllegalStateException(humanMsg))
                 return@callbackFlow
