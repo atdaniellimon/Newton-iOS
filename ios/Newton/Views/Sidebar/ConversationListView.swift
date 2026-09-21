@@ -361,7 +361,8 @@ public struct ConversationListView: View {
     
     private func createNewChat() {
         Haptics.light()
-        if selectedFilterTab == .remote, let firstWs = cloudService.desktopWorkspaces.first {
+        if selectedFilterTab == .remote {
+            let firstWs = cloudService.desktopWorkspaces.first
             let taskId = "task_\(Int(Date().timeIntervalSince1970))"
             let remoteConvo = Conversation(
                 id: taskId,
@@ -371,8 +372,8 @@ public struct ConversationListView: View {
                 isGhost: false,
                 modelId: "Singularity-Matrix",
                 isRemoteCodeChat: true,
-                workspacePath: firstWs.path,
-                workspaceName: firstWs.name,
+                workspacePath: firstWs?.path,
+                workspaceName: firstWs?.name,
                 createdAt: Date(),
                 updatedAt: Date()
             )

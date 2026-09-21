@@ -641,12 +641,16 @@ public struct ChatView: View {
             var rawStream = ""
             
             // Remote Studio Code Task Dispatch
-            if conversation.isRemoteCodeChat, let wsPath = conversation.workspacePath, !wsPath.isEmpty {
+            let targetWsPath = (conversation.workspacePath?.isEmpty == false) ? conversation.workspacePath : CloudChatService.shared.desktopWorkspaces.first?.path
+            if conversation.isRemoteCodeChat, let wsPath = targetWsPath, !wsPath.isEmpty {
                 do {
+                    let taskToSend = userPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? (backendPayloadPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Ejecutar tarea en workspace" : backendPayloadPrompt)
+                        : userPrompt
                     let dispatchRes = try await CloudChatService.shared.dispatchDesktopCommand(
                         workspacePath: wsPath,
                         chatId: conversation.id,
-                        task: userPrompt,
+                        task: taskToSend,
                         model: "Singularity-Matrix"
                     )
                     

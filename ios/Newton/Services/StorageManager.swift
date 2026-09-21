@@ -212,6 +212,10 @@ public final class StorageManager: ObservableObject {
             }
             
             let ghosts = self.conversations.filter { $0.isGhost }
+            // Preserve locally created chats that haven't synced with the cloud yet
+            let localUnsynced = self.conversations.filter { c in
+                !c.isGhost && !remoteChats.contains(where: { $0.id == c.id }) && !remoteCodeConversations.contains(where: { $0.id == c.id })
+            }
             var merged: [Conversation] = []
             
             // Merge Standard Cloud Chats
@@ -247,7 +251,7 @@ public final class StorageManager: ObservableObject {
                 }
             }
             
-            self.conversations = ghosts + merged
+            self.conversations = ghosts + localUnsynced + merged
             self.sortConversations()
             self.saveConversations()
         } catch {
