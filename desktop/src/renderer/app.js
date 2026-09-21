@@ -2754,7 +2754,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
           startLine: params.startLine != null ? Number(params.startLine) : null,
           endLine: params.endLine != null ? Number(params.endLine) : null
         });
-        if (!res.success) return { error: res.error || 'Failed to read file' };
+        if (!res.success) return { error: res.error || 'Failed to read file', hint: 'Paths are relative to the workspace root. Use list_files to confirm the file exists, or read in line ranges for large files.' };
         if (res.data?.isPartial) {
           return {
             success: true,
@@ -2806,7 +2806,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
               return { success: true, message: retryRes.message || `Successfully updated ${params.relativePath}`, diff: retryRes.diff };
             }
           }
-          return { error: res.error || 'Failed to edit file' };
+          return { error: res.error || 'Failed to edit file', hint: 'old_str must match the file byte-for-byte, including indentation. read_file the target region first, then retry with exact content and enough surrounding context to be unique.' };
         }
         sessionAuditTrail.files.add(params.relativePath);
         return { success: true, message: res.message || `Successfully updated ${params.relativePath}`, diff: res.diff };
@@ -2819,7 +2819,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
           query: params.query,
           subPath: params.subPath || ''
         });
-        if (!res.success) return { error: res.error || 'Failed to grep search' };
+        if (!res.success) return { error: res.error || 'Failed to grep search', hint: 'Use simple literals or POSIX ERE; avoid quotes/special chars. Try a shorter keyword.' };
         return { success: true, count: res.count || 0, matches: res.matches || [] };
       }
 
@@ -2854,7 +2854,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
           relativePath: params.relativePath,
           content
         });
-        if (!res.success) return { error: res.error || 'Failed to write file' };
+        if (!res.success) return { error: res.error || 'Failed to write file', hint: 'Confirm the directory exists via list_files; write_file creates parent dirs automatically, so the path itself may be invalid.' };
         sessionCreatedFiles.add(params.relativePath);
         sessionAuditTrail.files.add(params.relativePath);
         return { success: true, message: `Successfully wrote ${params.relativePath}`, diff: res.diff };
@@ -2873,7 +2873,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
           relativePath: params.relativePath,
           content
         });
-        if (!res.success) return { error: res.error || 'Failed to create file' };
+        if (!res.success) return { error: res.error || 'Failed to create file', hint: 'Check the path is valid and relative to the workspace root (list_files).' };
         sessionCreatedFiles.add(params.relativePath);
         sessionAuditTrail.files.add(params.relativePath);
         return { success: true, message: `Successfully created ${params.relativePath}` };
@@ -2887,7 +2887,7 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
           workspacePath: wsPath,
           relativePath: params.relativePath
         });
-        if (!res.success) return { error: res.error || 'Failed to delete file' };
+        if (!res.success) return { error: res.error || 'Failed to delete file', hint: 'The path may not exist; confirm with list_files first.' };
         sessionAuditTrail.files.add(`(deleted) ${params.relativePath}`);
         return { success: true, message: `Successfully deleted ${params.relativePath}` };
       }
@@ -3083,6 +3083,429 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
     };
   };
 
+  // =========================================================================
+  // Shared Agentic Engine — used by BOTH local tasks and remote dispatch
+  // =========================================================================
+
+  // Trigram similarity for fuzzy stall detection (catches paraphrased loops)
+  const trigrams = (s) => {
+    const set = new Set();
+    for (let i = 0; i < s.length - 2; i++) set.add(s.slice(i, i + 3));
+    return set;
+  };
+  const similarity = (a, b) => {
+    if (!a || !b) return 0;
+    const A = trigrams(a), B = trigrams(b);
+    let inter = 0;
+    for (const t of A) if (B.has(t)) inter++;
+    return inter / Math.max(1, Math.min(A.size, B.size));
+  };
+
+  // Verbose, structured tool output for the model: never swallow stderr/exit codes.
+  const formatToolOutput = (result) => {
+    if (typeof result === 'string') return result;
+    if (!result) return '(no output)';
+    if (result.error) {
+      let s = `ERROR: ${result.error}`;
+      if (result.hint) s += `\nHINT: ${result.hint}`;
+      if (result.stdout) s += `\nstdout:\n${result.stdout}`;
+      if (result.stderr) s += `\nstderr:\n${result.stderr}`;
+      return s;
+    }
+    const parts = [];
+    const preferred = result.content ?? result.files ?? result.summary ?? result.message;
+    if (preferred) parts.push(typeof preferred === 'string' ? preferred : JSON.stringify(preferred, null, 2));
+    if (result.exitCode !== undefined && result.exitCode !== 0) parts.push(`exit_code: ${result.exitCode}`);
+    if (result.stdout) parts.push(`--- stdout ---\n${result.stdout}`);
+    if (result.stderr) parts.push(`--- stderr ---\n${result.stderr}`);
+    if (result.matches !== undefined && !preferred) parts.push(`matches: ${JSON.stringify(result.matches, null, 2)}`);
+    if (result.lines) parts.push(`lines: ${result.lines}`);
+    if (parts.length === 0) return JSON.stringify(result, null, 2);
+    return parts.join('\n');
+  };
+
+  async function runAgenticTurns({ task, isGhost, isCancelled, chatId = null, sessionId = null, onStep = null }) {
+    const MAX_AGENT_STEPS = 40;
+    const MAX_HISTORY_CHARS = 90000;
+    const messagesStream = document.getElementById('code-messages-stream');
+    let stepCount = 0;
+    let currentPrompt = '';
+    let activeBotBubble = null;
+    let turnRawText = '';
+
+    const step = (payload) => {
+      if (onStep) onStep(payload).catch(() => {});
+    };
+
+    const cleanupStream = window.newtonAPI?.onStreamChunk((chunk) => {
+      if (chunk.type === 'delta') {
+        turnRawText += chunk.text;
+        if (activeBotBubble) {
+          updateCodeAssistantBubble(activeBotBubble, turnRawText);
+          scheduleScroll(messagesStream || document.getElementById('code-center-scroll'));
+        }
+      } else if (chunk.type === 'done') {
+        if (chunk.text && chunk.text.length > turnRawText.length) turnRawText = chunk.text;
+        if (activeBotBubble) updateCodeAssistantBubbleImmediate(activeBotBubble, turnRawText);
+        flushScroll();
+      }
+    });
+
+    const compactHistory = () => {
+      let total = codeSessionHistory.reduce((n, m) => n + (m.content?.length || 0), 0);
+      while (total > MAX_HISTORY_CHARS && codeSessionHistory.length > 6) {
+        const removed = codeSessionHistory.splice(0, 2);
+        total -= removed.reduce((n, m) => n + (m.content?.length || 0), 0);
+        codeSessionHistory.unshift({ role: 'user', content: '[Earlier steps compacted: older tool exchanges were summarized away to fit the context window.]' });
+      }
+    };
+
+    const runTaskVerification = async () => {
+      if (sessionAuditTrail.files.size === 0) return null;
+      const d = workspaceMemoryCache[activeWorkspace.path] || {};
+      const scripts = d.packageInfo?.scripts || {};
+      const testCmd = scripts.test && !/^echo/.test(scripts.test)
+        ? 'npm test'
+        : (scripts.lint ? 'npm run lint' : null);
+      if (!testCmd) return null;
+      try {
+        const res = await window.newtonAPI.execBash({ workspacePath: activeWorkspace.path, command: testCmd });
+        return { command: testCmd, ok: !!res.success, output: ((res.stdout || '') + (res.stderr || '')).slice(0, 3000) };
+      } catch (e) {
+        return { command: testCmd, ok: false, output: e.message };
+      }
+    };
+
+    const renderSessionSummary = (verification) => {
+      if (!messagesStream) return;
+      const card = document.createElement('div');
+      card.className = 'code-session-summary';
+      const filesHtml = [...sessionAuditTrail.files].map(f => `<li>${escapeHtml(f)}</li>`).join('');
+      const cmdsHtml = sessionAuditTrail.commands.slice(-8).map(c => `<li><code>${escapeHtml(c)}</code></li>`).join('');
+      const verifyHtml = verification
+        ? `<div class="summary-verify ${verification.ok ? 'ok' : 'fail'}">${verification.ok ? '✔' : '✘'} Verificación (${escapeHtml(verification.command)})</div><pre class="summary-verify-output">${escapeHtml(verification.output.slice(0, 1200))}</pre>`
+        : '';
+      card.innerHTML = `
+        <div class="summary-header"><i class="f7-icons">doc_checkmark</i> Resumen de la tarea</div>
+        ${filesHtml ? `<div class="summary-section">Archivos modificados</div><ul>${filesHtml}</ul>` : ''}
+        ${cmdsHtml ? `<div class="summary-section">Comandos ejecutados</div><ul>${cmdsHtml}</ul>` : ''}
+        ${verifyHtml}
+      `;
+      messagesStream.appendChild(card);
+      scrollCodeToBottom();
+    };
+
+    sessionCreatedFiles.clear();
+    sessionAuditTrail = { files: new Set(), commands: [], verified: false, lastVerification: null };
+    let forcedVerificationPushes = 0;
+    let lastReplyNorm = '';
+    let stallCount = 0;
+    let lastFailedTool = null;
+    let consecutiveFailures = 0;
+    const recentToolCalls = [];
+
+    try {
+      // Workspace inspection prefix (same richness for local and remote)
+      const branchStr = activeWorkspace.branch && activeWorkspace.branch !== 'undefined' ? activeWorkspace.branch : 'main';
+      let inspectionPrefix = `[ACTIVE WORKSPACE: ${activeWorkspace.name} (${activeWorkspace.path}) | Branch: ${branchStr}${sessionId ? ` | Remote Session: ${sessionId}` : ''} | Reasoning Effort: ${codeReasoningEffort}]\n`;
+      let d = workspaceMemoryCache[activeWorkspace.path];
+      if (!d) {
+        try {
+          const sumRes = await window.newtonAPI?.getWorkspaceSummary(activeWorkspace.path);
+          if (sumRes?.success && sumRes.data) {
+            d = sumRes.data;
+            workspaceMemoryCache[activeWorkspace.path] = d;
+          }
+        } catch (_) {}
+      }
+      if (d) {
+        const fileList = d.files || [];
+        const fileCount = fileList.length;
+        const fileNamesPreview = fileList.slice(0, 30).map(f => (f.isDirectory ? `${f.name}/` : f.name)).join(', ');
+        inspectionPrefix += `Workspace Topography: ${fileCount} files/folders: [${fileNamesPreview}${fileCount > 30 ? ', ...' : ''}].\n`;
+        if (d.mainEntrypoint) {
+          inspectionPrefix += `Primary Entrypoint Detected: ${d.mainEntrypoint.relativePath} (${d.mainEntrypoint.totalLines} lines):\n\`\`\`\n${d.mainEntrypoint.content.slice(0, 1200)}\n\`\`\`\n`;
+        }
+        if (d.packageInfo) {
+          if (d.packageInfo.name) {
+            inspectionPrefix += `Package Manifest (${d.packageInfo.name}@${d.packageInfo.version || '0.0.0'}):\n- Dependencies: ${(d.packageInfo.dependencies || []).slice(0, 25).join(', ')}\n- Scripts: ${Object.keys(d.packageInfo.scripts || {}).join(', ')}\n`;
+          } else if (d.packageInfo.snippet) {
+            inspectionPrefix += `Project Config (${d.packageInfo.type}):\n${d.packageInfo.snippet.slice(0, 400)}\n`;
+          }
+        }
+        if (d.readme) inspectionPrefix += `README Snippet:\n${d.readme.slice(0, 800)}\n`;
+        if (d.projectMemory) {
+          if (d.projectMemory.plan) inspectionPrefix += `\n[Active Project Plan (.newton/plan.md)]:\n${d.projectMemory.plan}\n`;
+          if (d.projectMemory.knowledge) inspectionPrefix += `\n[Project Memory & Invariants (.newton/memory.md)]:\n${d.projectMemory.knowledge}\n`;
+        }
+      }
+      inspectionPrefix += '\n';
+
+      const isFollowUpTurn = Array.isArray(codeSessionHistory) && codeSessionHistory.length > 0 && !sessionId;
+      currentPrompt = isFollowUpTurn
+        ? `USER DIRECTIVE: ${task}\n\nYou are the autonomous engineer on workspace "${activeWorkspace.name}". Continue executing the objective directly using your tools (write_file, edit_file, exec_bash). The user will not copy code or run commands. Emit your concrete <tool_call> block(s) to apply changes and verify.`
+        : `${SINGULARITY_MATRIX_SYSTEM_PROMPT}\n\n${inspectionPrefix}USER INTENT: ${task}\n\nYou are working autonomously in "${activeWorkspace.name}". From this intent alone, run your full operating cycle (orient → plan → execute → verify → commit & report) using batched parallel tool calls. Do not ask how; just deliver the working result.`;
+
+      activeBotBubble = createCodeAssistantBubble();
+      messagesStream.appendChild(activeBotBubble.container);
+      scrollCodeToBottom();
+
+      while (true) {
+        if (isCancelled()) {
+          activeBotBubble.content.style.display = 'block';
+          activeBotBubble.content.textContent += '\n\n*(Ejecución detenida por el usuario)*';
+          renderSessionSummary(null);
+          step({ stepType: 'error', message: 'Ejecución cancelada por el usuario.' });
+          break;
+        }
+
+        if (stepCount >= MAX_AGENT_STEPS) {
+          currentPrompt = `<system_notice>\nYou reached the maximum of ${MAX_AGENT_STEPS} steps for this task. Stop calling tools now and deliver a final report of what you accomplished and what remains.\n</system_notice>`;
+        }
+        if (stepCount >= MAX_AGENT_STEPS + 3) {
+          activeBotBubble.content.style.display = 'block';
+          activeBotBubble.content.textContent += '\n\n*(Límite de pasos alcanzado — ejecución finalizada)*';
+          renderSessionSummary(null);
+          step({ stepType: 'task_done', message: 'Límite de pasos alcanzado.' });
+          break;
+        }
+
+        stepCount++;
+
+        const payload = {
+          prompt: currentPrompt,
+          model: 'Singularity-Matrix',
+          history: codeSessionHistory,
+          isGhost: !!isGhost
+        };
+
+        let response = null;
+        let retryCount = 0;
+        const maxRetries = 2;
+        while (retryCount <= maxRetries) {
+          response = await window.newtonAPI.sendMessage(payload);
+          if (response.success) break;
+          const isTransient = /(?:502|520|524|503|gateway|timeout|fetch failed)/i.test(response.error || '');
+          if (isTransient && retryCount < maxRetries && !isCancelled()) {
+            retryCount++;
+            activeBotBubble.content.style.display = 'block';
+            activeBotBubble.content.textContent = `*(Reconectando con Singularity Matrix: reintento ${retryCount}/${maxRetries}...)*`;
+            await new Promise(r => setTimeout(r, 2500 * retryCount));
+            continue;
+          }
+          break;
+        }
+
+        if (isCancelled()) {
+          activeBotBubble.content.style.display = 'block';
+          activeBotBubble.content.textContent += '\n\n*(Ejecución detenida por el usuario)*';
+          break;
+        }
+
+        if (!response || !response.success) {
+          activeBotBubble.content.style.display = 'block';
+          activeBotBubble.content.textContent = `Error: ${response?.error || 'Failed to complete code task.'}`;
+          activeBotBubble.content.style.color = '#e67e80';
+          step({ stepType: 'error', message: response?.error || 'Failed to complete code task.' });
+          break;
+        }
+
+        const replyText = response.data?.reply || turnRawText;
+        updateCodeAssistantBubble(activeBotBubble, replyText);
+
+        const toolCallMatches = [...replyText.matchAll(/<tool_call>([\s\S]*?)<\/tool_call>/g)];
+        if (toolCallMatches.length === 0) {
+          // Stall / autonomy gate: repeated or permission-asking or unverified replies
+          const replyNorm = replyText
+            .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase()
+            .slice(0, 600);
+          const isRepeat = replyNorm.length > 60 && similarity(replyNorm, lastReplyNorm) >= 0.8;
+          lastReplyNorm = replyNorm;
+          const askingUser = /(puedo proceder|alguna preferencia|¿?prefieres|would you like|should i (proceed|ask)|let me know how|para continuar, puedo|necesitar[ií]as un desarrollo externo|requerir[ií]a un entorno xcode)/i.test(replyText);
+          const filesTouched = sessionAuditTrail.files.size > 0;
+          const needsVerification = filesTouched && !sessionAuditTrail.verified && forcedVerificationPushes < 2;
+
+          if (isRepeat || askingUser || needsVerification) {
+            stallCount = (isRepeat || askingUser) ? stallCount + 1 : 0;
+            if (stallCount >= 3) {
+              activeBotBubble.content.style.display = 'block';
+              activeBotBubble.content.textContent = '*(El agente quedó atascado repitiendo análisis sin actuar — ejecución detenida. Reformula la tarea o dale más contexto.)*';
+              activeBotBubble.content.style.color = '#e5989b';
+              renderSessionSummary(null);
+              step({ stepType: 'error', message: 'Agente atascado repitiendo análisis sin actuar.' });
+              break;
+            }
+            forcedVerificationPushes = needsVerification ? forcedVerificationPushes + 1 : forcedVerificationPushes;
+            codeSessionHistory.push({ role: 'user', content: currentPrompt });
+            codeSessionHistory.push({ role: 'assistant', content: replyText });
+            compactHistory();
+            const reasons = [];
+            if (isRepeat) reasons.push('your last responses were near-identical with NO <tool_call> — you are stalling');
+            if (askingUser) reasons.push('you asked the user how to proceed — that is forbidden; decide with reasonable defaults');
+            if (needsVerification) reasons.push(`you modified files (${[...sessionAuditTrail.files].slice(0, 8).join(', ')}) without verifying them`);
+            const verifyClause = needsVerification
+              ? ' Run the project checks (test/lint from package.json scripts or pyproject.toml) or a syntax check of every touched file via exec_bash.'
+              : '';
+            currentPrompt = `<system_gate>\nPROTOCOL VIOLATION: ${reasons.join('; ')}.${verifyClause}\n\nIn THIS response either emit the concrete <tool_call> block(s) that advance or verify the task, or — only if the work is truly complete and verified — deliver the final report. Nothing else.\n</system_gate>`;
+            turnRawText = '';
+            activeBotBubble = createCodeAssistantBubble();
+            messagesStream.appendChild(activeBotBubble.container);
+            scrollCodeToBottom();
+            continue;
+          }
+
+          codeSessionHistory.push({ role: 'user', content: currentPrompt });
+          codeSessionHistory.push({ role: 'assistant', content: replyText });
+          compactHistory();
+
+          const chatEntry = workspaceChatsMap[activeWorkspace.path]?.find(c => c.id === (chatId || currentCodeTaskId));
+          if (chatEntry) {
+            chatEntry.messages = [...codeSessionHistory];
+            saveWorkspaceChatsMap();
+            renderCodeWorkspacesTree();
+          }
+          const verification = sessionAuditTrail.lastVerification || await runTaskVerification();
+          renderSessionSummary(verification);
+          populateDashboardMetrics();
+          step({ stepType: 'task_done', message: replyText.slice(0, 3000) });
+          break;
+        }
+
+        const parsedCalls = [];
+        let parseFailed = false;
+        for (const m of toolCallMatches) {
+          let parsed = null;
+          try {
+            parsed = JSON.parse(m[1].trim());
+          } catch (jsonErr) {
+            console.warn('Tool call JSON parse error:', jsonErr);
+          }
+          if (!parsed || !parsed.tool) { parseFailed = true; break; }
+          parsedCalls.push({ toolName: parsed.tool, toolParams: parsed.parameters || {} });
+        }
+
+        if (parseFailed || parsedCalls.length === 0) {
+          currentPrompt = `<tool_response>\n[Parse error: one of your <tool_call> blocks contained invalid JSON or a missing "tool" field. Re-emit the call(s) with valid JSON.]\n</tool_response>`;
+          turnRawText = '';
+          activeBotBubble = createCodeAssistantBubble();
+          messagesStream.appendChild(activeBotBubble.container);
+          scrollCodeToBottom();
+          continue;
+        }
+
+        // Stuck-loop detector: only block repeated identical READ-ONLY calls;
+        // mutating/executing tools naturally re-run (compile, test, edit) across iterations.
+        const UNRESTRICTED_TOOLS = new Set(['exec_bash', 'write_file', 'edit_file', 'delete_file', 'create_file', 'git', 'update_plan', 'update_memory']);
+        const signatureOf = (c) => `${c.toolName}:${JSON.stringify(c.toolParams)}`;
+        const loopedCall = parsedCalls.find((c) => {
+          if (UNRESTRICTED_TOOLS.has(c.toolName)) return false;
+          const sig = signatureOf(c);
+          const pastCount = recentToolCalls.filter(s => s === sig).length;
+          return pastCount >= 2 || parsedCalls.filter(o => signatureOf(o) === sig).length > 1;
+        });
+        if (loopedCall) {
+          recentToolCalls.push(signatureOf(loopedCall));
+          const warnCard = renderToolCard(loopedCall.toolName, loopedCall.toolParams);
+          warnCard.setStatus('error', 'Loop Prevented');
+          warnCard.setOutput(`Notice: Read-only tool "${loopedCall.toolName}" was already executed with identical arguments.`);
+          currentPrompt = `<tool_response tool="${loopedCall.toolName}">\n[Notice: You already read this data with identical parameters. Proceed to edit files or conclude.]\n</tool_response>`;
+          turnRawText = '';
+          activeBotBubble = createCodeAssistantBubble();
+          messagesStream.appendChild(activeBotBubble.container);
+          scrollCodeToBottom();
+          continue;
+        }
+        for (const c of parsedCalls) recentToolCalls.push(signatureOf(c));
+        if (recentToolCalls.length > 12) recentToolCalls.splice(0, recentToolCalls.length - 12);
+
+        // Parallel-batch execution: read-only calls run concurrently; mutating calls sequential
+        const READONLY_PARALLEL = new Set(['list_files', 'read_file', 'grep_search', 'web_search', 'update_plan', 'update_memory']);
+        const allReadonly = parsedCalls.every(c => READONLY_PARALLEL.has(c.toolName));
+
+        const runSingleCall = async (call) => {
+          const toolUI = renderToolCard(call.toolName, call.toolParams);
+          step({ stepType: 'tool_start', toolName: call.toolName, parameters: call.toolParams, message: `Ejecutando: ${call.toolName}` });
+          const startedAt = Date.now();
+          let result = null;
+          try {
+            result = await executeMatrixTool(call.toolName, call.toolParams);
+            if (result.error) {
+              toolUI.setStatus('error', 'Failed');
+              toolUI.setOutput(`Error: ${result.error}`);
+            } else {
+              toolUI.setStatus('success', 'Completed');
+              if (result.diff) toolUI.setDiff(result.diff);
+              toolUI.setOutput(formatToolOutput(result).slice(0, 4000));
+            }
+          } catch (tErr) {
+            result = { error: tErr.message };
+            toolUI.setStatus('error', 'Exception');
+            toolUI.setOutput(`Exception: ${tErr.message}`);
+          }
+          const out = formatToolOutput(result);
+          let outTrimmed = out;
+          const MAX_TOOL_OUTPUT_CHARS = 12000;
+          if (typeof outTrimmed === 'string' && outTrimmed.length > MAX_TOOL_OUTPUT_CHARS) {
+            outTrimmed = outTrimmed.slice(0, MAX_TOOL_OUTPUT_CHARS) + `\n\n[Output truncated: ${outTrimmed.length - MAX_TOOL_OUTPUT_CHARS} characters omitted for brevity. Specify line ranges or narrower queries if more details are needed.]`;
+          }
+          const durationMs = Date.now() - startedAt;
+          step({
+            stepType: 'tool_done',
+            toolName: call.toolName,
+            parameters: call.toolParams,
+            result: result?.error ? { error: result.error } : { ok: true },
+            stdout: result?.stdout?.slice(0, 4000),
+            stderr: result?.stderr?.slice(0, 2000),
+            message: result?.error ? `Fallo (${durationMs}ms): ${result.error}` : `Éxito: ${call.toolName} (${durationMs}ms)`
+          });
+          return { call, out: outTrimmed, failed: !!(result && result.error) };
+        };
+
+        let results;
+        if (allReadonly && parsedCalls.length > 1) {
+          results = await Promise.all(parsedCalls.map(runSingleCall));
+        } else {
+          results = [];
+          for (const call of parsedCalls) results.push(await runSingleCall(call));
+        }
+
+        codeSessionHistory.push({ role: 'user', content: currentPrompt });
+        codeSessionHistory.push({ role: 'assistant', content: replyText });
+        compactHistory();
+
+        const responseBlocks = results.map(r => `<result tool="${r.call.toolName}">\n${r.out}\n</result>`).join('\n');
+        const batchNote = results.length > 1
+          ? `\n[System: ${results.length} tools executed in this batch. All results are below.]`
+          : '';
+
+        // Failure escalation: same tool failing 3 turns in a row → demand a new strategy
+        const anyFailed = results.some(r => r.failed);
+        const failedToolNames = [...new Set(results.filter(r => r.failed).map(r => r.call.toolName))];
+        if (anyFailed && failedToolNames.length === 1 && failedToolNames[0] === lastFailedTool) {
+          consecutiveFailures++;
+        } else {
+          lastFailedTool = anyFailed ? failedToolNames[0] : null;
+          consecutiveFailures = anyFailed ? 1 : 0;
+        }
+        const failNote = consecutiveFailures >= 3
+          ? `\n[System: "${lastFailedTool}" has failed ${consecutiveFailures} turns in a row. STOP retrying the same approach. Change strategy: read the failing file first, try a different tool, break the step into smaller pieces, research the correct usage with subagent or web_search, or if the goal is unachievable, say precisely why.]`
+          : '';
+
+        currentPrompt = `<tool_results>\n${responseBlocks}\n</tool_results>${batchNote}${failNote}\n\nReview the tool results. If further changes, commands, or tests are needed, emit your next <tool_call> block(s). If the objective is complete and verified, provide your final response to the user without any tool calls.`;
+
+        turnRawText = '';
+        activeBotBubble = createCodeAssistantBubble();
+        messagesStream.appendChild(activeBotBubble.container);
+        scrollCodeToBottom();
+      }
+    } finally {
+      if (cleanupStream) cleanupStream();
+    }
+  }
+
   // 6. Singularity Matrix Task Execution & Streaming Stream
   function setupCodeTaskExecution() {
     const codeTaskForm = document.getElementById('code-task-form');
@@ -3139,11 +3562,6 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
       // Append user bubble
       appendCodeMessage('user', prompt);
 
-      // Append bot bubble placeholder with Thinking Orb and Thinking Card
-      const botObj = createCodeAssistantBubble();
-      messagesStream.appendChild(botObj.container);
-      scrollCodeToBottom();
-
       // Animate header thinking orb to 'wave' during generation
       if (codeHeaderOrb) codeHeaderOrb.setState('wave');
       isCodeGenerating = true;
@@ -3156,399 +3574,17 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
         btnCodeSubmit.innerHTML = '<i class="f7-icons" style="font-size: 14px;">stop_fill</i>';
       }
 
-      let turnRawText = '';
-      let activeBotBubble = botObj;
-      const cleanupStream = window.newtonAPI?.onStreamChunk((chunk) => {
-        if (chunk.type === 'delta') {
-          turnRawText += chunk.text;
-          if (activeBotBubble) {
-            updateCodeAssistantBubble(activeBotBubble, turnRawText);
-            scheduleScroll(document.getElementById('code-messages-stream') || document.getElementById('code-center-scroll'));
-          }
-        } else if (chunk.type === 'done') {
-          if (chunk.text && chunk.text.length > turnRawText.length) turnRawText = chunk.text;
-          if (activeBotBubble) updateCodeAssistantBubbleImmediate(activeBotBubble, turnRawText);
-          flushScroll();
-        }
-      });
-
       try {
-        const branchStr = activeWorkspace.branch && activeWorkspace.branch !== 'undefined' ? activeWorkspace.branch : 'main';
-        let inspectionPrefix = `[ACTIVE WORKSPACE: ${activeWorkspace.name} (${activeWorkspace.path}) | Branch: ${branchStr} | Reasoning Effort: ${codeReasoningEffort}]\n`;
-
-        // Check if we have proactively cached data for this workspace
-        let d = workspaceMemoryCache[activeWorkspace.path];
-        if (!d) {
-          try {
-            const sumRes = await window.newtonAPI?.getWorkspaceSummary(activeWorkspace.path);
-            if (sumRes?.success && sumRes.data) {
-              d = sumRes.data;
-              workspaceMemoryCache[activeWorkspace.path] = d;
-            }
-          } catch (_) {}
-        }
-
-        if (d) {
-          const fileList = d.files || [];
-          const fileCount = fileList.length;
-          const fileNamesPreview = fileList.slice(0, 30).map(f => (f.isDirectory ? `${f.name}/` : f.name)).join(', ');
-          inspectionPrefix += `Workspace Topography: ${fileCount} files/folders: [${fileNamesPreview}${fileCount > 30 ? ', ...' : ''}].\n`;
-
-          if (d.mainEntrypoint) {
-            inspectionPrefix += `Primary Entrypoint Detected: ${d.mainEntrypoint.relativePath} (${d.mainEntrypoint.totalLines} lines):\n\`\`\`\n${d.mainEntrypoint.content.slice(0, 1200)}\n\`\`\`\n`;
-          }
-
-          if (d.packageInfo) {
-            if (d.packageInfo.name) {
-              inspectionPrefix += `Package Manifest (${d.packageInfo.name}@${d.packageInfo.version || '0.0.0'}):\n- Dependencies: ${(d.packageInfo.dependencies || []).slice(0, 25).join(', ')}\n- Scripts: ${Object.keys(d.packageInfo.scripts || {}).join(', ')}\n`;
-            } else if (d.packageInfo.snippet) {
-              inspectionPrefix += `Project Config (${d.packageInfo.type}):\n${d.packageInfo.snippet.slice(0, 400)}\n`;
-            }
-          }
-
-          if (d.readme) {
-            inspectionPrefix += `README Snippet:\n${d.readme.slice(0, 800)}\n`;
-          }
-
-          if (d.projectMemory) {
-            if (d.projectMemory.plan) {
-              inspectionPrefix += `\n[Active Project Plan (.newton/plan.md)]:\n${d.projectMemory.plan}\n`;
-            }
-            if (d.projectMemory.knowledge) {
-              inspectionPrefix += `\n[Project Memory & Invariants (.newton/memory.md)]:\n${d.projectMemory.knowledge}\n`;
-            }
-          }
-        }
-        inspectionPrefix += '\n';
-
-        const isFollowUpTurn = Array.isArray(codeSessionHistory) && codeSessionHistory.length > 0;
-        const fullPrompt = isFollowUpTurn
-          ? `USER DIRECTIVE: ${prompt}\n\nYou are the autonomous engineer on workspace "${activeWorkspace.name}". Continue executing the objective directly using your tools (write_file, edit_file, exec_bash). The user will not copy code or run commands. Emit your concrete <tool_call> block(s) to apply changes and verify.`
-          : `${SINGULARITY_MATRIX_SYSTEM_PROMPT}\n\n${inspectionPrefix}USER INTENT: ${prompt}\n\nYou are working autonomously in "${activeWorkspace.name}". From this intent alone, run your full operating cycle (orient → plan → execute → verify → commit & report) using batched parallel tool calls. Do not ask how; just deliver the working result.`;
-
-        // Ensure chat entry exists under active workspace directory
-        if (!currentCodeTaskId) {
-          currentCodeTaskId = 'task_' + Date.now().toString(36);
-          if (!workspaceChatsMap[activeWorkspace.path]) {
-            workspaceChatsMap[activeWorkspace.path] = [];
-          }
-          workspaceChatsMap[activeWorkspace.path].unshift({
-            id: currentCodeTaskId,
-            title: prompt.slice(0, 45),
-            created_at: Math.floor(Date.now() / 1000),
-            messages: []
-          });
-          saveWorkspaceChatsMap();
-          renderCodeWorkspacesTree();
-        }
-
-        // Autonomous Agentic Execution Loop (bounded by MAX_AGENT_STEPS)
-        const MAX_AGENT_STEPS = 40;
-        const MAX_HISTORY_CHARS = 90000;
-        let stepCount = 0;
-        let currentPrompt = fullPrompt;
-        activeBotBubble = botObj;
-        const recentToolCalls = [];
-        sessionCreatedFiles.clear();
-        sessionAuditTrail = { files: new Set(), commands: [], verified: false, lastVerification: null };
-        let forcedVerificationPushes = 0;
-        let lastReplyNorm = '';
-        let stallCount = 0;
-        let lastFailedTool = null;
-        let consecutiveFailures = 0;
-
-        // Context compaction: keep the protocol coherent while trimming old tool chatter
-        const compactHistory = () => {
-          let total = codeSessionHistory.reduce((n, m) => n + (m.content?.length || 0), 0);
-          while (total > MAX_HISTORY_CHARS && codeSessionHistory.length > 6) {
-            const removed = codeSessionHistory.splice(0, 2);
-            total -= removed.reduce((n, m) => n + (m.content?.length || 0), 0);
-            codeSessionHistory.unshift({ role: 'user', content: '[Earlier steps compacted: older tool exchanges were summarized away to fit the context window.]' });
-          }
-        };
-
-        // End-of-task verification: run the project's own checks if it modified files
-        const runTaskVerification = async () => {
-          if (sessionAuditTrail.files.size === 0) return null;
-          const d = workspaceMemoryCache[activeWorkspace.path] || {};
-          const scripts = d.packageInfo?.scripts || {};
-          const testCmd = scripts.test && !/^echo/.test(scripts.test)
-            ? 'npm test'
-            : (scripts.lint ? 'npm run lint' : null);
-          if (!testCmd) return null;
-          try {
-            const res = await window.newtonAPI.execBash({ workspacePath: activeWorkspace.path, command: testCmd });
-            return { command: testCmd, ok: !!res.success, output: ((res.stdout || '') + (res.stderr || '')).slice(0, 3000) };
-          } catch (e) {
-            return { command: testCmd, ok: false, output: e.message };
-          }
-        };
-
-        const renderSessionSummary = (verification) => {
-          const messagesStream = document.getElementById('code-messages-stream');
-          if (!messagesStream) return;
-          const card = document.createElement('div');
-          card.className = 'code-session-summary';
-          const filesHtml = [...sessionAuditTrail.files].map(f => `<li>${escapeHtml(f)}</li>`).join('');
-          const cmdsHtml = sessionAuditTrail.commands.slice(-8).map(c => `<li><code>${escapeHtml(c)}</code></li>`).join('');
-          const verifyHtml = verification
-            ? `<div class="summary-verify ${verification.ok ? 'ok' : 'fail'}">${verification.ok ? '✔' : '✘'} Verificación (${escapeHtml(verification.command)})</div><pre class="summary-verify-output">${escapeHtml(verification.output.slice(0, 1200))}</pre>`
-            : '';
-          card.innerHTML = `
-            <div class="summary-header"><i class="f7-icons">doc_checkmark</i> Resumen de la tarea</div>
-            ${filesHtml ? `<div class="summary-section">Archivos modificados</div><ul>${filesHtml}</ul>` : ''}
-            ${cmdsHtml ? `<div class="summary-section">Comandos ejecutados</div><ul>${cmdsHtml}</ul>` : ''}
-            ${verifyHtml}
-          `;
-          messagesStream.appendChild(card);
-          scrollCodeToBottom();
-        };
-
-        while (true) {
-          if (isAgentCancelled) {
-            activeBotBubble.content.style.display = 'block';
-            activeBotBubble.content.textContent += '\n\n*(Ejecución detenida por el usuario)*';
-            renderSessionSummary(null);
-            break;
-          }
-
-          if (stepCount >= MAX_AGENT_STEPS) {
-            currentPrompt = `<system_notice>\nYou reached the maximum of ${MAX_AGENT_STEPS} steps for this task. Stop calling tools now and deliver a final report of what you accomplished and what remains.\n</system_notice>`;
-          }
-          if (stepCount >= MAX_AGENT_STEPS + 3) {
-            activeBotBubble.content.style.display = 'block';
-            activeBotBubble.content.textContent += '\n\n*(Límite de pasos alcanzado — ejecución finalizada)*';
-            renderSessionSummary(null);
-            break;
-          }
-
-          stepCount++;
-
-          const payload = {
-            prompt: currentPrompt,
-            model: 'Singularity-Matrix',
-            history: codeSessionHistory,
-            isGhost: true
-          };
-
-          let response = null;
-          let retryCount = 0;
-          const maxRetries = 2;
-
-          while (retryCount <= maxRetries) {
-            response = await window.newtonAPI.sendMessage(payload);
-            if (response.success) break;
-
-            const isTransient = /(?:502|520|524|503|gateway|timeout|fetch failed)/i.test(response.error || '');
-            if (isTransient && retryCount < maxRetries && !isAgentCancelled) {
-              retryCount++;
-              activeBotBubble.content.style.display = 'block';
-              activeBotBubble.content.textContent = `*(Reconectando con Singularity Matrix: reintento ${retryCount}/${maxRetries}...)*`;
-              await new Promise(r => setTimeout(r, 2500 * retryCount));
-              continue;
-            }
-            break;
-          }
-
-          if (isAgentCancelled) {
-            activeBotBubble.content.style.display = 'block';
-            activeBotBubble.content.textContent += '\n\n*(Ejecución detenida por el usuario)*';
-            break;
-          }
-
-          if (!response || !response.success) {
-            activeBotBubble.content.style.display = 'block';
-            activeBotBubble.content.textContent = `Error: ${response?.error || 'Failed to complete code task.'}`;
-            activeBotBubble.content.style.color = '#e67e80';
-            break;
-          }
-
-          const replyText = response.data?.reply || turnRawText;
-          updateCodeAssistantBubble(activeBotBubble, replyText);
-
-          // Parse ALL tool calls in the reply: multiple <tool_call>{...}</tool_call> blocks
-          const toolCallMatches = [...replyText.matchAll(/<tool_call>([\s\S]*?)<\/tool_call>/g)];
-          if (toolCallMatches.length === 0) {
-            // Stall detector: an action-less reply that repeats the previous
-            // action-less reply means the agent is narrating instead of working.
-            const replyNorm = replyText
-              .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .toLowerCase()
-              .slice(0, 600);
-            const isRepeat = replyNorm.length > 60 && replyNorm === lastReplyNorm;
-            lastReplyNorm = replyNorm;
-
-            // Only flag identical repetitive text responses if the agent is stalling without tools
-            if (isRepeat) {
-              stallCount = stallCount + 1;
-              if (stallCount >= 3) {
-                activeBotBubble.content.style.display = 'block';
-                activeBotBubble.content.textContent = '*(El agente quedó atascado repitiendo análisis sin actuar — ejecución detenida. Reformula la tarea o dale más contexto.)*';
-                activeBotBubble.content.style.color = '#e5989b';
-                renderSessionSummary(null);
-                break;
-              }
-              codeSessionHistory.push({ role: 'user', content: currentPrompt });
-              codeSessionHistory.push({ role: 'assistant', content: replyText });
-              compactHistory();
-              currentPrompt = `<system_gate>\nYour last two responses were nearly identical and contained NO <tool_call>. If the task is finished, output your final summary. Otherwise, emit the necessary <tool_call> block(s) to continue.\n</system_gate>`;
-              turnRawText = '';
-              activeBotBubble = createCodeAssistantBubble();
-              messagesStream.appendChild(activeBotBubble.container);
-              scrollCodeToBottom();
-              continue;
-            }
-
-            codeSessionHistory.push({ role: 'user', content: prompt });
-            codeSessionHistory.push({ role: 'assistant', content: replyText });
-            compactHistory();
-
-            const chatEntry = workspaceChatsMap[activeWorkspace.path]?.find(c => c.id === currentCodeTaskId);
-            if (chatEntry) {
-              chatEntry.messages = [...codeSessionHistory];
-              saveWorkspaceChatsMap();
-              renderCodeWorkspacesTree();
-            }
-            const verification = sessionAuditTrail.lastVerification || await runTaskVerification();
-            renderSessionSummary(verification);
-            populateDashboardMetrics();
-            break;
-          }
-
-          const parsedCalls = [];
-          let parseFailed = false;
-          for (const m of toolCallMatches) {
-            let parsed = null;
-            try {
-              parsed = JSON.parse(m[1].trim());
-            } catch (jsonErr) {
-              console.warn('Tool call JSON parse error:', jsonErr);
-            }
-            if (!parsed || !parsed.tool) { parseFailed = true; break; }
-            parsedCalls.push({ toolName: parsed.tool, toolParams: parsed.parameters || {} });
-          }
-
-          if (parseFailed || parsedCalls.length === 0) {
-            currentPrompt = `<tool_response>\n[Parse error: one of your <tool_call> blocks contained invalid JSON or a missing "tool" field. Re-emit the call(s) with valid JSON.]\n</tool_response>`;
-            turnRawText = '';
-            activeBotBubble = createCodeAssistantBubble();
-            messagesStream.appendChild(activeBotBubble.container);
-            scrollCodeToBottom();
-            continue;
-          }
-
-          // Stuck-loop detector: Only prevent repetitive identical READ-ONLY calls with no state changes.
-          // Never block exec_bash, write_file, edit_file, delete_file, or git commands since compiling, testing,
-          // and modifying code naturally re-runs the same commands across iterations.
-          const UNRESTRICTED_TOOLS = new Set(['exec_bash', 'write_file', 'edit_file', 'delete_file', 'create_file', 'git', 'update_plan', 'update_memory']);
-          const signatureOf = (c) => `${c.toolName}:${JSON.stringify(c.toolParams)}`;
-          const loopedCall = parsedCalls.find((c) => {
-            if (UNRESTRICTED_TOOLS.has(c.toolName)) return false;
-            const sig = signatureOf(c);
-            const pastCount = recentToolCalls.filter(s => s === sig).length;
-            return pastCount >= 2 || parsedCalls.filter(o => signatureOf(o) === sig).length > 1;
-          });
-          if (loopedCall) {
-            recentToolCalls.push(signatureOf(loopedCall));
-            const warnCard = renderToolCard(loopedCall.toolName, loopedCall.toolParams);
-            warnCard.setStatus('error', 'Loop Prevented');
-            warnCard.setOutput(`Notice: Read-only tool "${loopedCall.toolName}" was already executed with identical arguments.`);
-            currentPrompt = `<tool_response tool="${loopedCall.toolName}">\n[Notice: You already read this data with identical parameters. Proceed to edit files or conclude.]\n</tool_response>`;
-            turnRawText = '';
-            activeBotBubble = createCodeAssistantBubble();
-            messagesStream.appendChild(activeBotBubble.container);
-            scrollCodeToBottom();
-            continue;
-          }
-          for (const c of parsedCalls) {
-            recentToolCalls.push(signatureOf(c));
-          }
-          if (recentToolCalls.length > 12) recentToolCalls.splice(0, recentToolCalls.length - 12);
-
-          // Parallel-batch execution: read-only calls run concurrently; any
-          // mutating/executing call runs sequentially in emission order.
-          const READONLY_PARALLEL = new Set(['list_files', 'read_file', 'grep_search', 'web_search', 'update_plan', 'update_memory']);
-          const allReadonly = parsedCalls.every(c => READONLY_PARALLEL.has(c.toolName));
-
-          const runSingleCall = async (call) => {
-            const toolUI = renderToolCard(call.toolName, call.toolParams);
-            let result = null;
-            try {
-              result = await executeMatrixTool(call.toolName, call.toolParams);
-              if (result.error) {
-                toolUI.setStatus('error', 'Failed');
-                toolUI.setOutput(`Error: ${result.error}`);
-              } else {
-                toolUI.setStatus('success', 'Completed');
-                if (result.diff) toolUI.setDiff(result.diff);
-                const outPreview = typeof result === 'string'
-                  ? result
-                  : (result.content || result.files || result.stdout || result.message || result.summary || JSON.stringify(result, null, 2));
-                toolUI.setOutput(outPreview);
-              }
-            } catch (tErr) {
-              result = { error: tErr.message };
-              toolUI.setStatus('error', 'Exception');
-              toolUI.setOutput(`Exception: ${tErr.message}`);
-            }
-            let out = typeof result === 'string'
-              ? result
-              : (result.content || result.files || result.stdout || result.message || result.summary || JSON.stringify(result, null, 2));
-            const MAX_TOOL_OUTPUT_CHARS = 12000;
-            if (typeof out === 'string' && out.length > MAX_TOOL_OUTPUT_CHARS) {
-              out = out.slice(0, MAX_TOOL_OUTPUT_CHARS) + `\n\n[Output truncated: ${out.length - MAX_TOOL_OUTPUT_CHARS} characters omitted for brevity. Specify line ranges or narrower queries if more details are needed.]`;
-            }
-            return { call, out, failed: !!(result && result.error) };
-          };
-
-          let results;
-          if (allReadonly && parsedCalls.length > 1) {
-            // Independent reads: execute concurrently, render cards in order
-            results = await Promise.all(parsedCalls.map(runSingleCall));
-          } else {
-            results = [];
-            for (const call of parsedCalls) results.push(await runSingleCall(call));
-          }
-
-          // Record turn in history
-          codeSessionHistory.push({ role: 'user', content: currentPrompt });
-          codeSessionHistory.push({ role: 'assistant', content: replyText });
-          compactHistory();
-
-          // Next agent step: combined <tool_response> for every executed call
-          const responseBlocks = results.map(r => `<result tool="${r.call.toolName}">\n${r.out}\n</result>`).join('\n');
-          const batchNote = results.length > 1
-            ? `\n[System: ${results.length} tools executed in this batch. All results are below.]`
-            : '';
-
-          // Failure escalation: same tool failing 3 turns in a row → demand a new strategy
-          const anyFailed = results.some(r => r.failed);
-          const failedToolNames = [...new Set(results.filter(r => r.failed).map(r => r.call.toolName))];
-          if (anyFailed && failedToolNames.length === 1 && failedToolNames[0] === lastFailedTool) {
-            consecutiveFailures++;
-          } else {
-            lastFailedTool = anyFailed ? failedToolNames[0] : null;
-            consecutiveFailures = anyFailed ? 1 : 0;
-          }
-          const failNote = consecutiveFailures >= 3
-            ? `\n[System: "${lastFailedTool}" has failed ${consecutiveFailures} turns in a row. STOP retrying the same approach. Change strategy: read the failing file first, try a different tool, break the step into smaller pieces, research the correct usage with subagent or web_search, or if the goal is unachievable, say precisely why.]`
-            : '';
-
-          currentPrompt = `<tool_results>\n${responseBlocks}\n</tool_results>${batchNote}${failNote}\n\nReview the tool results. If further changes, commands, or tests are needed, emit your next <tool_call> block(s). If the objective is complete and verified, provide your final response to the user without any tool calls.`;
-
-          // Prepare new bubble for next iteration
-          turnRawText = '';
-          activeBotBubble = createCodeAssistantBubble();
-          messagesStream.appendChild(activeBotBubble.container);
-          scrollCodeToBottom();
-        }
+        // Shared agentic engine (same loop used for local tasks and remote dispatch)
+        await runAgenticTurns({
+          task: prompt,
+          isGhost: true,
+          isCancelled: () => isAgentCancelled,
+          chatId: currentCodeTaskId
+        });
       } catch (err) {
-        botObj.content.textContent = `Connection error: ${err.message}`;
-        botObj.content.style.color = '#e67e80';
+        appendCodeMessage('assistant-error', `Connection error: ${err.message}`);
       } finally {
-        if (cleanupStream) cleanupStream();
         isCodeGenerating = false;
         if (btnCodeSubmit) {
           btnCodeSubmit.disabled = false;
@@ -3648,181 +3684,28 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
       });
     }
 
-    // Inspect workspace
-    let inspectionPrefix = `[LOCAL WORKSPACE INSPECTION: ${activeWorkspace.name} (${activeWorkspace.path}) | Git Branch: ${activeWorkspace.branch} | Remote Client: Mobile]\n`;
+    // Run the SAME shared agentic engine used for local tasks, with live
+    // step reporting so the mobile Remote Studio mirrors the host in real time.
     try {
-      const sumRes = await window.newtonAPI?.getWorkspaceSummary(activeWorkspace.path);
-      if (sumRes?.success && sumRes.data) {
-        const d = sumRes.data;
-        if (Array.isArray(d.files)) {
-          const fileList = d.files.slice(0, 40).map(f => `${f.isDirectory ? '[DIR] ' : '      '}${f.name}`).join('\n');
-          inspectionPrefix += `Local Project Files:\n${fileList}\n`;
-        }
-        if (d.packageInfo) {
-          inspectionPrefix += `Package: ${d.packageInfo.name || 'unnamed'} | Dependencies: ${(d.packageInfo.dependencies || []).join(', ')} | Scripts: ${(d.packageInfo.scripts || []).join(', ')}\n`;
-        }
-        if (d.readme) {
-          inspectionPrefix += `README Snippet:\n${d.readme.slice(0, 800)}\n`;
-        }
-      }
-    } catch (_) {}
-    inspectionPrefix += '\n';
-
-    let currentPrompt = inspectionPrefix + data.task;
-    let botObj = createCodeAssistantBubble();
-    messagesStream.appendChild(botObj.container);
-    scrollCodeToBottom();
-
-    let stepCount = 0;
-
-    try {
-      while (true) {
-        if (isRemoteCancelled) {
-          if (window.newtonAPI?.reportDesktopStep) {
-            await window.newtonAPI.reportDesktopStep({
-              sessionId: sessionId,
-              chatId: targetChat.id,
-              workspacePath: activeWorkspace.path,
-              stepType: 'error',
-              message: 'La ejecución fue cancelada desde el dispositivo móvil.'
-            });
-          }
-          updateCodeAssistantBubble(botObj, 'Ejecución cancelada por el usuario desde el móvil.');
-          break;
-        }
-
-        stepCount++;
-        const payload = {
-          prompt: currentPrompt,
-          model: 'Singularity-Matrix',
-          history: codeSessionHistory,
-          isGhost: false
-        };
-
-        const response = await window.newtonAPI.sendMessage(payload);
-        if (!response.success) {
-          const errText = response.error || 'Error al ejecutar Singularity Matrix';
-          if (window.newtonAPI?.reportDesktopStep) {
-            await window.newtonAPI.reportDesktopStep({
-              sessionId: sessionId,
-              chatId: targetChat.id,
-              workspacePath: activeWorkspace.path,
-              stepType: 'error',
-              message: errText
-            });
-          }
-          updateCodeAssistantBubble(botObj, `Error: ${errText}`);
-          break;
-        }
-
-        const replyText = response.data?.reply || '';
-        updateCodeAssistantBubble(botObj, replyText);
-
-        const toolMatch = replyText.match(/<tool_call>([\s\S]*?)<\/tool_call>/);
-        if (!toolMatch) {
-          // Finished! Add turns to codeSessionHistory & save to workspace chat
-          codeSessionHistory.push({ role: 'user', content: data.task });
-          codeSessionHistory.push({ role: 'assistant', content: replyText });
-          targetChat.messages = [...codeSessionHistory];
-          saveWorkspaceChatsMap();
-          renderCodeWorkspacesTree();
-          syncDesktopWorkspacesWithChats();
-
-          if (window.newtonAPI?.reportDesktopStep) {
-            await window.newtonAPI.reportDesktopStep({
-              sessionId: sessionId,
-              chatId: targetChat.id,
-              workspacePath: activeWorkspace.path,
-              stepType: 'task_done',
-              message: replyText
-            });
-          }
-          break;
-        }
-
-        let parsed = null;
-        try {
-          parsed = JSON.parse(toolMatch[1].trim());
-        } catch (e) {
-          break;
-        }
-
-        const toolName = parsed.tool;
-        const toolParams = parsed.parameters || {};
-
-        // Report tool_start to mobile
-        if (window.newtonAPI?.reportDesktopStep) {
-          await window.newtonAPI.reportDesktopStep({
-            sessionId: sessionId,
-            chatId: targetChat.id,
-            workspacePath: activeWorkspace.path,
-            stepType: 'tool_start',
-            toolName: toolName,
-            parameters: toolParams,
-            message: `Ejecutando herramienta: ${toolName}`
-          });
-        }
-
-        const toolUI = renderToolCard(toolName, toolParams);
-        let toolResult = null;
-        try {
-          toolResult = await executeMatrixTool(toolName, toolParams, activeWorkspace.path);
-          if (toolResult.error) {
-            toolUI.setStatus('error', 'Failed');
-            toolUI.setOutput(`Error: ${toolResult.error}`);
-          } else {
-            toolUI.setStatus('success', 'Completed');
-            const outPreview = typeof toolResult === 'string'
-              ? toolResult
-              : (toolResult.content || toolResult.files || toolResult.stdout || toolResult.message || JSON.stringify(toolResult, null, 2));
-            toolUI.setOutput(outPreview);
-          }
-        } catch (tErr) {
-          toolResult = { error: tErr.message };
-          toolUI.setStatus('error', 'Exception');
-          toolUI.setOutput(`Exception: ${tErr.message}`);
-        }
-
-        // Report tool_done to mobile
-        if (window.newtonAPI?.reportDesktopStep) {
-          await window.newtonAPI.reportDesktopStep({
-            sessionId: sessionId,
-            chatId: targetChat.id,
-            workspacePath: activeWorkspace.path,
-            stepType: 'tool_done',
-            toolName: toolName,
-            parameters: toolParams,
-            result: toolResult,
-            stdout: toolResult?.stdout,
-            stderr: toolResult?.stderr,
-            message: toolResult?.error ? `Fallo: ${toolResult.error}` : `Éxito: ${toolName}`
-          });
-        }
-
-        codeSessionHistory.push({ role: 'user', content: currentPrompt });
-        codeSessionHistory.push({ role: 'assistant', content: replyText });
-        targetChat.messages = [...codeSessionHistory];
-        saveWorkspaceChatsMap();
-        syncDesktopWorkspacesWithChats();
-        let outText = typeof toolResult === 'string'
-          ? toolResult
-          : (toolResult.content || toolResult.files || toolResult.stdout || toolResult.message || JSON.stringify(toolResult, null, 2));
-
-        const MAX_TOOL_OUTPUT_CHARS = 12000;
-        if (typeof outText === 'string' && outText.length > MAX_TOOL_OUTPUT_CHARS) {
-          outText = outText.slice(0, MAX_TOOL_OUTPUT_CHARS) + `\n\n[Output truncated: ${outText.length - MAX_TOOL_OUTPUT_CHARS} characters omitted for brevity. Specify line ranges or narrower queries if more details are needed.]`;
-        }
-
-        currentPrompt = `<tool_response tool="${toolName}">\n${outText}\n</tool_response>\n\nTool "${toolName}" executed successfully. Now take immediate action: apply the necessary code modifications to the workspace using write_file or edit_file. Do not enter protracted reasoning loops or repeat redundant file reads. If the objective is completely achieved and verified, provide your final response to the user.`;
-
-        botObj = createCodeAssistantBubble();
-        messagesStream.appendChild(botObj.container);
-        scrollCodeToBottom();
-      }
+      await runAgenticTurns({
+        task: data.task,
+        isGhost: false,
+        isCancelled: () => isRemoteCancelled,
+        chatId: targetChat.id,
+        sessionId,
+        onStep: (stepPayload) => window.newtonAPI?.reportDesktopStep({
+          sessionId,
+          chatId: targetChat.id,
+          workspacePath: activeWorkspace.path,
+          ...stepPayload
+        })
+      });
     } catch (err) {
       if (window.newtonAPI?.reportDesktopStep) {
         await window.newtonAPI.reportDesktopStep({
           sessionId: sessionId,
+          chatId: targetChat.id,
+          workspacePath: activeWorkspace.path,
           stepType: 'error',
           message: err.message
         });
@@ -3842,6 +3725,14 @@ Work step by step (max 6 steps). When you have enough information, stop calling 
       bubble.className = 'code-bubble-user';
       bubble.textContent = text;
       messagesStream.appendChild(bubble);
+      scrollCodeToBottom();
+    } else {
+      // Assistant-style error/status bubble
+      const botObj = createCodeAssistantBubble();
+      messagesStream.appendChild(botObj.container);
+      botObj.content.style.display = 'block';
+      botObj.content.textContent = text;
+      if (role === 'assistant-error') botObj.content.style.color = '#e67e80';
       scrollCodeToBottom();
     }
   }
