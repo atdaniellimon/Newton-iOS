@@ -611,10 +611,10 @@ public struct ChatView: View {
         // Build typed attachments for API v2.2.0
         var apiAttachments: [NWTNAttachment] = []
         if let imgUrl = imgBase64DataUrl {
-            apiAttachments.append(NWTNAttachment(type: .image, data: imgUrl, name: "image.jpg"))
+            apiAttachments.append(NWTNAttachment(type: "image", data: imgUrl, name: "image.jpg"))
         }
         for att in createdAttachments {
-            let attType: NWTNAttachmentType = (att.fileExtension.lowercased() == "pdf") ? .pdf : .text
+            let attType = (att.fileExtension.lowercased() == "pdf") ? "pdf" : "text"
             if let attData = att.base64Data {
                 apiAttachments.append(NWTNAttachment(type: attType, data: attData, name: att.fileName))
             }
