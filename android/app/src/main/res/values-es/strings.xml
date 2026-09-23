@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App & General -->
+    <string name="app_name">Newton</string>
+    <string name="sign_in">Iniciar sesión</string>
+    <string name="create_account">Crear cuenta</string>
+    <string name="settings">Ajustes</string>
+    <string name="cancel">Cancelar</string>
+    <string name="done">Listo</string>
+
+    <!-- Sidebar & Navigation -->
+    <string name="all">Todos</string>
+    <string name="chats">Chats</string>
+    <string name="remote_studio">Remote Studio</string>
+    <string name="remote_studio_subtitle">Consola, workspaces y herramientas</string>
+    <string name="ghost_session">Sesión Fantasma</string>
+    <string name="ghost_session_subtitle">Efímera, sin rastro en la nube</string>
+    <string name="art_gallery">Galería de arte</string>
+    <string name="art_gallery_subtitle">Creaciones visuales generadas</string>
+    
+    <string name="pinned">FIJADOS</string>
+    <string name="recents">RECIENTES</string>
+    <string name="conversations">CONVERSACIONES</string>
+    <string name="new_chat">Nuevo chat</string>
+    <string name="pin_chat">Fijar Chat</string>
+    <string name="unpin_chat">Desfijar Chat</string>
+    <string name="delete_chat">Eliminar Chat</string>
+    <string name="empty_conversations">Sin conversaciones aún.\nToca \'+ Nuevo chat\' para comenzar.</string>
+
+    <!-- Host Status & Remote Studio -->
+    <string name="mac_host_connected">Mac Host Conectado</string>
+    <string name="mac_host_disconnected">Mac Host Desconectado</string>
+    <string name="host_online">Host En Línea</string>
+    <string name="host_offline">Host Desconectado</string>
+    <string name="select_workspace_for_new_task">Seleccionar Workspace para Nueva Tarea</string>
+    <string name="open_task_in_workspace">Abrir Tarea en Workspace</string>
+    <string name="remote_code_task">Tarea de Remote Code</string>
+    <string name="configure_models">Configurar Modelos...</string>
+</resources>

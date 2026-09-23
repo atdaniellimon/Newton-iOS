@@ -57,6 +57,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import ai.newton.android.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -146,8 +148,8 @@ fun ConversationListScreen(
                     ) {
                         SidebarItemRow(
                             icon = Icons.Default.AutoAwesome,
-                            title = "Sesión Fantasma",
-                            subtitle = "Efímera, sin rastro en la nube",
+                            title = stringResource(R.string.ghost_session),
+                            subtitle = stringResource(R.string.ghost_session_subtitle),
                             tint = NewtonColors.GhostPurple,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -158,8 +160,8 @@ fun ConversationListScreen(
 
                         SidebarItemRow(
                             icon = Icons.Default.Laptop,
-                            title = "Remote Studio (Mac)",
-                            subtitle = "Consola, workspaces y herramientas",
+                            title = stringResource(R.string.remote_studio),
+                            subtitle = stringResource(R.string.remote_studio_subtitle),
                             tint = NewtonColors.Aqua,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -169,8 +171,8 @@ fun ConversationListScreen(
 
                         SidebarItemRow(
                             icon = Icons.Default.Collections,
-                            title = "Galería de arte",
-                            subtitle = "Creaciones visuales generadas",
+                            title = stringResource(R.string.art_gallery),
+                            subtitle = stringResource(R.string.art_gallery_subtitle),
                             tint = NewtonColors.Sand,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -183,7 +185,7 @@ fun ConversationListScreen(
                 // Section 2: Pinned (if any)
                 if (pinnedList.isNotEmpty()) {
                     item(key = "header_pinned") {
-                        SectionHeader(title = "FIJADOS")
+                        SectionHeader(title = stringResource(R.string.pinned))
                     }
 
                     items(pinnedList, key = { "pinned_${it.id}" }) { convo ->
@@ -214,7 +216,7 @@ fun ConversationListScreen(
 
                 // Section 3: Recents
                 item(key = "header_recents") {
-                    SectionHeader(title = if (pinnedList.isNotEmpty()) "RECIENTES" else "CONVERSACIONES")
+                    SectionHeader(title = if (pinnedList.isNotEmpty()) stringResource(R.string.recents) else stringResource(R.string.conversations))
                 }
 
                 if (recentsList.isEmpty() && pinnedList.isEmpty()) {
@@ -226,7 +228,7 @@ fun ConversationListScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = "Sin conversaciones aún.\nToca '+ Nuevo chat' para comenzar.",
+                                text = stringResource(R.string.empty_conversations),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = NewtonColors.TextMutedDark,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -325,7 +327,7 @@ fun ConversationListScreen(
                         modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        text = "Nuevo chat",
+                        text = stringResource(R.string.new_chat),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                         ),
@@ -546,7 +548,7 @@ private fun ConversationRowItem(
             DropdownMenuItem(
                 text = {
                     Text(
-                        text = if (conversation.isPinned) "Desfijar" else "Fijar arriba",
+                        text = if (conversation.isPinned) stringResource(R.string.unpin_chat) else stringResource(R.string.pin_chat),
                         color = NewtonColors.TextPrimaryDark,
                     )
                 },
@@ -566,7 +568,7 @@ private fun ConversationRowItem(
             DropdownMenuItem(
                 text = {
                     Text(
-                        text = "Eliminar conversación",
+                        text = stringResource(R.string.delete_chat),
                         color = NewtonColors.CoralRed,
                     )
                 },

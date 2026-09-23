@@ -54,3 +54,44 @@
 "REQUIRES PRO" = "REQUIERE PRO";
 "Plan Upgrade Required" = "Mejora de plan requerida";
 "Got it" = "Entendido";
+
+/* Sidebar & Remote Studio */
+"All" = "Todos";
+"Chats" = "Chats";
+"Remote Studio" = "Remote Studio";
+"Mac Host Conectado" = "Mac Host Conectado";
+"Mac Host Desconectado" = "Mac Host Desconectado";
+"Host Online" = "Host En Línea";
+"Host Offline" = "Host Desconectado";
+"Ghost Session" = "Sesión Fantasma";
+"Art gallery" = "Galería de arte";
+"Galería de arte" = "Galería de arte";
+"Recents" = "Recientes";
+"Remote Studio Tasks" = "Tareas de Remote Studio";
+"FIJADOS" = "FIJADOS";
+"CONVERSACIONES" = "CONVERSACIONES";
+"RECIENTES" = "RECIENTES";
+"New chat" = "Nuevo chat";
+"Nuevo chat" = "Nuevo chat";
+"Pin" = "Fijar";
+"Unpin" = "Desfijar";
+"Delete" = "Eliminar";
+"Pin Chat" = "Fijar Chat";
+"Unpin Chat" = "Desfijar Chat";
+"Delete Chat" = "Eliminar Chat";
+"No hay conversaciones aún" = "No hay conversaciones aún";
+"Inicia un nuevo chat con el botón '+'." = "Inicia un nuevo chat con el botón '+'.";
+"No hay tareas de Remote Studio aún" = "No hay tareas de Remote Studio aún";
+"Crea una tarea con '+' para ejecutar código en tu Mac." = "Crea una tarea con '+' para ejecutar código en tu Mac.";
+"Seleccionar Workspace para Nueva Tarea" = "Seleccionar Workspace para Nueva Tarea";
+"Abrir Tarea en Workspace" = "Abrir Tarea en Workspace";
+"Remote Code Task" = "Tarea de Remote Code";
+"Configurar Modelos..." = "Configurar Modelos...";
+"Export as PDF" = "Exportar como PDF";
+"Export as Markdown" = "Exportar como Markdown";
+"Vanish" = "Desvanecer";
+"Session ended by Newton." = "Sesión finalizada por Newton.";
+"Newton is reasoning..." = "Newton está razonando...";
+"Thought Complete" = "Pensamiento completado";
+"Can you please look online for " = "¿Puedes buscar en la web información sobre ";
+

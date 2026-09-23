@@ -47,6 +47,7 @@ public struct ChatView: View {
     @State private var showVoiceCall: Bool = false
     @State private var exportFileUrl: URL? = nil
     @State private var peerEventTask: Task<Void, Never>? = nil
+    @State private var showWorkspaceSwitcher: Bool = false
     
     public init(conversation: Binding<Conversation>) {
         self._conversation = conversation
@@ -235,44 +236,61 @@ public struct ChatView: View {
             }
             
             ToolbarItem(placement: .principal) {
-                Menu {
-                    ForEach(settings.availableModels) { model in
-                        Button {
-                            Haptics.selection()
-                            conversation.modelId = model.id
-                            settings.currentModelId = model.id
-                            storage.updateConversation(conversation)
-                        } label: {
-                            HStack {
-                                Text(model.name)
-                                if conversation.modelId == model.id {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-
-                    Divider()
-
+                if conversation.isRemoteCodeChat {
                     Button {
-                        activeSheet = .modelPicker
+                        Haptics.selection()
+                        showWorkspaceSwitcher = true
                     } label: {
-                        Label("Configurar Modelos...", systemImage: "slider.horizontal.3")
-                    }
-                } label: {
-                    VStack(spacing: 1) {
-                        Text(conversation.title)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(NewtonTheme.textPrimary)
-                            .lineLimit(1)
+                        VStack(spacing: 1) {
+                            Text(conversation.title)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                                .lineLimit(1)
 
-                        HStack(spacing: 4) {
-                            if conversation.isRemoteCodeChat {
+                            HStack(spacing: 4) {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 8, weight: .semibold))
                                 Text(conversation.workspaceName ?? "Remote Studio")
                                     .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            } else {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 7, weight: .bold))
+                            }
+                            .foregroundColor(NewtonTheme.sand)
+                        }
+                    }
+                } else {
+                    Menu {
+                        ForEach(settings.availableModels) { model in
+                            Button {
+                                Haptics.selection()
+                                conversation.modelId = model.id
+                                settings.currentModelId = model.id
+                                storage.updateConversation(conversation)
+                            } label: {
+                                HStack {
+                                    Text(model.name)
+                                    if conversation.modelId == model.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            activeSheet = .modelPicker
+                        } label: {
+                            Label("Configurar Modelos...", systemImage: "slider.horizontal.3")
+                        }
+                    } label: {
+                        VStack(spacing: 1) {
+                            Text(conversation.title)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(NewtonTheme.textPrimary)
+                                .lineLimit(1)
+
+                            HStack(spacing: 4) {
                                 Image(systemName: conversation.modelId == "Singularity-Matrix" ? "chevron.left.forwardslash.chevron.right" : "atom")
                                     .font(.system(size: 8, weight: .semibold))
                                 Text(settings.availableModels.first(where: { $0.id == conversation.modelId })?.name ?? conversation.modelId)
@@ -280,8 +298,8 @@ public struct ChatView: View {
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 7, weight: .bold))
                             }
+                            .foregroundColor(NewtonTheme.sand)
                         }
-                        .foregroundColor(NewtonTheme.sand)
                     }
                 }
             }
@@ -393,6 +411,36 @@ public struct ChatView: View {
             case .failure(let error):
                 print("File import error: \(error)")
             }
+        }
+        .confirmationDialog(
+            "Abrir Tarea en Workspace",
+            isPresented: $showWorkspaceSwitcher,
+            titleVisibility: .visible
+        ) {
+            ForEach(CloudChatService.shared.desktopWorkspaces) { ws in
+                Button(ws.name) {
+                    Haptics.medium()
+                    let taskId = "task_\(Int(Date().timeIntervalSince1970))"
+                    let newRemoteConvo = Conversation(
+                        id: taskId,
+                        title: "Remote Code Task",
+                        messages: [],
+                        isPinned: false,
+                        isGhost: false,
+                        modelId: "Singularity-Matrix",
+                        isRemoteCodeChat: true,
+                        workspacePath: ws.path,
+                        workspaceName: ws.name,
+                        createdAt: Date(),
+                        updatedAt: Date()
+                    )
+                    storage.conversations.insert(newRemoteConvo, at: 0)
+                    storage.sortConversations()
+                    storage.saveConversations()
+                    conversation = newRemoteConvo
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
         }
         .task {
             // 1. Fetch remote messages if empty and authenticated
@@ -590,8 +638,7 @@ public struct ChatView: View {
                 fileExtension: ext,
                 fileSizeFormatted: sizeStr,
                 lineCount: lines,
-                previewSnippet: previewText,
-                base64Data: (ext.lowercased() == "pdf") ? "data:application/pdf;base64,\(fileData.base64EncodedString())" : (String(data: fileData, encoding: .utf8) ?? fileData.base64EncodedString())
+                previewSnippet: previewText
             )
             createdAttachments.append(attachment)
         }
@@ -607,19 +654,6 @@ public struct ChatView: View {
         if let img = attachedImage, let jpegData = img.jpegData(compressionQuality: 0.75) {
             imgBase64DataUrl = "data:image/jpeg;base64,\(jpegData.base64EncodedString())"
         }
-
-        // Build typed attachments for API v2.2.0
-        var apiAttachments: [NWTNAttachment] = []
-        let effectiveImgUrl = imgBase64DataUrl ?? conversation.messages.last(where: { !($0.imageUrl ?? "").isEmpty })?.imageUrl
-        if let imgUrl = effectiveImgUrl {
-            apiAttachments.append(NWTNAttachment(type: "image", data: imgUrl, name: "image.jpg"))
-        }
-        for att in createdAttachments {
-            let attType = (att.fileExtension.lowercased() == "pdf") ? "pdf" : "text"
-            if let attData = att.base64Data {
-                apiAttachments.append(NWTNAttachment(type: attType, data: attData, name: att.fileName))
-            }
-        }
         
         attachedImage = nil
         attachedFileName = nil
@@ -632,16 +666,6 @@ public struct ChatView: View {
         
         if isFirstMessage {
             conversation.title = String(rawInput.isEmpty ? fileName : rawInput.split(separator: " ").prefix(4).joined(separator: " "))
-            if !rawInput.isEmpty {
-                Task {
-                    if let fastTitle = await CloudChatService.shared.generateConversationTitle(prompt: rawInput) {
-                        await MainActor.run {
-                            conversation.title = fastTitle
-                            storage.updateConversation(conversation)
-                        }
-                    }
-                }
-            }
         }
         
         let assistantMessageId = UUID().uuidString
@@ -759,8 +783,7 @@ public struct ChatView: View {
                 let stream = LLMService.shared.streamCompletion(
                     messages: messagesToSend,
                     modelId: conversation.modelId,
-                    systemPrompt: systemPrompt,
-                    attachments: apiAttachments
+                    systemPrompt: systemPrompt
                 )
                 
                 for try await token in stream {

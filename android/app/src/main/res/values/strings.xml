@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App & General -->
+    <string name="app_name">Newton</string>
+    <string name="sign_in">Sign In</string>
+    <string name="create_account">Create Account</string>
+    <string name="settings">Settings</string>
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+
+    <!-- Sidebar & Navigation -->
+    <string name="all">All</string>
+    <string name="chats">Chats</string>
+    <string name="remote_studio">Remote Studio</string>
+    <string name="remote_studio_subtitle">Console, workspaces and tools</string>
+    <string name="ghost_session">Ghost Session</string>
+    <string name="ghost_session_subtitle">Ephemeral, leaves no cloud trace</string>
+    <string name="art_gallery">Art gallery</string>
+    <string name="art_gallery_subtitle">Generated visual creations</string>
+    
+    <string name="pinned">PINNED</string>
+    <string name="recents">RECENTS</string>
+    <string name="conversations">CONVERSATIONS</string>
+    <string name="new_chat">New chat</string>
+    <string name="pin_chat">Pin Chat</string>
+    <string name="unpin_chat">Unpin Chat</string>
+    <string name="delete_chat">Delete Chat</string>
+    <string name="empty_conversations">No conversations yet.\nTap \'+ New chat\' to begin.</string>
+
+    <!-- Host Status & Remote Studio -->
+    <string name="mac_host_connected">Mac Host Connected</string>
+    <string name="mac_host_disconnected">Mac Host Disconnected</string>
+    <string name="host_online">Host Online</string>
+    <string name="host_offline">Host Offline</string>
+    <string name="select_workspace_for_new_task">Select Workspace for New Task</string>
+    <string name="open_task_in_workspace">Open Task in Workspace</string>
+    <string name="remote_code_task">Remote Code Task</string>
+    <string name="configure_models">Configure Models...</string>
+</resources>
