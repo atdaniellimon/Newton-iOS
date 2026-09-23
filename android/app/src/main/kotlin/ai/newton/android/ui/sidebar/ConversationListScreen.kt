@@ -9,6 +9,7 @@ import ai.newton.shared.Conversation
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -86,7 +87,7 @@ fun ConversationListScreen(
     LaunchedEffect(auth.isLoggedIn) {
         if (auth.isLoggedIn.value) {
             store.syncWithRemoteServer(cloudService, auth)
-            cloudService.startGlobalSyncListener { event ->
+            cloudService.startGlobalSyncListener(scope) { event ->
                 store.handleRemoteSyncEvent(event)
             }
         }

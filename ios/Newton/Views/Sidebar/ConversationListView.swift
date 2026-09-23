@@ -16,9 +16,6 @@ public struct ConversationListView: View {
     @Binding public var selectedConversationId: String?
     public var onSelectConversation: ((String) -> Void)? = nil
     
-    @Binding public var selectedConversationId: String?
-    public var onSelectConversation: ((String) -> Void)? = nil
-    
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
     @State private var showArtGallery: Bool = false
@@ -302,14 +299,14 @@ public struct ConversationListView: View {
         .contextMenu {
             Button {
                 Haptics.medium()
-                storage.togglePin(convo.id)
+                storage.togglePin(id: convo.id)
             } label: {
                 Label(convo.isPinned ? "Desfijar" : "Fijar arriba", systemImage: convo.isPinned ? "pin.slash" : "pin")
             }
             
             Button(role: .destructive) {
                 Haptics.medium()
-                storage.deleteConversation(convo.id)
+                storage.deleteConversation(id: convo.id)
             } label: {
                 Label("Eliminar", systemImage: "trash")
             }
@@ -317,16 +314,16 @@ public struct ConversationListView: View {
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 Haptics.medium()
-                storage.deleteConversation(convo.id)
+                storage.deleteConversation(id: convo.id)
             } label: {
                 Label("Eliminar", systemImage: "trash")
             }
-            .tint(NewtonTheme.red)
+            .tint(NewtonTheme.coralRed)
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             Button {
                 Haptics.medium()
-                storage.togglePin(convo.id)
+                storage.togglePin(id: convo.id)
             } label: {
                 Label(convo.isPinned ? "Desfijar" : "Fijar", systemImage: convo.isPinned ? "pin.slash" : "pin")
             }
