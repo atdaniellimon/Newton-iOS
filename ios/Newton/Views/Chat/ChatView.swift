@@ -590,7 +590,8 @@ public struct ChatView: View {
                 fileExtension: ext,
                 fileSizeFormatted: sizeStr,
                 lineCount: lines,
-                previewSnippet: previewText
+                previewSnippet: previewText,
+                base64Data: (ext.lowercased() == "pdf") ? "data:application/pdf;base64,\(fileData.base64EncodedString())" : (String(data: fileData, encoding: .utf8) ?? fileData.base64EncodedString())
             )
             createdAttachments.append(attachment)
         }
@@ -605,6 +606,18 @@ public struct ChatView: View {
         var imgBase64DataUrl: String? = nil
         if let img = attachedImage, let jpegData = img.jpegData(compressionQuality: 0.75) {
             imgBase64DataUrl = "data:image/jpeg;base64,\(jpegData.base64EncodedString())"
+        }
+
+        // Build typed attachments for API v2.2.0
+        var apiAttachments: [NWTNAttachment] = []
+        if let imgUrl = imgBase64DataUrl {
+            apiAttachments.append(NWTNAttachment(type: .image, data: imgUrl, name: "image.jpg"))
+        }
+        for att in createdAttachments {
+            let attType: NWTNAttachmentType = (att.fileExtension.lowercased() == "pdf") ? .pdf : .text
+            if let attData = att.base64Data {
+                apiAttachments.append(NWTNAttachment(type: attType, data: attData, name: att.fileName))
+            }
         }
         
         attachedImage = nil
@@ -745,7 +758,8 @@ public struct ChatView: View {
                 let stream = LLMService.shared.streamCompletion(
                     messages: messagesToSend,
                     modelId: conversation.modelId,
-                    systemPrompt: systemPrompt
+                    systemPrompt: systemPrompt,
+                    attachments: apiAttachments
                 )
                 
                 for try await token in stream {

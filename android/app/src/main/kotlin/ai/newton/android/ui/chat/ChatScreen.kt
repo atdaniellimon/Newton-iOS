@@ -190,12 +190,25 @@ fun ChatScreen(
 
                 var snippet: String? = null
                 var lineCount: Int? = null
+                var base64Data: String? = null
                 try {
                     val stream = context.contentResolver.openInputStream(fileUri)
-                    val textContent = stream?.bufferedReader()?.use { it.readText() }
-                    if (textContent != null && textContent.length < 50000) {
-                        snippet = textContent.take(1500)
-                        lineCount = textContent.lines().size
+                    val bytes = stream?.use { it.readBytes() }
+                    if (bytes != null) {
+                        if (ext.lowercase() == "pdf") {
+                            base64Data = "data:application/pdf;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+                            snippet = "PDF Document ($sizeStr)"
+                            lineCount = 1
+                        } else if (bytes.size < 500_000) {
+                            val textContent = try { String(bytes, Charsets.UTF_8) } catch (_: Exception) { null }
+                            if (textContent != null) {
+                                snippet = textContent.take(1500)
+                                lineCount = textContent.lines().size
+                                base64Data = textContent
+                            } else {
+                                base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                            }
+                        }
                     }
                 } catch (_: Exception) {}
 
@@ -206,6 +219,7 @@ fun ChatScreen(
                     lineCount = lineCount,
                     previewSnippet = snippet,
                     mimeType = context.contentResolver.getType(fileUri) ?: "application/octet-stream",
+                    base64Data = base64Data,
                 )
                 attachedFiles = attachedFiles + fileAttachment
             } catch (_: Exception) {}

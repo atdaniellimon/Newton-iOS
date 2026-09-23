@@ -551,15 +551,15 @@ class AIService {
     });
   }
 
-  async sendMessage({ chatId, prompt, model = 'Singularity', history = [], system = null, isGhost = false }, onChunk = null) {
+  async sendMessage({ chatId, prompt, model = 'Singularity', history = [], system = null, isGhost = false, attachments = [] }, onChunk = null) {
     const isCloudChat = chatId && !isGhost;
     const endpoint = isCloudChat
       ? `/nwtn/chats/${chatId}/messages?stream=true`
       : `/nwtn/chat?stream=true`;
 
     const bodyData = isCloudChat
-      ? { prompt, model, ...(system ? { system } : {}) }
-      : { prompt, model, history, ...(system ? { system } : {}), stream: true };
+      ? { prompt, model, ...(system ? { system } : {}), ...(attachments && attachments.length > 0 ? { attachments } : {}) }
+      : { prompt, model, history, ...(system ? { system } : {}), ...(attachments && attachments.length > 0 ? { attachments } : {}), stream: true };
 
     const res = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'POST',

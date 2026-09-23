@@ -63,6 +63,13 @@ enum class ChatPeerEventType {
     UNKNOWN,
 }
 
+data class ChatAttachment(
+    val type: String, // "image", "pdf", "text", "file", "ref", "url"
+    val data: String? = null,
+    val id: String? = null,
+    val name: String? = null,
+)
+
 data class ChatPeerEvent(
     val event: ChatPeerEventType,
     val messageId: String?,
@@ -307,7 +314,7 @@ class CloudChatService private constructor(private val auth: AuthManager) {
         chatId: String,
         prompt: String,
         model: String = "Singularity",
-        attachments: List<Pair<String, String>> = emptyList(), // Pair(type, data/url)
+        attachments: List<ChatAttachment> = emptyList(),
     ): Flow<String> = flow {
         val body = JSONObject().apply {
             put("prompt", prompt)
@@ -316,8 +323,10 @@ class CloudChatService private constructor(private val auth: AuthManager) {
                 val attArr = JSONArray()
                 for (att in attachments) {
                     val attObj = JSONObject().apply {
-                        put("type", att.first)
-                        put("data", att.second)
+                        put("type", att.type)
+                        if (!att.data.isNullOrEmpty()) put("data", att.data)
+                        if (!att.id.isNullOrEmpty()) put("id", att.id)
+                        if (!att.name.isNullOrEmpty()) put("name", att.name)
                     }
                     attArr.put(attObj)
                 }
@@ -500,6 +509,29 @@ class CloudChatService private constructor(private val auth: AuthManager) {
             }
         }
     }.flowOn(Dispatchers.IO)
+
+    // 8. Ephemeral File Storage (POST /nwtn/files)
+    suspend fun uploadFile(type: String, data: String, name: String? = null): String? = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply {
+            put("type", type)
+            put("data", data)
+            if (!name.isNullOrEmpty()) put("name", name)
+        }
+        val req = makeRequestBuilder("/nwtn/files")
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        try {
+            val response = client.newCall(req).execute()
+            if (response.isSuccessful) {
+                val json = JSONObject(response.body?.string().orEmpty())
+                json.optString("id").takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     // 9. Desktop Remote Control API
     suspend fun fetchDesktopStatus(): RemoteDesktopStatus = withContext(Dispatchers.IO) {

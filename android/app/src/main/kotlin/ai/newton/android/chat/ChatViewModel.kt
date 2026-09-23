@@ -1,6 +1,7 @@
 package ai.newton.android.chat
 
 import ai.newton.android.data.AuthManager
+import ai.newton.android.data.ChatAttachment
 import ai.newton.android.data.ChatPeerEvent
 import ai.newton.android.data.ChatPeerEventType
 import ai.newton.android.data.CloudChatService
@@ -271,9 +272,26 @@ class ChatViewModel(
                 }
 
                 val flow = if (useCloud) {
-                    val atts = mutableListOf<Pair<String, String>>()
+                    val atts = mutableListOf<ChatAttachment>()
                     if (attachedImageBase64 != null) {
-                        atts.add("image" to attachedImageBase64)
+                        atts.add(ChatAttachment(type = "image", data = attachedImageBase64))
+                    }
+                    for (att in attachments) {
+                        val attType = when (att.fileExtension.lowercase()) {
+                            "pdf" -> "pdf"
+                            "png", "jpg", "jpeg", "gif", "webp" -> "image"
+                            else -> "text"
+                        }
+                        val attData = att.base64Data ?: att.previewSnippet
+                        if (!attData.isNullOrEmpty()) {
+                            atts.add(
+                                ChatAttachment(
+                                    type = attType,
+                                    data = attData,
+                                    name = att.fileName,
+                                )
+                            )
+                        }
                     }
                     cloudService.streamChatMessage(
                         chatId = targetChatId,
