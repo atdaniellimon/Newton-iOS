@@ -670,19 +670,24 @@ public final class CloudChatService: ObservableObject {
         public let chatId: String?
         public let status: String?
         public let message: String?
+        public let desktopOnline: Bool?
     }
     
     public struct RemoteStepEvent {
         public let stepType: String
+        public let sessionId: String?
         public let chatId: String?
         public let workspacePath: String?
         public let toolName: String?
+        public let parameters: [String: Any]?
         public let message: String?
         public let stdout: String?
         public let stderr: String?
+        public let durationMs: Int?
+        public let serverTimestamp: Date?
         public let timestamp: Date
     }
-    
+
     public func fetchDesktopStatus() async throws -> RemoteDesktopStatus {
         let req = try makeRequest(endpoint: "/nwtn/desktop/status")
         let (data, response) = try await URLSession.shared.data(for: req)
@@ -729,67 +734,118 @@ public final class CloudChatService: ObservableObject {
         _ = try await URLSession.shared.data(for: req)
     }
     
-    public func streamDesktopSession() -> AsyncStream<RemoteStepEvent> {
+    /// Streams remote desktop steps for a session, surviving network drops:
+    /// reconnects with exponential backoff and resumes via Last-Event-ID replay.
+    /// The stream only finishes when the task is cancelled (or after 10 failed attempts).
+    public func streamDesktopSession(filterSessionId: String? = nil) -> AsyncStream<RemoteStepEvent> {
         AsyncStream { continuation in
             let task = Task {
-                do {
-                    var req = try self.makeRequest(endpoint: "/nwtn/desktop/session/stream")
-                    req.timeoutInterval = 86400
-                    
-                    let (bytes, response) = try await URLSession.shared.bytes(for: req)
-                    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                        continuation.finish()
-                        return
-                    }
-                    
-                    var currentEventType: String? = nil
-                    var buffer = ""
-                    var utf8Buffer: [UInt8] = []
-                    
-                    for try await byte in bytes {
-                        guard !Task.isCancelled else { break }
-                        utf8Buffer.append(byte)
-                        if let decodedString = String(bytes: utf8Buffer, encoding: .utf8) {
-                            buffer.append(decodedString)
-                            utf8Buffer.removeAll(keepingCapacity: true)
-                        } else if utf8Buffer.count > 16 {
-                            buffer.append(String(decoding: utf8Buffer, as: UTF8.self))
-                            utf8Buffer.removeAll(keepingCapacity: true)
+                var lastEventId: Int? = nil
+                var attempt = 0
+                let maxAttempts = 10
+
+                func makeStep(from json: [String: Any], fallbackEvent: String?) -> RemoteStepEvent {
+                    let serverTs = (json["timestamp"] as? Double).map { Date(timeIntervalSince1970: $0) }
+                    return RemoteStepEvent(
+                        stepType: json["stepType"] as? String ?? fallbackEvent ?? "step",
+                        sessionId: json["sessionId"] as? String,
+                        chatId: json["chatId"] as? String,
+                        workspacePath: json["workspacePath"] as? String,
+                        toolName: json["toolName"] as? String,
+                        parameters: json["parameters"] as? [String: Any],
+                        message: json["message"] as? String,
+                        stdout: json["stdout"] as? String,
+                        stderr: json["stderr"] as? String,
+                        durationMs: (json["durationMs"] as? NSNumber)?.intValue,
+                        serverTimestamp: serverTs,
+                        timestamp: serverTs ?? Date()
+                    )
+                }
+
+                while !Task.isCancelled && attempt < maxAttempts {
+                    do {
+                        var endpoint = "/nwtn/desktop/session/stream"
+                        var query: [String] = []
+                        if let sid = filterSessionId {
+                            query.append("sessionId=\(sid)")
                         }
-                        
-                        while let lineEnd = buffer.range(of: "\n") {
-                            let line = String(buffer[..<lineEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-                            buffer = String(buffer[lineEnd.upperBound...])
-                            
-                            if line.hasPrefix("event: ") {
-                                currentEventType = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
-                            } else if line.hasPrefix("data: ") {
-                                let dataStr = String(line.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-                                if let data = dataStr.data(using: .utf8),
-                                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                                    
-                                    let step = RemoteStepEvent(
-                                        stepType: json["stepType"] as? String ?? currentEventType ?? "step",
-                                        chatId: json["chatId"] as? String,
-                                        workspacePath: json["workspacePath"] as? String,
-                                        toolName: json["toolName"] as? String,
-                                        message: json["message"] as? String,
-                                        stdout: json["stdout"] as? String,
-                                        stderr: json["stderr"] as? String,
-                                        timestamp: Date()
-                                    )
-                                    continuation.yield(step)
+                        if let lid = lastEventId {
+                            query.append("lastEventId=\(lid)")
+                        }
+                        if !query.isEmpty {
+                            endpoint += "?" + query.joined(separator: "&")
+                        }
+                        var req = try self.makeRequest(endpoint: endpoint)
+                        if let lid = lastEventId {
+                            req.setValue(String(lid), forHTTPHeaderField: "Last-Event-ID")
+                        }
+                        req.timeoutInterval = 86400
+
+                        let (bytes, response) = try await URLSession.shared.bytes(for: req)
+                        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                            throw NSError(domain: "CloudChatService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Stream connect failed"])
+                        }
+                        attempt = 0
+
+                        var currentEventType: String? = nil
+                        var currentEventId: Int? = nil
+                        var buffer = ""
+                        var utf8Buffer: [UInt8] = []
+
+                        streamLoop: for try await byte in bytes {
+                            guard !Task.isCancelled else { break }
+                            utf8Buffer.append(byte)
+                            if let decodedString = String(bytes: utf8Buffer, encoding: .utf8) {
+                                buffer.append(decodedString)
+                                utf8Buffer.removeAll(keepingCapacity: true)
+                            } else if utf8Buffer.count > 16 {
+                                buffer.append(String(decoding: utf8Buffer, as: UTF8.self))
+                                utf8Buffer.removeAll(keepingCapacity: true)
+                            }
+
+                            while let lineEnd = buffer.range(of: "\n") {
+                                let line = String(buffer[..<lineEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                                buffer = String(buffer[lineEnd.upperBound...])
+
+                                if line.hasPrefix("id: ") {
+                                    currentEventId = Int(line.dropFirst(4).trimmingCharacters(in: .whitespacesAndNewlines))
+                                } else if line.hasPrefix("event: ") {
+                                    currentEventType = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                                } else if line.hasPrefix("data: ") {
+                                    let dataStr = String(line.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
+                                    if let data = dataStr.data(using: .utf8),
+                                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                        if currentEventType == "connected" {
+                                            continue
+                                        }
+                                        if currentEventType == "desktop:command" {
+                                            // Command echo (dispatched from this device); skip to avoid loops
+                                            continue
+                                        }
+                                        let step = makeStep(from: json, fallbackEvent: currentEventType)
+                                        if currentEventId != nil { lastEventId = currentEventId }
+                                        continuation.yield(step)
+                                    }
+                                    currentEventType = nil
+                                    currentEventId = nil
+                                } else if line.isEmpty {
+                                    continue
                                 }
-                                currentEventType = nil
                             }
                         }
+                        // Server closed or network dropped → fall through to reconnect
+                    } catch {
+                        // fall through to backoff
                     }
-                    continuation.finish()
-                } catch {
-                    continuation.finish()
+                    if !Task.isCancelled {
+                        attempt += 1
+                        let delay = min(Double(2 * attempt), 8.0)
+                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    }
                 }
+                continuation.finish()
             }
-            
+
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }

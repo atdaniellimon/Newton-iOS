@@ -13,6 +13,9 @@ data class Conversation(
     val messages: List<Message> = emptyList(),
     val isPinned: Boolean = false,
     val isGhost: Boolean = false,
+    val isRemoteCodeChat: Boolean = false,
+    val workspacePath: String? = null,
+    val workspaceName: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

@@ -5,10 +5,16 @@ import ai.newton.android.data.WorkspaceManager
 import ai.newton.android.theme.NewtonColors
 import ai.newton.android.ui.components.Hero3DCanvas
 import ai.newton.android.ui.components.ThinkingOrb
+import ai.newton.shared.FileAttachment
 import ai.newton.shared.Message
 import ai.newton.shared.MessageRole
+import ai.newton.android.ui.components.AttachmentCard
+import ai.newton.android.ui.components.InteractiveChartCard
+import ai.newton.android.ui.components.InteractiveChartParser
+import ai.newton.android.ui.components.ShareableCardDialog
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -45,6 +51,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -52,6 +59,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -115,6 +123,7 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     var attachedImageUri by remember { mutableStateOf<Uri?>(null) }
     var attachedImageBase64 by remember { mutableStateOf<String?>(null) }
+    var attachedFiles by remember { mutableStateOf<List<FileAttachment>>(emptyList()) }
 
     var showModelMenu by remember { mutableStateOf(false) }
     var showExportMenu by remember { mutableStateOf(false) }
@@ -152,6 +161,52 @@ fun ChatScreen(
                 if (bytes != null) {
                     attachedImageBase64 = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
                 }
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Document / File picker launcher
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        uri?.let { fileUri ->
+            try {
+                var fileName = "document"
+                var fileSize = 0L
+                context.contentResolver.query(fileUri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIndex != -1) fileName = cursor.getString(nameIndex)
+                        if (sizeIndex != -1) fileSize = cursor.getLong(sizeIndex)
+                    }
+                }
+
+                val ext = fileName.substringAfterLast('.', "")
+                val sizeStr = if (fileSize > 1024 * 1024) String.format("%.1f MB", fileSize / (1024f * 1024f))
+                    else if (fileSize > 1024) String.format("%.1f KB", fileSize / 1024f)
+                    else "$fileSize B"
+
+                var snippet: String? = null
+                var lineCount: Int? = null
+                try {
+                    val stream = context.contentResolver.openInputStream(fileUri)
+                    val textContent = stream?.bufferedReader()?.use { it.readText() }
+                    if (textContent != null && textContent.length < 50000) {
+                        snippet = textContent.take(1500)
+                        lineCount = textContent.lines().size
+                    }
+                } catch (_: Exception) {}
+
+                val fileAttachment = FileAttachment(
+                    fileName = fileName,
+                    fileExtension = ext,
+                    fileSizeFormatted = sizeStr,
+                    lineCount = lineCount,
+                    previewSnippet = snippet,
+                    mimeType = context.contentResolver.getType(fileUri) ?: "application/octet-stream",
+                )
+                attachedFiles = attachedFiles + fileAttachment
             } catch (_: Exception) {}
         }
     }
@@ -388,22 +443,30 @@ fun ChatScreen(
                         color = NewtonColors.TextSecondaryDark,
                     )
                 }
-            } else {
                 ChatInputBar(
                     text = inputText,
                     onTextChange = { inputText = it },
                     attachedImageUri = attachedImageUri,
+                    attachedFiles = attachedFiles,
                     onRemoveAttachment = {
                         attachedImageUri = null
                         attachedImageBase64 = null
                     },
+                    onRemoveFile = { file ->
+                        attachedFiles = attachedFiles.filter { it.id != file.id }
+                    },
                     onTriggerAttachmentMenu = { showAttachmentMenu = true },
                     onSend = {
-                        if (inputText.isNotBlank() || attachedImageBase64 != null) {
-                            viewModel.send(inputText, attachedImageBase64 = attachedImageBase64)
+                        if (inputText.isNotBlank() || attachedImageBase64 != null || attachedFiles.isNotEmpty()) {
+                            viewModel.send(
+                                prompt = inputText,
+                                attachedImageBase64 = attachedImageBase64,
+                                attachments = attachedFiles,
+                            )
                             inputText = ""
                             attachedImageUri = null
                             attachedImageBase64 = null
+                            attachedFiles = emptyList()
                         }
                     },
                     onStop = { viewModel.stop() },
@@ -564,6 +627,14 @@ fun ChatScreen(
                     },
                 )
                 DropdownMenuItem(
+                    leadingIcon = { Icon(Icons.Default.Description, null, tint = NewtonColors.Sand) },
+                    text = { Text("Documento / Archivo", color = NewtonColors.TextPrimaryDark) },
+                    onClick = {
+                        showAttachmentMenu = false
+                        documentPickerLauncher.launch(arrayOf("*/*"))
+                    },
+                )
+                DropdownMenuItem(
                     leadingIcon = { Icon(Icons.Default.Public, null, tint = NewtonColors.Aqua) },
                     text = { Text("Búsqueda web", color = NewtonColors.TextPrimaryDark) },
                     onClick = {
@@ -599,26 +670,34 @@ private fun MessageBubble(message: Message) {
                         contentScale = ContentScale.Crop,
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .clip(
-                            RoundedCornerShape(
-                                topStart = 16.dp,
-                                topEnd = 16.dp,
-                                bottomStart = 16.dp,
-                                bottomEnd = 4.dp,
+                for (att in message.attachments) {
+                    AttachmentCard(
+                        attachment = att,
+                        modifier = Modifier.width(280.dp),
+                    )
+                }
+                if (message.content.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(
+                                RoundedCornerShape(
+                                    topStart = 16.dp,
+                                    topEnd = 16.dp,
+                                    bottomStart = 16.dp,
+                                    bottomEnd = 4.dp,
+                                ),
+                            )
+                            .background(NewtonColors.UserBubbleDark)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = NewtonColors.BgDark,
+                                fontWeight = FontWeight.Medium,
                             ),
                         )
-                        .background(NewtonColors.UserBubbleDark)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = NewtonColors.BgDark,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                    )
+                    }
                 }
             }
         } else {
@@ -634,9 +713,34 @@ private fun MessageBubble(message: Message) {
                     )
                 }
 
-                // Orbit tool cards
+                // Orbit tool cards and Web Citations
                 for (orbit in message.orbitResults) {
-                    OrbitCard(orbit = orbit)
+                    val name = orbit.orbitName.lowercase()
+                    if (name.contains("search") || name.contains("web")) {
+                        WebCitationCard(
+                            citation = WebCitationItem(
+                                title = "Búsqueda Web: ${orbit.params}",
+                                urlString = "https://duckduckgo.com/?q=${Uri.encode(orbit.params)}",
+                                snippet = orbit.result,
+                                citationNumber = 1,
+                            ),
+                        )
+                    } else {
+                        OrbitCard(orbit = orbit)
+                    }
+                }
+
+                // File attachments
+                for (att in message.attachments) {
+                    AttachmentCard(attachment = att)
+                }
+
+                // Interactive Chart if detected
+                val chartPayload = remember(message.content) {
+                    InteractiveChartParser.extractChartData(message.content)
+                }
+                if (chartPayload != null) {
+                    InteractiveChartCard(payload = chartPayload)
                 }
 
                 // Generated image (if any)
@@ -682,6 +786,17 @@ private fun RenderFormattedText(text: String) {
                 val lang = if (lines.isNotEmpty() && !lines.first().contains(" ")) lines.first() else ""
                 val code = if (lang.isNotEmpty()) lines.drop(1).joinToString("\n") else segment.trim()
 
+                var showShareCardDialog by remember { mutableStateOf(false) }
+
+                if (showShareCardDialog) {
+                    ShareableCardDialog(
+                        codeSnippet = code,
+                        language = if (lang.isNotEmpty()) lang else "code",
+                        title = "Newton Singularity",
+                        onDismiss = { showShareCardDialog = false },
+                    )
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -706,16 +821,30 @@ private fun RenderFormattedText(text: String) {
                                     color = NewtonColors.Sand,
                                 ),
                             )
-                            IconButton(
-                                onClick = { clipboardManager.setText(AnnotatedString(code)) },
-                                modifier = Modifier.size(24.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy",
-                                    tint = NewtonColors.TextMutedDark,
-                                    modifier = Modifier.size(14.dp),
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { showShareCardDialog = true },
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share",
+                                        tint = NewtonColors.TextMutedDark,
+                                        modifier = Modifier.size(13.dp),
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                IconButton(
+                                    onClick = { clipboardManager.setText(AnnotatedString(code)) },
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy",
+                                        tint = NewtonColors.TextMutedDark,
+                                        modifier = Modifier.size(13.dp),
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
@@ -828,7 +957,9 @@ private fun ChatInputBar(
     text: String,
     onTextChange: (String) -> Unit,
     attachedImageUri: Uri?,
+    attachedFiles: List<FileAttachment> = emptyList(),
     onRemoveAttachment: () -> Unit,
+    onRemoveFile: (FileAttachment) -> Unit = {},
     onTriggerAttachmentMenu: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
@@ -840,38 +971,83 @@ private fun ChatInputBar(
             .background(NewtonColors.BgDark)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        // Attachment thumbnail chip
-        if (attachedImageUri != null) {
+        // Attachment thumbnail chips
+        if (attachedImageUri != null || attachedFiles.isNotEmpty()) {
             Row(
                 modifier = Modifier
-                    .padding(bottom = 6.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(NewtonColors.CardDark)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                AsyncImage(
-                    model = attachedImageUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-                Text(
-                    text = "Foto adjunta",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NewtonColors.TextPrimaryDark,
-                )
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Remove",
-                    tint = NewtonColors.CoralRed,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .clickable(onClick = onRemoveAttachment),
-                )
+                if (attachedImageUri != null) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(NewtonColors.CardDark)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        AsyncImage(
+                            model = attachedImageUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Crop,
+                        )
+                        Text(
+                            text = "Foto adjunta",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = NewtonColors.TextPrimaryDark,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            tint = NewtonColors.CoralRed,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable(onClick = onRemoveAttachment),
+                        )
+                    }
+                }
+
+                for (file in attachedFiles) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(NewtonColors.CardDark)
+                            .border(0.8.dp, NewtonColors.Sand.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = file.fileExtension.uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                            ),
+                            color = NewtonColors.Sand,
+                        )
+                        Text(
+                            text = file.fileName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = NewtonColors.TextPrimaryDark,
+                            maxLines = 1,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            tint = NewtonColors.CoralRed,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { onRemoveFile(file) },
+                        )
+                    }
+                }
             }
         }
 

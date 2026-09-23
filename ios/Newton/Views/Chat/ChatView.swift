@@ -40,6 +40,7 @@ public struct ChatView: View {
     
     @State private var isStreaming: Bool = false
     @State private var currentStreamTask: Task<Void, Never>? = nil
+    @State private var remoteSessionId: String? = nil
     @State private var errorMessage: String? = nil
     @State private var activeSheet: ActiveModalSheet? = nil
     @State private var showFileImporter: Bool = false
@@ -653,27 +654,58 @@ public struct ChatView: View {
                         task: taskToSend,
                         model: "Singularity-Matrix"
                     )
-                    
-                    let stream = CloudChatService.shared.streamDesktopSession()
+                    let dispatchedSessionId = dispatchRes.sessionId
+                    await MainActor.run { remoteSessionId = dispatchedSessionId }
+                    if dispatchRes.desktopOnline == false {
+                        fullResponse += "⚠️ El host Mac no reporta conexión activa — la tarea quedará en cola hasta que la app de escritorio se conecte.\n"
+                        await updateLiveStreamingMessage(id: assistantMessageId, content: fullResponse, thinking: currentThinking)
+                    }
+
+                    let stream = CloudChatService.shared.streamDesktopSession(filterSessionId: dispatchedSessionId)
                     for await step in stream {
                         guard !Task.isCancelled else { break }
-                        if step.stepType == "agent_message" || step.stepType == "tool_start" || step.stepType == "tool_result" {
-                            let stepText = step.message ?? step.stdout ?? ""
-                            if !stepText.isEmpty {
-                                fullResponse += "\n" + stepText
+                        // Only consume steps belonging to this session (server filters too; belt and suspenders)
+                        if let sid = step.sessionId, let expected = dispatchedSessionId, sid != expected { continue }
+
+                        switch step.stepType {
+                        case "agent_message":
+                            if let msg = step.message, !msg.isEmpty {
+                                fullResponse += "\n" + msg
                                 await updateLiveStreamingMessage(id: assistantMessageId, content: fullResponse, thinking: currentThinking)
                             }
-                        } else if step.stepType == "task_done" {
+                        case "tool_start", "tool_done":
+                            let isDone = step.stepType == "tool_done"
+                            var line = "\n\(isDone ? "✅" : "🔧") \(step.toolName ?? "tool")"
+                            if let p = step.parameters, !p.isEmpty {
+                                let summary = ["relativePath", "command", "query", "subPath", "action"].compactMap { key in
+                                    p[key].flatMap { $0 as? String }.map { "\($0)" }
+                                }.joined(separator: ", ")
+                                if !summary.isEmpty { line += " — \(summary)" }
+                            }
+                            if isDone {
+                                if let dur = step.durationMs { line += " (\(dur)ms)" }
+                            }
+                            fullResponse += "\n" + line
+                            if let out = step.stdout, !out.isEmpty {
+                                fullResponse += "\n```stdout\n\(out.prefix(1500))\n```"
+                            }
+                            if let err = step.stderr, !err.isEmpty {
+                                fullResponse += "\n```stderr\n\(err.prefix(800))\n```"
+                            }
+                            await updateLiveStreamingMessage(id: assistantMessageId, content: fullResponse, thinking: currentThinking)
+                        case "task_done":
                             if let finalReply = step.message, !finalReply.isEmpty {
                                 fullResponse = finalReply
                             }
                             break
-                        } else if step.stepType == "error" {
-                            let errDesc = step.message ?? "Error executing remote task"
+                        case "error":
+                            let errDesc = step.message ?? step.stderr ?? "Error executing remote task"
                             throw NSError(domain: "RemoteStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: errDesc])
+                        default:
+                            break
                         }
                     }
-                    
+
                     await finalizeStreamingMessage(
                         id: assistantMessageId,
                         finalContent: fullResponse.isEmpty ? "Tarea completada por Newton Desktop Host." : fullResponse,
@@ -682,6 +714,7 @@ public struct ChatView: View {
                         currentThinking: "",
                         thinkingContent: nil
                     )
+                    await MainActor.run { remoteSessionId = nil }
                 } catch {
                     await handleStreamFailure(id: assistantMessageId, error: error, fullResponse: fullResponse)
                 }
@@ -900,7 +933,15 @@ public struct ChatView: View {
         currentStreamTask?.cancel()
         currentStreamTask = nil
         isStreaming = false
-        
+
+        // Real remote cancellation: tell the Mac host to stop the agent loop.
+        if conversation.isRemoteCodeChat, let sid = remoteSessionId {
+            remoteSessionId = nil
+            Task {
+                try? await CloudChatService.shared.cancelDesktopCommand(sessionId: sid)
+            }
+        }
+
         if let index = conversation.messages.indices.last {
             conversation.messages[index].isStreaming = false
         }

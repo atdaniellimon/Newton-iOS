@@ -33,7 +33,10 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,9 +48,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -102,6 +109,8 @@ fun SettingsScreen(
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showRotateKeyDialog by remember { mutableStateOf(false) }
+    var showModelSelectorDialog by remember { mutableStateOf(false) }
+    var hapticsEnabled by remember { mutableStateOf(true) }
     var temperature by remember { mutableFloatStateOf(0.7f) }
 
     LaunchedEffect(Unit) {
@@ -403,7 +412,7 @@ fun SettingsScreen(
                 // MARK: - Model & AI Configuration
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "CONFIGURACIÓN DEL MODELO",
+                        text = "MODELO DE INTELIGENCIA ARTIFICIAL",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
@@ -421,25 +430,45 @@ fun SettingsScreen(
                             .padding(16.dp),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            // Model selector
+                            // Model selector row with modal dialog trigger
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showModelSelectorDialog = true },
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text(
-                                    text = "Modelo Principal",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = NewtonColors.TextPrimaryDark,
-                                )
-                                Text(
-                                    text = currentModelId,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold,
-                                    ),
-                                    color = NewtonColors.Sand,
-                                )
+                                Column {
+                                    Text(
+                                        text = "Modelo Principal",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = NewtonColors.TextPrimaryDark,
+                                    )
+                                    Text(
+                                        text = if (currentModelId == "Singularity-Matrix") "Especialista en código y arquitectura" else "Razonamiento general y visión",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = NewtonColors.TextSecondaryDark,
+                                    )
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        text = currentModelId,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                        color = NewtonColors.Sand,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = NewtonColors.TextMutedDark,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
                             }
 
                             HorizontalDivider(color = NewtonColors.BorderDark.copy(alpha = 0.5f))
@@ -476,6 +505,71 @@ fun SettingsScreen(
                     }
                 }
 
+                // MARK: - App Preferences & Haptics
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "PREFERENCIAS DE APLICACIÓN",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp,
+                        ),
+                        color = NewtonColors.TextMutedDark,
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(NewtonColors.CardDark)
+                            .border(1.dp, NewtonColors.BorderDark, RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Haptic Feedback Switch
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Vibration,
+                                        contentDescription = null,
+                                        tint = NewtonColors.Sand,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Vibración y Háptica",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = NewtonColors.TextPrimaryDark,
+                                        )
+                                        Text(
+                                            text = "Respuesta táctil al pulsar y enviar",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = NewtonColors.TextSecondaryDark,
+                                        )
+                                    }
+                                }
+                                Switch(
+                                    checked = hapticsEnabled,
+                                    onCheckedChange = { hapticsEnabled = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = NewtonColors.BgDark,
+                                        checkedTrackColor = NewtonColors.Sand,
+                                        uncheckedThumbColor = NewtonColors.TextMutedDark,
+                                        uncheckedTrackColor = NewtonColors.SurfaceDark,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // MARK: - Logout Button
                 Button(
                     onClick = { showLogoutDialog = true },
@@ -501,6 +595,88 @@ fun SettingsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // Model Selection Dialog
+            if (showModelSelectorDialog) {
+                AlertDialog(
+                    onDismissRequest = { showModelSelectorDialog = false },
+                    title = {
+                        Text(
+                            text = "Seleccionar Modelo",
+                            fontWeight = FontWeight.Bold,
+                            color = NewtonColors.TextPrimaryDark,
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // Option 1: Singularity
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (currentModelId == "Singularity") NewtonColors.Sand.copy(alpha = 0.12f) else Color.Transparent)
+                                    .clickable {
+                                        scope.launch { settings.setModelId("Singularity") }
+                                        showModelSelectorDialog = false
+                                    }
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(
+                                    selected = currentModelId == "Singularity",
+                                    onClick = {
+                                        scope.launch { settings.setModelId("Singularity") }
+                                        showModelSelectorDialog = false
+                                    },
+                                    colors = RadioButtonDefaults.colors(selectedColor = NewtonColors.Sand),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Newton Singularity", fontWeight = FontWeight.Bold, color = NewtonColors.TextPrimaryDark)
+                                    Text("Razonamiento general, multimodal y visión", style = MaterialTheme.typography.bodySmall, color = NewtonColors.TextSecondaryDark)
+                                }
+                            }
+
+                            // Option 2: Singularity-Matrix
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (currentModelId == "Singularity-Matrix") NewtonColors.Aqua.copy(alpha = 0.12f) else Color.Transparent)
+                                    .clickable {
+                                        scope.launch { settings.setModelId("Singularity-Matrix") }
+                                        showModelSelectorDialog = false
+                                    }
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(
+                                    selected = currentModelId == "Singularity-Matrix",
+                                    onClick = {
+                                        scope.launch { settings.setModelId("Singularity-Matrix") }
+                                        showModelSelectorDialog = false
+                                    },
+                                    colors = RadioButtonDefaults.colors(selectedColor = NewtonColors.Aqua),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Singularity-Matrix", fontWeight = FontWeight.Bold, color = NewtonColors.TextPrimaryDark)
+                                    Text("Especialista en código, terminal y workspaces", style = MaterialTheme.typography.bodySmall, color = NewtonColors.TextSecondaryDark)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = { showModelSelectorDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = NewtonColors.Sand, contentColor = Color.Black),
+                        ) {
+                            Text("Aceptar", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    containerColor = NewtonColors.SurfaceDark,
+                )
             }
 
             // Rotate Key Confirmation Dialog

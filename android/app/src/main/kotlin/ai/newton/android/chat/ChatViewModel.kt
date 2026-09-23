@@ -193,9 +193,14 @@ class ChatViewModel(
         _ui.value = ChatUiState()
     }
 
-    fun send(prompt: String, attachedImageBase64: String? = null, attachedFileName: String? = null) {
+    fun send(
+        prompt: String,
+        attachedImageBase64: String? = null,
+        attachedFileName: String? = null,
+        attachments: List<ai.newton.shared.FileAttachment> = emptyList(),
+    ) {
         val text = prompt.trim()
-        if (text.isEmpty() && attachedImageBase64 == null) return
+        if (text.isEmpty() && attachedImageBase64 == null && attachments.isEmpty()) return
         var convo = _ui.value.conversation ?: run {
             newConversation()
             _ui.value.conversation!!
@@ -207,8 +212,17 @@ class ChatViewModel(
             displayPrompt = "Describe and analyze this image."
             backendPrompt = displayPrompt
         }
+        if (displayPrompt.isEmpty() && attachments.isNotEmpty()) {
+            displayPrompt = "Analiza el archivo adjunto: ${attachments.first().fileName}"
+            backendPrompt = displayPrompt
+        }
         if (!attachedFileName.isNullOrEmpty()) {
             backendPrompt += "\n\n[Attached File: $attachedFileName]"
+        }
+        for (att in attachments) {
+            if (!att.previewSnippet.isNullOrEmpty()) {
+                backendPrompt += "\n\n[Attached File: ${att.fileName} (${att.fileExtension})]\n```${att.fileExtension}\n${att.previewSnippet}\n```"
+            }
         }
 
         val isFirstMessage = convo.messages.isEmpty()
@@ -216,6 +230,7 @@ class ChatViewModel(
             role = MessageRole.USER,
             content = displayPrompt,
             imageUrl = attachedImageBase64,
+            attachments = attachments,
         )
         val assistantId = UUID.randomUUID().toString()
         val assistantPlaceholder = Message(
@@ -226,7 +241,7 @@ class ChatViewModel(
         )
 
         val updatedConvo = convo.copy(
-            title = if (isFirstMessage) titleFrom(text.ifEmpty { attachedFileName ?: "New Conversation" }) else convo.title,
+            title = if (isFirstMessage) titleFrom(text.ifEmpty { attachedFileName ?: attachments.firstOrNull()?.fileName ?: "New Conversation" }) else convo.title,
             messages = convo.messages + userMsg + assistantPlaceholder,
         )
         _ui.value = _ui.value.copy(conversation = updatedConvo, isStreaming = true, error = null)
