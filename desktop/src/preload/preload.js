@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('newtonAPI', {
   getChatMessages: (params) => ipcRenderer.invoke('ai:get-messages', params),
   updateChat: (params) => ipcRenderer.invoke('ai:update-chat', params),
   deleteChat: (chatId) => ipcRenderer.invoke('ai:delete-chat', chatId),
+  getUsage: () => ipcRenderer.invoke('ai:get-usage'),
+  getUsageHistory: (params) => ipcRenderer.invoke('ai:get-usage-history', params),
+  uploadFile: (payload) => ipcRenderer.invoke('ai:upload-file', payload),
+  getFileMetadata: (fileId) => ipcRenderer.invoke('ai:get-file-metadata', fileId),
+  generateTitle: (prompt) => ipcRenderer.invoke('ai:generate-title', prompt),
   generateImage: (data) => ipcRenderer.invoke('ai:generate-image', data),
   sendMessage: (payload) => ipcRenderer.invoke('ai:send-message', payload),
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
@@ -31,6 +36,7 @@ contextBridge.exposeInMainWorld('newtonAPI', {
   },
   syncDesktopWorkspaces: (workspaces) => ipcRenderer.invoke('desktop:sync-workspaces', workspaces),
   reportDesktopStep: (payload) => ipcRenderer.invoke('desktop:report-step', payload),
+  desktopHeartbeat: (activeWorkspace) => ipcRenderer.invoke('desktop:heartbeat', activeWorkspace),
 
   // Auth Management
   login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
@@ -38,6 +44,7 @@ contextBridge.exposeInMainWorld('newtonAPI', {
   logout: () => ipcRenderer.invoke('auth:logout'),
   setApiKey: (apiKey) => ipcRenderer.invoke('auth:set-api-key', apiKey),
   getAuthStatus: () => ipcRenderer.invoke('auth:status'),
+  resendVerification: (email) => ipcRenderer.invoke('auth:resend-verification', email),
 
   // Workspace, Files & Terminal
   listWorkspaces: () => ipcRenderer.invoke('workspace:list'),

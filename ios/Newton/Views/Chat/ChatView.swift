@@ -618,6 +618,16 @@ public struct ChatView: View {
         
         if isFirstMessage {
             conversation.title = String(rawInput.isEmpty ? fileName : rawInput.split(separator: " ").prefix(4).joined(separator: " "))
+            if !rawInput.isEmpty {
+                Task {
+                    if let fastTitle = await CloudChatService.shared.generateConversationTitle(prompt: rawInput) {
+                        await MainActor.run {
+                            conversation.title = fastTitle
+                            storage.updateConversation(conversation)
+                        }
+                    }
+                }
+            }
         }
         
         let assistantMessageId = UUID().uuidString

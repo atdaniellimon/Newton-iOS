@@ -260,6 +260,48 @@ class CloudChatService private constructor(private val auth: AuthManager) {
         list
     }
 
+    // Ephemeral File Storage: POST /nwtn/files
+    suspend fun uploadEphemeralFile(type: String = "text", data: String, name: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val body = JSONObject().apply {
+                put("type", type)
+                put("data", data)
+                put("name", name)
+            }
+            val req = makeRequestBuilder("/nwtn/files")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            val response = client.newCall(req).execute()
+            if (!response.isSuccessful) return@withContext null
+            val json = JSONObject(response.body?.string().orEmpty())
+            json.optString("id").takeIf { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // Fast Title Generator: POST /nwtn/chat (task: "title")
+    suspend fun generateTitle(prompt: String): String? = withContext(Dispatchers.IO) {
+        val clean = prompt.trim()
+        if (clean.isEmpty()) return@withContext null
+        try {
+            val body = JSONObject().apply {
+                put("prompt", clean)
+                put("task", "title")
+                put("stream", false)
+            }
+            val req = makeRequestBuilder("/nwtn/chat")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            val response = client.newCall(req).execute()
+            if (!response.isSuccessful) return@withContext null
+            val json = JSONObject(response.body?.string().orEmpty())
+            json.optString("reply").trim().takeIf { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // 6. Stream Chat Message: POST /nwtn/chats/{id}/messages?stream=true
     fun streamChatMessage(
         chatId: String,

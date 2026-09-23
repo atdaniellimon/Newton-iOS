@@ -293,7 +293,7 @@ public final class OrbitEngine {
     }
     
     /// Generate an image via NWTN /images endpoint
-    public func generateImage(prompt: String, baseUrl: String = "", apiKey: String = "") async -> String {
+    public func generateImage(prompt: String, reference: String? = nil, n: Int = 1, baseUrl: String = "", apiKey: String = "") async -> String {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanPrompt.isEmpty else { return "" }
 
@@ -311,7 +311,10 @@ public final class OrbitEngine {
         request.setValue(nwtnKey, forHTTPHeaderField: "x-api-key")
         request.setValue("Newton-iOS/2.2.0", forHTTPHeaderField: "User-Agent")
 
-        let payload: [String: Any] = ["prompt": cleanPrompt, "n": 1]
+        var payload: [String: Any] = ["prompt": cleanPrompt, "n": max(1, min(4, n))]
+        if let ref = reference, !ref.isEmpty {
+            payload["reference"] = ref
+        }
 
         guard let bodyData = try? JSONSerialization.data(withJSONObject: payload) else { return "" }
         request.httpBody = bodyData

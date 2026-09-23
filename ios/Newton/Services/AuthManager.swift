@@ -411,6 +411,70 @@ public final class AuthManager: ObservableObject {
         }
     }
 
+    // MARK: - Quick Balance (GET /nwtn/usage)
+
+    @MainActor
+    public func fetchQuickUsage() async {
+        let key = nwtnKey
+        guard !key.isEmpty else { return }
+
+        guard let url = URL(string: Self.apiBaseURL + "/nwtn/usage") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 10
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return
+            }
+            if let remaining = json["remaining"] as? Int {
+                self.creditsRemaining = remaining
+            }
+            if let rpm = json["rpm_limit"] as? Int {
+                self.rpmLimit = rpm
+            }
+        } catch {}
+    }
+
+    // MARK: - Resend Verification Email (POST /auth/resend-verification)
+
+    public func resendVerificationEmail(email: String) async -> (Bool, String) {
+        guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return (false, "Email cannot be empty.")
+        }
+        guard let url = URL(string: Self.apiBaseURL + "/auth/resend-verification") else {
+            return (false, "Invalid URL.")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload = ["email": email]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: payload) else {
+            return (false, "Failed to encode payload.")
+        }
+        req.httpBody = bodyData
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                return (false, "Invalid server response.")
+            }
+            let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            if http.statusCode == 200 && (json["ok"] as? Bool == true) {
+                let msg = json["message"] as? String ?? "Verification email dispatched."
+                return (true, msg)
+            } else {
+                let msg = (json["error"] as? [String: Any])?["message"] as? String ?? json["message"] as? String ?? "Failed to resend email."
+                return (false, msg)
+            }
+        } catch {
+            return (false, error.localizedDescription)
+        }
+    }
+
     // MARK: - Realtime Stream Credits Update
 
     @MainActor

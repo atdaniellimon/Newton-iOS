@@ -225,7 +225,9 @@ class OrbitEngine(
 
         return when (trimmed) {
             "image_gen", "imagine", "generate_image", "draw" -> {
-                val url = tools.generateImage(str("prompt"), baseUrl, apiKey)
+                val ref = params["reference"]?.takeIf { it.isNotBlank() }
+                val nVal = params["n"]?.toIntOrNull() ?: 1
+                val url = tools.generateImage(str("prompt"), reference = ref, n = nVal, baseUrl = baseUrl, apiKey = apiKey)
                 OrbitExecutionResult(orbitName = "image_gen", params = paramsJson, result = url, isSuccess = true)
             }
             "web_search", "search" -> {

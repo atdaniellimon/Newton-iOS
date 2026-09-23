@@ -270,6 +270,66 @@ public final class CloudChatService: ObservableObject {
         }
     }
     
+    // MARK: - Ephemeral File Storage: POST /nwtn/files & GET /nwtn/files/{id}
+    
+    public func uploadEphemeralFile(type: String = "text", data: String, name: String) async throws -> String {
+        let payload: [String: Any] = [
+            "type": type,
+            "data": data,
+            "name": name
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: payload)
+        let req = try makeRequest(endpoint: "/nwtn/files", method: "POST", body: bodyData)
+        
+        let (resData, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...201).contains(http.statusCode) else {
+            let bodyStr = String(data: resData, encoding: .utf8) ?? ""
+            throw NSError(domain: "CloudChatService", code: (response as? HTTPURLResponse)?.statusCode ?? -1, userInfo: [NSLocalizedDescriptionKey: "Failed to upload ephemeral file: \(bodyStr)"])
+        }
+        
+        guard let json = try? JSONSerialization.jsonObject(with: resData) as? [String: Any],
+              let fileId = json["id"] as? String else {
+            throw NSError(domain: "CloudChatService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Malformed server response for file upload"])
+        }
+        return fileId
+    }
+    
+    public func getFileMetadata(fileId: String) async throws -> [String: Any] {
+        let req = try makeRequest(endpoint: "/nwtn/files/\(fileId)")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NSError(domain: "CloudChatService", code: -1, userInfo: [NSLocalizedDescriptionKey: "File metadata not found or expired"])
+        }
+        return json
+    }
+    
+    // MARK: - Fast Title Generator: POST /nwtn/chat (task: "title")
+    
+    public func generateConversationTitle(prompt: String) async -> String? {
+        guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        do {
+            let payload: [String: Any] = [
+                "prompt": prompt,
+                "task": "title",
+                "stream": false
+            ]
+            let bodyData = try JSONSerialization.data(withJSONObject: payload)
+            let req = try makeRequest(endpoint: "/nwtn/chat", method: "POST", body: bodyData)
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+            if let reply = json["reply"] as? String, !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return reply.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        } catch {
+            return nil
+        }
+        return nil
+    }
+    
     // MARK: - 5. Fetch Messages: GET /nwtn/chats/{id}/messages
     
     public func fetchMessages(chatId: String, limit: Int = 100) async throws -> [Message] {

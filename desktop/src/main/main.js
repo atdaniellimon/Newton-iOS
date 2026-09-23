@@ -318,6 +318,60 @@ ipcMain.handle('ai:delete-chat', async (event, chatId) => {
   }
 });
 
+ipcMain.handle('ai:get-usage', async () => {
+  try {
+    const data = await aiService.getUsage();
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('ai:get-usage-history', async (event, { days = 7, limit = 30 } = {}) => {
+  try {
+    const data = await aiService.getUsageHistory(days, limit);
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('ai:upload-file', async (event, payload) => {
+  try {
+    const data = await aiService.uploadFile(payload);
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('ai:get-file-metadata', async (event, fileId) => {
+  try {
+    const data = await aiService.getFileMetadata(fileId);
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('ai:generate-title', async (event, prompt) => {
+  try {
+    const title = await aiService.generateTitle(prompt);
+    return { success: true, data: title };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth:resend-verification', async (event, email) => {
+  try {
+    const res = await aiService.resendVerification(email);
+    return { success: true, data: res };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('ai:generate-image', async (event, payload) => {
   try {
     const res = await aiService.generateImage(payload);
@@ -536,6 +590,14 @@ ipcMain.handle('desktop:sync-workspaces', async (_event, workspaces) => {
 ipcMain.handle('desktop:report-step', async (_event, stepPayload) => {
   try {
     return await aiService.reportDesktopStep(stepPayload);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('desktop:heartbeat', async (_event, activeWorkspace) => {
+  try {
+    return await aiService.desktopHeartbeat(activeWorkspace);
   } catch (err) {
     return { success: false, error: err.message };
   }

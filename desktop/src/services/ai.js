@@ -416,6 +416,19 @@ class AIService {
     }
   }
 
+  async desktopHeartbeat(activeWorkspace) {
+    try {
+      const res = await fetch(`${this.baseUrl}/nwtn/desktop/heartbeat`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ activeWorkspace: activeWorkspace || null })
+      });
+      return await res.json();
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
   getHeaders(extra = {}) {
     const headers = {
       'Content-Type': 'application/json',
@@ -494,6 +507,40 @@ class AIService {
   async deleteChat(chatId) {
     return this.request(`/nwtn/chats/${chatId}`, {
       method: 'DELETE'
+    });
+  }
+
+  async getUsage() {
+    return this.request('/nwtn/usage');
+  }
+
+  async getUsageHistory(days = 7, limit = 30) {
+    return this.request(`/nwtn/usage/history?days=${days}&limit=${limit}`);
+  }
+
+  async uploadFile({ type = 'text', data, name }) {
+    return this.request('/nwtn/files', {
+      method: 'POST',
+      body: JSON.stringify({ type, data, name })
+    });
+  }
+
+  async getFileMetadata(fileId) {
+    return this.request(`/nwtn/files/${encodeURIComponent(fileId)}`);
+  }
+
+  async generateTitle(prompt) {
+    const res = await this.request('/nwtn/chat', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, task: 'title', stream: false })
+    });
+    return res.reply || res.title || null;
+  }
+
+  async resendVerification(email) {
+    return this.request('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email })
     });
   }
 

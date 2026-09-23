@@ -25,8 +25,16 @@ import java.util.Locale
  * CalendarContract, PdfDocument, …) without touching [OrbitEngine].
  */
 interface OrbitTools {
-    /** Calls `{base}/v1/images/generations`. Returns a URL or data-URL, "" on failure. */
+    /** Calls `{base}/v1/images/generations` or `{base}/images`. Returns a URL or data-URL, "" on failure. */
     suspend fun generateImage(prompt: String, baseUrl: String, apiKey: String): String = ""
+
+    suspend fun generateImage(
+        prompt: String,
+        reference: String? = null,
+        n: Int = 1,
+        baseUrl: String = "",
+        apiKey: String = "",
+    ): String = generateImage(prompt, baseUrl, apiKey)
 
     suspend fun webSearch(query: String): String
 
@@ -70,7 +78,13 @@ open class JvmOrbitTools(
     private val memories = mutableListOf<String>()
     private val lock = Any()
 
-    override suspend fun generateImage(prompt: String, baseUrl: String, apiKey: String): String {
+    override suspend fun generateImage(
+        prompt: String,
+        reference: String?,
+        n: Int,
+        baseUrl: String,
+        apiKey: String,
+    ): String {
         val clean = prompt.trim()
         if (clean.isEmpty()) return ""
         var activeBase = baseUrl.trim()
@@ -88,12 +102,15 @@ open class JvmOrbitTools(
             else -> "$cleanBase/v1/images/generations"
         }
 
+        val clampedN = n.coerceIn(1, 4)
+
         return withContext(Dispatchers.IO) {
             try {
                 val jsonPayload = if (isNewton) {
-                    """{"prompt":${jsonQuote(clean)},"n":1}"""
+                    val refField = if (!reference.isNullOrBlank()) ""","reference":${jsonQuote(reference.trim())}""" else ""
+                    """{"prompt":${jsonQuote(clean)},"n":$clampedN$refField}"""
                 } else {
-                    """{"prompt":${jsonQuote(clean)},"n":1,"size":"1024x1024","model":"dall-e-3"}"""
+                    """{"prompt":${jsonQuote(clean)},"n":$clampedN,"size":"1024x1024","model":"dall-e-3"}"""
                 }
                 val body = jsonPayload.toRequestBody("application/json; charset=utf-8".toMediaType())
                 val reqBuilder = Request.Builder().url(endpoint).post(body)

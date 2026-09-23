@@ -399,24 +399,31 @@ class ChatViewModel(
     private suspend fun generateAiTitle(conversationId: String, prompt: String) {
         try {
             val current = store.conversations.value.firstOrNull { it.id == conversationId } ?: return
-            var title = ""
-            llm.streamCompletion(
-                messages = listOf(
-                    Message(
-                        role = MessageRole.USER,
-                        content = "Create a concise, descriptive 2-4 word title in the language of this query: \"$prompt\". Output ONLY the title, no quotes or punctuation.",
+            var clean: String? = null
+            if (auth.isLoggedIn.value) {
+                clean = cloudService.generateTitle(prompt)
+            }
+            if (clean.isNullOrEmpty()) {
+                var title = ""
+                llm.streamCompletion(
+                    messages = listOf(
+                        Message(
+                            role = MessageRole.USER,
+                            content = "Create a concise, descriptive 2-4 word title in the language of this query: \"$prompt\". Output ONLY the title, no quotes or punctuation.",
+                        ),
                     ),
-                ),
-                provider = current.provider,
-                modelId = current.modelId,
-                baseUrl = AuthManager.API_BASE_URL + "/nwtn",
-                apiKey = auth.nwtnKey,
-                temperature = 0.3,
-                maxTokens = 15,
-                systemPrompt = "You are a concise title generator. Reply ONLY with a 2-4 word title.",
-            ).collect { title += it }
-            val clean = title.trim().replace("\"", "").replace("\n", " ")
-            if (clean.isNotEmpty()) {
+                    provider = current.provider,
+                    modelId = current.modelId,
+                    baseUrl = AuthManager.API_BASE_URL + "/nwtn",
+                    apiKey = auth.nwtnKey,
+                    temperature = 0.3,
+                    maxTokens = 15,
+                    systemPrompt = "You are a concise title generator. Reply ONLY with a 2-4 word title.",
+                ).collect { title += it }
+                clean = title.trim().replace("\"", "").replace("\n", " ").takeIf { it.isNotEmpty() }
+            }
+
+            if (!clean.isNullOrEmpty()) {
                 val renamed = current.copy(title = clean)
                 store.upsert(renamed)
                 if (_ui.value.conversation?.id == conversationId) {

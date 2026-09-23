@@ -344,6 +344,51 @@ class AuthManager private constructor(private val appContext: Context) {
         } catch (_: Exception) {}
     }
 
+    suspend fun fetchQuickUsage() = withContext(Dispatchers.IO) {
+        val key = nwtnKey
+        if (key.isEmpty()) return@withContext
+        try {
+            val req = Request.Builder()
+                .url("$API_BASE_URL/nwtn/usage")
+                .header("Authorization", "Bearer $key")
+                .header("x-api-key", key)
+                .build()
+            val response = client.newCall(req).execute()
+            if (!response.isSuccessful) return@withContext
+            val json = JSONObject(response.body?.string().orEmpty())
+            if (json.has("remaining")) {
+                _creditsRemaining.value = json.optLong("remaining")
+            }
+            if (json.has("rpm_limit")) {
+                _rpmLimit.value = json.optInt("rpm_limit")
+            }
+        } catch (_: Exception) {}
+    }
+
+    suspend fun resendVerification(email: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val clean = email.trim()
+        if (clean.isEmpty()) return@withContext Pair(false, "El correo no puede estar vacío.")
+        try {
+            val body = JSONObject().apply { put("email", clean) }
+            val req = Request.Builder()
+                .url("$API_BASE_URL/auth/resend-verification")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            val response = client.newCall(req).execute()
+            val json = JSONObject(response.body?.string().orEmpty())
+            if (response.isSuccessful && json.optBoolean("ok", true)) {
+                val msg = json.optString("message", "Correo de verificación reenviado.")
+                Pair(true, msg)
+            } else {
+                val err = json.optJSONObject("error")?.optString("message")
+                    ?: json.optString("message", "No se pudo reenviar el correo.")
+                Pair(false, err)
+            }
+        } catch (e: Exception) {
+            Pair(false, e.message ?: "Error de conexión")
+        }
+    }
+
     fun updateCreditsFromStream(newCreditsRemaining: Long) {
         _creditsRemaining.value = newCreditsRemaining
     }
