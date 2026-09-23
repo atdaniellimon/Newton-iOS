@@ -15,6 +15,7 @@ private class FakeTools(
     val savedMemories = mutableListOf<String>()
     override suspend fun webSearch(query: String): String = "$searchResult:$query"
     override suspend fun generateImage(prompt: String, baseUrl: String, apiKey: String): String = imageResult
+    override suspend fun generateImage(prompt: String, reference: String?, n: Int, baseUrl: String, apiKey: String): String = imageResult
     override fun calculate(expression: String): String = calcResult ?: super.calculate(expression)
     override fun saveMemory(fact: String): String {
         savedMemories.add(fact)

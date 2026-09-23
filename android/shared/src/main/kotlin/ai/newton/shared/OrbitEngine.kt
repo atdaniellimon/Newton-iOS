@@ -224,7 +224,7 @@ class OrbitEngine(
             keys.firstNotNullOfOrNull { params[it] }.orEmpty().ifEmpty { paramsJson }
 
         return when (trimmed) {
-            "image_gen", "imagine", "generate_image", "draw" -> {
+            "image_gen", "imagine", "generate_image", "generate", "draw" -> {
                 val ref = params["reference"]?.takeIf { it.isNotBlank() }
                 val nVal = params["n"]?.toIntOrNull() ?: 1
                 val url = tools.generateImage(str("prompt"), reference = ref, n = nVal, baseUrl = baseUrl, apiKey = apiKey)

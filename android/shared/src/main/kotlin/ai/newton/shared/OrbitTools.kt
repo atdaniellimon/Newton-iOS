@@ -78,6 +78,9 @@ open class JvmOrbitTools(
     private val memories = mutableListOf<String>()
     private val lock = Any()
 
+    override suspend fun generateImage(prompt: String, baseUrl: String, apiKey: String): String =
+        generateImage(prompt, reference = null, n = 1, baseUrl = baseUrl, apiKey = apiKey)
+
     override suspend fun generateImage(
         prompt: String,
         reference: String?,
