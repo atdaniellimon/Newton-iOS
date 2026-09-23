@@ -273,8 +273,9 @@ class ChatViewModel(
 
                 val flow = if (useCloud) {
                     val atts = mutableListOf<ChatAttachment>()
-                    if (attachedImageBase64 != null) {
-                        atts.add(ChatAttachment(type = "image", data = attachedImageBase64))
+                    val effectiveImage = attachedImageBase64 ?: updatedConvo.messages.dropLast(1).lastOrNull { !it.imageUrl.isNullOrEmpty() }?.imageUrl
+                    if (effectiveImage != null) {
+                        atts.add(ChatAttachment(type = "image", data = effectiveImage))
                     }
                     for (att in attachments) {
                         val attType = when (att.fileExtension.lowercase()) {

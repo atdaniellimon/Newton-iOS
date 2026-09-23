@@ -610,7 +610,8 @@ public struct ChatView: View {
 
         // Build typed attachments for API v2.2.0
         var apiAttachments: [NWTNAttachment] = []
-        if let imgUrl = imgBase64DataUrl {
+        let effectiveImgUrl = imgBase64DataUrl ?? conversation.messages.last(where: { !($0.imageUrl ?? "").isEmpty })?.imageUrl
+        if let imgUrl = effectiveImgUrl {
             apiAttachments.append(NWTNAttachment(type: "image", data: imgUrl, name: "image.jpg"))
         }
         for att in createdAttachments {

@@ -995,7 +995,13 @@ document.addEventListener('DOMContentLoaded', () => {
     promptInput.style.height = 'auto';
     setGenerating(true);
 
+    let attachmentsToSend = [];
     if (currentAttachment) {
+      attachmentsToSend.push({
+        type: currentAttachment.type || 'image',
+        data: currentAttachment.dataUrl,
+        name: currentAttachment.name || 'image.png'
+      });
       currentAttachment = null;
       if (fileInput) fileInput.value = '';
       attachmentBar.style.display = 'none';
@@ -1058,7 +1064,8 @@ document.addEventListener('DOMContentLoaded', () => {
         prompt: prompt,
         model: modelSelect.value,
         isGhost: isGhostSession,
-        history: localGhostHistory
+        history: localGhostHistory,
+        attachments: attachmentsToSend
       };
 
       const response = await window.newtonAPI.sendMessage(payload);
