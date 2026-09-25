@@ -96,4 +96,9 @@ public struct L10n {
     public static func tr(_ en: String, es: String) -> String {
         LocalizationManager.shared.isSpanish ? es : en
     }
+
+    /// Translates key using standard NSLocalizedString lookup
+    public static func tr(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
 }

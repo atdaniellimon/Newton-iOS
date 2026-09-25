@@ -25,7 +25,7 @@
     <string name="pin_chat">Pin Chat</string>
     <string name="unpin_chat">Unpin Chat</string>
     <string name="delete_chat">Delete Chat</string>
-    <string name="empty_conversations">No conversations yet.\nTap \'+ New chat\' to begin.</string>
+    <string name="empty_conversations">"No conversations yet.\nTap '+' New chat to begin."</string>
 
     <!-- Host Status & Remote Studio -->
     <string name="mac_host_connected">Mac Host Connected</string>
