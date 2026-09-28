@@ -76,8 +76,11 @@ public struct MessageBubbleView: View {
                         ThinkingCardView(content: thinking)
                     }
                     
-                    // Orbit results (with Web Citations)
-                    ForEach(message.orbitResults) { orbit in
+                    // Orbit results (with Web Citations, omitting silent memory storage)
+                    ForEach(message.orbitResults.filter { 
+                        let name = $0.orbitName.lowercased()
+                        return !name.contains("memory") && !name.contains("remember")
+                    }) { orbit in
                         if orbit.orbitName.lowercased().contains("search") || orbit.orbitName.lowercased().contains("web") {
                             WebCitationCardView(citation: WebCitation(
                                 title: "Búsqueda Web: \(orbit.params)",

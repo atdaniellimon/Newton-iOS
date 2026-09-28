@@ -686,7 +686,6 @@ public struct ChatView: View {
         NotificationManager.shared.beginBackgroundTask(name: "NewtonStreamTask") {
             var fullResponse = ""
             var currentThinking = ""
-            var isInsideThinkingTag = false
             var rawStream = ""
             
             // Remote Studio Code Task Dispatch
@@ -786,64 +785,21 @@ public struct ChatView: View {
                     systemPrompt: systemPrompt
                 )
                 
+                var parsedDisplay = ""
+                var parsedThinking = ""
+                
                 for try await token in stream {
                     guard !Task.isCancelled else { break }
                     
                     rawStream += token
-                    if !token.contains("<") && !token.contains(">") && !isInsideThinkingTag {
-                        // Fast path: plain prose, no tag activity — skip full re-parse.
-                        fullResponse += token
-                    } else if !token.contains("<") && !token.contains(">") {
-                        // Inside an open thinking block: plain prose extends the thought.
-                        currentThinking += token
-                    } else {
-                    // Re-derive live display from rawStream so tags split across chunks still parse.
-                    // Handles both <think> and <thinking>, hides orbit/download tags until executed.
-                    do {
-                        var display = rawStream
-                        var think = ""
-                        if let re = try? NSRegularExpression(pattern: "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>", options: [.caseInsensitive]) {
-                            let ns = display as NSString
-                            let matches = re.matches(in: display, options: [], range: NSRange(location: 0, length: ns.length))
-                            for m in matches.reversed() where m.numberOfRanges >= 2 {
-                                let inner = ns.substring(with: m.range(at: 1))
-                                think = inner + (think.isEmpty ? "" : "\n\n---\n\n" + think)
-                                display = (display as NSString).replacingCharacters(in: m.range, with: "")
-                            }
-                        }
-                        var inside = false
-                        if let openRange = display.range(of: "<think", options: [.caseInsensitive]) {
-                            let tail = String(display[openRange.lowerBound...])
-                            if tail.range(of: "</think", options: [.caseInsensitive]) == nil {
-                                var thoughtTail = tail
-                                if let tagEnd = thoughtTail.range(of: ">") {
-                                    thoughtTail = String(thoughtTail[tagEnd.upperBound...])
-                                } else {
-                                    thoughtTail = ""
-                                }
-                                if !thoughtTail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    think += (think.isEmpty ? "" : "\n\n---\n\n") + thoughtTail
-                                }
-                                display = String(display[..<openRange.lowerBound])
-                                inside = true
-                            }
-                        }
-                        if let stray = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive]) {
-                            display = stray.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
-                        }
-                        if let reOrbit = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive]) {
-                            display = reOrbit.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
-                        }
-                        if let reDl = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive]) {
-                            display = reDl.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
-                        }
-                        isInsideThinkingTag = inside
-                        currentThinking = think
-                        fullResponse = display
-                    }
-                    }
                     
-                    await updateLiveStreamingMessage(id: assistantMessageId, content: fullResponse, thinking: currentThinking)
+                    // Unified live parsing: cleanly separates thinking & visible prose
+                    // without ever corrupting the text buffer or stuttering
+                    let parsed = Self.parseLiveStreamingBuffer(rawStream)
+                    parsedDisplay = parsed.display
+                    parsedThinking = parsed.thinking
+                    
+                    await updateLiveStreamingMessage(id: assistantMessageId, content: parsedDisplay, thinking: parsedThinking)
                 }
                 
                 // Process tool calling (image generation, web search, calculator) + chain of thought
@@ -859,7 +815,7 @@ public struct ChatView: View {
                     finalContent: finalContent,
                     imageUrl: detectedImgUrl,
                     orbitResults: orbitResults,
-                    currentThinking: currentThinking,
+                    currentThinking: parsedThinking,
                     thinkingContent: thinkingContent
                 )
                 
@@ -994,6 +950,57 @@ public struct ChatView: View {
             conversation.messages[index].isStreaming = false
         }
         storage.updateConversation(conversation)
+    }
+    
+    // MARK: - Live Streaming Unified Parser (Prevents stuttering & duplications)
+    public static func parseLiveStreamingBuffer(_ raw: String) -> (display: String, thinking: String, isInsideThinking: Bool) {
+        var display = raw
+        var think = ""
+        
+        // 1. Extract closed thinking blocks <think>...</think> or <thinking>...</thinking>
+        if let re = try? NSRegularExpression(pattern: "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>", options: [.caseInsensitive]) {
+            let ns = display as NSString
+            let matches = re.matches(in: display, options: [], range: NSRange(location: 0, length: ns.length))
+            for m in matches.reversed() where m.numberOfRanges >= 2 {
+                let inner = ns.substring(with: m.range(at: 1))
+                think = inner + (think.isEmpty ? "" : "\n\n---\n\n" + think)
+                display = (display as NSString).replacingCharacters(in: m.range, with: "")
+            }
+        }
+        
+        // 2. Extract active unclosed thinking block at the tail
+        var insideThinking = false
+        if let openRange = display.range(of: "<think", options: [.caseInsensitive]) {
+            let tail = String(display[openRange.lowerBound...])
+            if tail.range(of: "</think", options: [.caseInsensitive]) == nil {
+                var thoughtTail = tail
+                if let tagEnd = thoughtTail.range(of: ">") {
+                    thoughtTail = String(thoughtTail[tagEnd.upperBound...])
+                } else {
+                    thoughtTail = ""
+                }
+                if !thoughtTail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    think += (think.isEmpty ? "" : "\n\n---\n\n") + thoughtTail
+                }
+                display = String(display[..<openRange.lowerBound])
+                insideThinking = true
+            }
+        }
+        
+        // 3. Strip stray close tags
+        if let stray = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive]) {
+            display = stray.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+        }
+        
+        // 4. Temporarily strip partially or fully streaming orbit tool tags and download tags from visible prose
+        if let reOrbit = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive]) {
+            display = reOrbit.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+        }
+        if let reDl = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive]) {
+            display = reDl.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
+        }
+        
+        return (display: display, thinking: think, isInsideThinking: insideThinking)
     }
 }
 

@@ -75,11 +75,13 @@ public final class LLMService {
 
 
                     ==================================================
-                    PERSISTENT USER LONG-TERM MEMORY SYSTEM
+                    PERSISTENT USER LONG-TERM MEMORY & PROACTIVE SEARCH
                     ==================================================
                     - You POSSESS an active persistent memory system across all sessions.
                     - Current stored user memories:
-                    \(memoryFacts.isEmpty ? "(No facts stored yet. When the user tells you about themselves, invoke <orbit:save_memory>{\"fact\": \"...\"}</orbit:save_memory>.)" : memoryFacts)
+                    \(memoryFacts.isEmpty ? "(No facts stored yet.)" : memoryFacts)
+                    - SILENT AUTO-MEMORY PROTOCOL: When the user shares facts about their identity, profession, hobbies, tech stack, preferences, or personal details, automatically invoke <orbit:save_memory>{"fact": "..."}</orbit:save_memory>. Never announce or confirm memory saving in prose; remain 100% silent and focus solely on the user's answer.
+                    - PROACTIVE INVESTIGATION PROTOCOL: If the user asks about upcoming, unreleased, recent, or unknown hardware/software/topics (e.g. iPhone 17/18, new chips, future events), NEVER assume or state that it doesn't exist or that your knowledge is cut off. You MUST proactively emit <orbit:web_search>{"query": "..."}</orbit:web_search> to verify before drawing any conclusions.
                     """
 
                     history.append(["role": "system", "content": effectiveSystem])
