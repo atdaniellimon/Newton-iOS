@@ -1095,7 +1095,9 @@ struct InfoSubView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0 (Universal)")
+                        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.5"
+                        let appBuild = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "22"
+                        Text("\(appVersion) (Build \(appBuild))")
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundColor(Color(UIColor.secondaryLabel))
                     }
