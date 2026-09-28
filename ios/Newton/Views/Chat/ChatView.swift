@@ -953,12 +953,18 @@ public struct ChatView: View {
     }
     
     // MARK: - Live Streaming Unified Parser (Prevents stuttering & duplications)
+    // All regexes compiled once as statics — never re-compiled per token.
+    private static let _reThinkClosed = try? NSRegularExpression(pattern: "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>", options: [.caseInsensitive])
+    private static let _reThinkClose = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive])
+    private static let _reOrbitLive   = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive])
+    private static let _reDlLive      = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive])
+
     public static func parseLiveStreamingBuffer(_ raw: String) -> (display: String, thinking: String, isInsideThinking: Bool) {
         var display = raw
         var think = ""
         
         // 1. Extract closed thinking blocks <think>...</think> or <thinking>...</thinking>
-        if let re = try? NSRegularExpression(pattern: "<think(?:ing)?>([\\s\\S]*?)</think(?:ing)?>", options: [.caseInsensitive]) {
+        if let re = Self._reThinkClosed {
             let ns = display as NSString
             let matches = re.matches(in: display, options: [], range: NSRange(location: 0, length: ns.length))
             for m in matches.reversed() where m.numberOfRanges >= 2 {
@@ -988,15 +994,15 @@ public struct ChatView: View {
         }
         
         // 3. Strip stray close tags
-        if let stray = try? NSRegularExpression(pattern: "</think(?:ing)?>", options: [.caseInsensitive]) {
+        if let stray = Self._reThinkClose {
             display = stray.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
         }
         
         // 4. Temporarily strip partially or fully streaming orbit tool tags and download tags from visible prose
-        if let reOrbit = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive]) {
+        if let reOrbit = Self._reOrbitLive {
             display = reOrbit.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
         }
-        if let reDl = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive]) {
+        if let reDl = Self._reDlLive {
             display = reDl.stringByReplacingMatches(in: display, options: [], range: NSRange(location: 0, length: (display as NSString).length), withTemplate: "")
         }
         

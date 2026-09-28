@@ -78,77 +78,52 @@ public struct ConversationListView: View {
                 
                 // Studio Section Navigation Items (Chats, Ghost, Remote Studio, Art gallery)
                 VStack(spacing: 4) {
-                    // Host Presence Card Pill
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(cloudService.desktopStatus?.online == true ? Color.green : Color.red)
-                            .frame(width: 8, height: 8)
-                        
-                        Text(cloudService.desktopStatus?.online == true ? "Mac Host Conectado" : "Mac Host Desconectado")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(cloudService.desktopStatus?.online == true ? Color.green : NewtonTheme.textMuted)
-                        
-                        Spacer()
-                        
-                        if cloudService.desktopStatus?.online == true {
+                    // Host Presence Card Pill — only visible when Mac host is online
+                    if cloudService.desktopStatus?.online == true {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            
+                            Text("Mac Host Connected")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color.green)
+                            
+                            Spacer()
+                            
                             Text("\(cloudService.desktopWorkspaces.count) ws")
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(NewtonTheme.textSecondary)
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(NewtonTheme.surface.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(.bottom, 6)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(NewtonTheme.surface.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .padding(.bottom, 6)
                     
-                    // Filter Mode Picker: All Chats vs Remote Studio Code Chats
-                    HStack(spacing: 6) {
-                        Button {
-                            Haptics.selection()
-                            selectedFilterTab = .all
-                        } label: {
-                            Text("All")
-                                .font(.system(size: 12, weight: selectedFilterTab == .all ? .semibold : .regular))
-                                .foregroundColor(selectedFilterTab == .all ? NewtonTheme.sand : NewtonTheme.textSecondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(selectedFilterTab == .all ? NewtonTheme.card : Color.clear)
-                                .clipShape(Capsule())
+                    // Remote Studio toggle — single button instead of 3-pill tabs
+                    Button {
+                        Haptics.selection()
+                        selectedFilterTab = selectedFilterTab == .remote ? .all : .remote
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "terminal.fill")
+                                .font(.system(size: 11))
+                            Text("Remote Studio")
+                                .font(.system(size: 12, weight: selectedFilterTab == .remote ? .semibold : .regular))
                         }
-                        
-                        Button {
-                            Haptics.selection()
-                            selectedFilterTab = .chats
-                        } label: {
-                            Text("Chats")
-                                .font(.system(size: 12, weight: selectedFilterTab == .chats ? .semibold : .regular))
-                                .foregroundColor(selectedFilterTab == .chats ? NewtonTheme.sand : NewtonTheme.textSecondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(selectedFilterTab == .chats ? NewtonTheme.card : Color.clear)
-                                .clipShape(Capsule())
-                        }
-                        
-                        Button {
-                            Haptics.selection()
-                            selectedFilterTab = .remote
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "terminal.fill")
-                                    .font(.system(size: 10))
-                                Text("Remote Studio")
-                            }
-                            .font(.system(size: 12, weight: selectedFilterTab == .remote ? .semibold : .regular))
-                            .foregroundColor(selectedFilterTab == .remote ? NewtonTheme.sand : NewtonTheme.textSecondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(selectedFilterTab == .remote ? NewtonTheme.card : Color.clear)
-                            .clipShape(Capsule())
-                        }
-                        
-                        Spacer()
+                        .foregroundColor(selectedFilterTab == .remote ? NewtonTheme.sand : NewtonTheme.textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(selectedFilterTab == .remote ? NewtonTheme.card : Color.clear)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(NewtonTheme.border.opacity(0.5), lineWidth: 1)
+                        )
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 6)
                     
                     Button {
@@ -157,7 +132,7 @@ public struct ConversationListView: View {
                         selectedConversationId = ghost.id
                         onSelectConversation?(ghost.id)
                     } label: {
-                        SidebarItemRow(icon: "ghost", title: "Ghost Session", isSelected: false)
+                        SidebarItemRow(icon: "moon.stars.fill", title: "Ghost Session", isSelected: false)
                     }
                     
                     Button {

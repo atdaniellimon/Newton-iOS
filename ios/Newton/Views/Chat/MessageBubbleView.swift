@@ -120,7 +120,7 @@ public struct MessageBubbleView: View {
                     
                     // Main Text Content with elegant Serif typography
                     if !message.content.isEmpty {
-                        FormattedAssistantContent(content: message.content)
+                        FormattedAssistantContent(content: message.content, isStreaming: message.isStreaming)
                             .textSelection(.enabled)
                     }
                     
@@ -488,36 +488,28 @@ public struct GeneratedImageCardView: View {
 
 public struct FormattedAssistantContent: View {
     public let content: String
-    
+    /// During active streaming, skip all expensive regex processing and render
+    /// plain text. Heavy formatting kicks in only when the stream is finished.
+    public var isStreaming: Bool = false
+
+    // MARK: - Stable compiled regexes (compiled once, reused on every render)
+    private static let orbitRegex = try? NSRegularExpression(pattern: "\\[ORBIT:[\\w\\-_]+\\][\\s\\S]*?(?:\\[/ORBIT\\]|$)", options: [.caseInsensitive])
+    private static let thinkRegex = try? NSRegularExpression(pattern: "<think(?:ing)?>[\\s\\S]*?(?:</think(?:ing)?>|$)", options: [.caseInsensitive])
+    private static let natOrbitRegex = try? NSRegularExpression(pattern: "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)", options: [.caseInsensitive])
+    private static let dlRegex = try? NSRegularExpression(pattern: "<download>[\\s\\S]*?(?:</download>|$)", options: [.caseInsensitive])
+    private static let jsonRegex = try? NSRegularExpression(pattern: "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```", options: [.caseInsensitive])
+    private static let mdImgRegex = try? NSRegularExpression(pattern: "!\\[.*?\\]\\(.*?\\)", options: [])
+    private static let codeBlockRegex = try? NSRegularExpression(pattern: "```([a-zA-Z0-9_-]*)\\n([\\s\\S]*?)```")
+
     private var cleanContent: String {
         var text = content
-        // Strip any full or partially streaming [ORBIT:name]...[/ORBIT] tags
-        let orbitPattern = "\\[ORBIT:[\\w\\-_]+\\][\\s\\S]*?(?:\\[/ORBIT\\]|$)"
-        if let regex = try? NSRegularExpression(pattern: orbitPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        // Strip natural chain-of-thought + orbit/download tags (parsed into cards, never shown raw)
-        let thinkTagPattern = "<think(?:ing)?>[\\s\\S]*?(?:</think(?:ing)?>|$)"
-        if let regex = try? NSRegularExpression(pattern: thinkTagPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        let natOrbitPattern = "<orbit:[^>]*>[\\s\\S]*?(?:</orbit:[^>]*>|$)"
-        if let regex = try? NSRegularExpression(pattern: natOrbitPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        let dlTagPattern = "<download>[\\s\\S]*?(?:</download>|$)"
-        if let regex = try? NSRegularExpression(pattern: dlTagPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        // Strip json tool calls
-        let jsonPattern = "```(?:json)?\\s*\\{\\s*\"name\"\\s*:[\\s\\S]*?\\}\\s*```"
-        if let regex = try? NSRegularExpression(pattern: jsonPattern, options: [.caseInsensitive]) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
-        let mdImgPattern = "!\\[.*?\\]\\(.*?\\)"
-        if let regex = try? NSRegularExpression(pattern: mdImgPattern, options: []) {
-            text = regex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: (text as NSString).length), withTemplate: "")
-        }
+        let len = { (text as NSString).length }
+        if let r = Self.orbitRegex   { text = r.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: len()), withTemplate: "") }
+        if let r = Self.thinkRegex   { text = r.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: len()), withTemplate: "") }
+        if let r = Self.natOrbitRegex { text = r.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: len()), withTemplate: "") }
+        if let r = Self.dlRegex      { text = r.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: len()), withTemplate: "") }
+        if let r = Self.jsonRegex    { text = r.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: len()), withTemplate: "") }
+        if let r = Self.mdImgRegex   { text = r.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: len()), withTemplate: "") }
         text = text.replacingOccurrences(of: "Generated Image", with: "")
         text = text.replacingOccurrences(of: "Imagen generada", with: "")
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -528,15 +520,24 @@ public struct FormattedAssistantContent: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(blocks) { block in
-                if block.isCode, let code = block.code {
-                    CodeBlockView(code: code, language: block.language ?? "")
-                } else if let txt = block.text {
-                    Text(LocalizedStringKey(txt))
-                        .font(.system(size: 15, design: .serif))
-                        .foregroundColor(NewtonTheme.textPrimary)
-                        .lineSpacing(4)
+        if isStreaming {
+            // Fast path: plain text, zero regex overhead. Avoids rebuild-on-every-token stutter.
+            Text(content)
+                .font(.system(size: 15, design: .serif))
+                .foregroundColor(NewtonTheme.textPrimary)
+                .lineSpacing(4)
+        } else {
+            // Slow path: full formatting with code blocks and markdown — only runs once at the end.
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(blocks) { block in
+                    if block.isCode, let code = block.code {
+                        CodeBlockView(code: code, language: block.language ?? "")
+                    } else if let txt = block.text {
+                        Text(LocalizedStringKey(txt))
+                            .font(.system(size: 15, design: .serif))
+                            .foregroundColor(NewtonTheme.textPrimary)
+                            .lineSpacing(4)
+                    }
                 }
             }
         }
@@ -544,8 +545,7 @@ public struct FormattedAssistantContent: View {
     
     private func parseContentBlocks(_ raw: String) -> [ContentBlock] {
         var resultBlocks: [ContentBlock] = []
-        let pattern = "```([a-zA-Z0-9_-]*)\\n([\\s\\S]*?)```"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+        guard let regex = Self.codeBlockRegex else {
             return [.text(raw)]
         }
         
@@ -581,17 +581,18 @@ public struct FormattedAssistantContent: View {
 }
 
 public struct ContentBlock: Identifiable {
-    public let id = UUID()
+    /// Stable ID derived from content so SwiftUI can diff in-place instead of destroy+recreate.
+    public let id: String
     public let text: String?
     public let language: String?
     public let code: String?
     public let isCode: Bool
     
     public static func text(_ str: String) -> ContentBlock {
-        ContentBlock(text: str, language: nil, code: nil, isCode: false)
+        ContentBlock(id: "t_\(str.hashValue)", text: str, language: nil, code: nil, isCode: false)
     }
     
     public static func code(language: String, code: String) -> ContentBlock {
-        ContentBlock(text: nil, language: language, code: code, isCode: true)
+        ContentBlock(id: "c_\(code.hashValue)", text: nil, language: language, code: code, isCode: true)
     }
 }
