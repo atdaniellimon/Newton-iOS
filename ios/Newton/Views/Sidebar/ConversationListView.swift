@@ -22,7 +22,7 @@ public struct ConversationListView: View {
         case remote
     }
     
-    @State private var selectedFilterTab: FilterTab = .all
+    @State private var selectedFilterTab: FilterTab = .chats
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
     @State private var showArtGallery: Bool = false
@@ -102,29 +102,13 @@ public struct ConversationListView: View {
                         .padding(.bottom, 6)
                     }
                     
-                    // Remote Studio toggle — single button instead of 3-pill tabs
+                    // Remote Studio — same row style as Ghost and Art Gallery
                     Button {
                         Haptics.selection()
-                        selectedFilterTab = selectedFilterTab == .remote ? .all : .remote
+                        selectedFilterTab = selectedFilterTab == .remote ? .chats : .remote
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "terminal.fill")
-                                .font(.system(size: 11))
-                            Text("Remote Studio")
-                                .font(.system(size: 12, weight: selectedFilterTab == .remote ? .semibold : .regular))
-                        }
-                        .foregroundColor(selectedFilterTab == .remote ? NewtonTheme.sand : NewtonTheme.textSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(selectedFilterTab == .remote ? NewtonTheme.card : Color.clear)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(NewtonTheme.border.opacity(0.5), lineWidth: 1)
-                        )
+                        SidebarItemRow(icon: "terminal.fill", title: "Remote Studio", isSelected: selectedFilterTab == .remote)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 6)
                     
                     Button {
                         Haptics.medium()
